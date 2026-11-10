@@ -18,11 +18,12 @@
  */
 
 import type { NovelToolDefinition } from './novel-tools'
+import { computeScreenplayFindings } from '@webnovel/review'
 import {
   checkScreenplayGate, draftFromOutline, emptySceneOutline, emptyStoryDraft,
   outlineFromStory, parseSceneOutline, parseScreenplay, parseStoryDraft,
   renderSceneOutline, renderScreenplay, renderStoryDraft, runScreenplayPipeline,
-  runScreenplayReview, screenplayFinalPath, validateSceneOutline, validateScreenplay,
+  screenplayFinalPath, validateSceneOutline, validateScreenplay,
   validateStoryDraft, estimatePages,
   MARKET_VALUES, OUTPUT_FORM_VALUES, GENRE_TIER_IDS, type GenreTierId,
 } from '@webnovel/core'
@@ -206,7 +207,7 @@ export function createScreenplayTools(deps: ScreenplayToolsDeps = {}): NovelTool
     },
     {
       name: 'novel_screenplay_review',
-      description: '剧本审读：三个确定性模块（剧本对白审读、剧本节奏审读、剧本场次完整性审读）一次跑完。任一高级别发现项即阻断，不得进定稿；无分场大纲时节奏审读只报材料缺失，不伪装通过。',
+      description: '剧本审读：三个确定性模块（剧本对白审读、剧本节奏审读、剧本场次完整性审读）经共享审读注册表一次跑完（范围 剧本，与章节审读同一套完成判定逻辑）。任一高级别发现项即阻断，不得进定稿；无分场大纲时节奏审读只报材料缺失，不伪装通过。返回的发现项是本轮确定性检查的结果；语义审读（剧本语义审读）按底本/全量审读.md 派发，发现项与确定性发现项一并经 novel_record_review_findings（适用范围 剧本）回写进剧本审读记录（草稿区/审核/审-剧本.json）；全部范围模块回写完毕才算审核完成。',
       parameters: {
         type: 'object',
         properties: {
@@ -223,6 +224,9 @@ export function createScreenplayTools(deps: ScreenplayToolsDeps = {}): NovelTool
             ok: { type: 'boolean' },
             是否阻断: { type: 'boolean' },
             发现项: { type: 'array', items: { type: 'object' } },
+            审核编号: { type: 'string', description: '本次审读的编号（剧本固定为 审-剧本）' },
+            审读指纹: { type: 'string', description: '本次审读输入的指纹；回写发现项时原样传入 novel_record_review_findings' },
+            待回写模块: { type: 'array', items: { type: 'string' }, description: '尚未回写的范围模块（语义审读须派发回写后才算完成）' },
             原因: { type: 'array', items: { type: 'string' } },
           },
           required: ['ok'],
@@ -237,12 +241,21 @@ export function createScreenplayTools(deps: ScreenplayToolsDeps = {}): NovelTool
         if (outline !== undefined && outline.outline === undefined) {
           return { ok: false, 是否阻断: true, 发现项: [], 原因: outline.problems }
         }
-        const result = runScreenplayReview({
+        const result = computeScreenplayFindings({
           剧本草稿: draft.draft,
-          ...(outline?.outline !== undefined ? { 分场大纲: outline.outline } : {}),
+          剧本草稿文本: textArg(args, '剧本草稿'),
+          ...(outline?.outline !== undefined ? { 分场大纲: outline.outline, 分场大纲文本: outlineText } : {}),
           片长: enumArg(args, '片长') === '短片' ? '短片' : '长片',
         })
-        return { ok: !result.是否阻断, 是否阻断: result.是否阻断, 发现项: result.findings, 原因: [] }
+        return {
+          ok: !result.是否阻断,
+          是否阻断: result.是否阻断,
+          发现项: result.findings,
+          审核编号: result.审核编号,
+          审读指纹: result.审读指纹,
+          待回写模块: ['剧本语义审读'],
+          原因: [],
+        }
       },
     },
     {

@@ -174,9 +174,30 @@ export function normalizeFinding(raw: unknown): Finding | null {
 }
 
 export function loadReviewRecord(bookRoot: string, key: Pick<ChapterKey, '卷' | '章名'>): ReviewRecord | null {
-  const text = readText(bookRoot, paths.审核记录(key.卷, key.章名))
+  return loadReviewRecordAt(bookRoot, paths.审核记录(key.卷, key.章名))
+}
+
+/** 按相对路径读审核记录（章 / 剧本 / 短剧集三者共用解析与序列化）。 */
+function loadReviewRecordAt(bookRoot: string, rel: string): ReviewRecord | null {
+  const text = readText(bookRoot, rel)
   if (text === null) return null
   return parseReviewRecord(text)
+}
+
+/**
+ * 影视剧扩展（跟进轮）：电影剧本审读记录（全书一部，`草稿区/审核/审-剧本.json`）。
+ * 与章记录同一 ReviewRecord 形状、同一解析/序列化；寻址按剧本，不按章。
+ */
+export function loadScreenplayReviewRecord(bookRoot: string): ReviewRecord | null {
+  return loadReviewRecordAt(bookRoot, paths.剧本审核记录())
+}
+
+/**
+ * 影视剧扩展（跟进轮）：短剧单集审读记录（按集寻址，`草稿区/审核/审-集NNN.json`）。
+ * 与章记录同一形状；寻址按集/场，不按卷/章。
+ */
+export function loadEpisodeReviewRecord(bookRoot: string, 集: number): ReviewRecord | null {
+  return loadReviewRecordAt(bookRoot, paths.短剧审核记录(集))
 }
 
 function parseReviewRecord(text: string): ReviewRecord {
@@ -291,12 +312,30 @@ export function readReviewRecordForUpdate(bookRoot: string, key: Pick<ChapterKey
 }
 
 function writeReviewRecordLocked(bookRoot: string, key: Pick<ChapterKey, '卷' | '章名'>, record: ReviewRecord): string {
-  const rel = paths.审核记录(key.卷, key.章名)
+  return writeReviewRecordAt(bookRoot, paths.审核记录(key.卷, key.章名), record)
+}
+
+export const writeReviewRecord = bookWriter(writeReviewRecordLocked)
+
+/** 按相对路径写审核记录（章 / 剧本 / 短剧集三者共用）。 */
+function writeReviewRecordAt(bookRoot: string, rel: string, record: ReviewRecord): string {
   writeFileAtomic(bookRoot, rel, serializeReviewRecord(record))
   return rel
 }
 
-export const writeReviewRecord = bookWriter(writeReviewRecordLocked)
+function writeScreenplayReviewRecordLocked(bookRoot: string, record: ReviewRecord): string {
+  return writeReviewRecordAt(bookRoot, paths.剧本审核记录(), record)
+}
+
+/** 写电影剧本审读记录（bookWriter 锁，与章记录同一写入语义）。 */
+export const writeScreenplayReviewRecord = bookWriter(writeScreenplayReviewRecordLocked)
+
+function writeEpisodeReviewRecordLocked(bookRoot: string, 集: number, record: ReviewRecord): string {
+  return writeReviewRecordAt(bookRoot, paths.短剧审核记录(集), record)
+}
+
+/** 写短剧单集审读记录（bookWriter 锁，与章记录同一写入语义）。 */
+export const writeEpisodeReviewRecord = bookWriter(writeEpisodeReviewRecordLocked)
 
 function planReviewRecordLocked(bookRoot: string, key: Pick<ChapterKey, '卷' | '章名'>, plan: ReviewPlan): ReviewRecord {
   const existing = loadReviewRecord(bookRoot, key) ?? emptyReviewRecord()

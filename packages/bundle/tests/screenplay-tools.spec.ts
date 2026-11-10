@@ -39,15 +39,24 @@ describe('阶段 2：电影剧本工具定义（screenplay-tools，不改 novel-
     expect(draft.待写清单.length).toBeGreaterThan(0)
   })
 
-  it('审读工具：有效草稿零阻断；(beat) 草稿阻断', async () => {
+  it('审读工具：有效草稿零阻断；(beat) 草稿阻断；经注册表返回审核编号与指纹', async () => {
     const tool = byName.get('novel_screenplay_review')!
-    const good = await tool.execute({ 剧本草稿: renderScreenplay(VALID_DRAFT), 分场大纲: VALID_OUTLINE, 片长: '短片' }) as { ok: boolean; 是否阻断: boolean }
+    const good = await tool.execute({ 剧本草稿: renderScreenplay(VALID_DRAFT), 分场大纲: VALID_OUTLINE, 片长: '短片' }) as { ok: boolean; 是否阻断: boolean; 审核编号: string; 审读指纹: string; 待回写模块: string[]; 发现项: unknown[] }
     expect(good.ok).toBe(true)
     expect(good.是否阻断).toBe(false)
+    expect(good.审核编号).toBe('审-剧本')
+    expect(typeof good.审读指纹).toBe('string')
+    expect(good.审读指纹.length).toBeGreaterThan(0)
+    expect(good.待回写模块).toEqual(['剧本语义审读'])
+    expect(good.发现项).toEqual([])
     const beat = renderScreenplay(VALID_DRAFT).replace('(pause)', '(beat)')
-    const bad = await tool.execute({ 剧本草稿: beat, 分场大纲: VALID_OUTLINE, 片长: '短片' }) as { ok: boolean; 是否阻断: boolean }
+    const bad = await tool.execute({ 剧本草稿: beat, 分场大纲: VALID_OUTLINE, 片长: '短片' }) as { ok: boolean; 是否阻断: boolean; 审核编号: string; 审读指纹: string; 待回写模块: string[]; 发现项: Array<{ 问题说明: string }> }
     expect(bad.ok).toBe(false)
     expect(bad.是否阻断).toBe(true)
+    expect(bad.审核编号).toBe('审-剧本')
+    expect(bad.审读指纹).not.toBe(good.审读指纹)
+    expect(bad.待回写模块).toEqual(['剧本语义审读'])
+    expect(bad.发现项.some((f) => f.问题说明.includes('(beat)'))).toBe(true)
   })
 
   it('渲染工具：返回标准格式文本与页数粗估', async () => {

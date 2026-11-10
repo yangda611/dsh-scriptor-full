@@ -12,8 +12,9 @@
  *   本工具只返回路径与正文）。
  * - novel_shortdrama_check_beats：节拍检查（逐集逐规则报通过/未通过/不适用）。
  * - novel_shortdrama_review_episode：短剧审读确定性检查（发现项模块名 `短剧审读`，
- *   直接返回发现项；不走小说章节的 novel_record_review_findings 回写通道，
- *   该通道按卷/章寻址，短剧按集/场寻址）。
+ *   经共享审读注册表跑完；返回发现项 + 审核编号 + 审读指纹；发现项经
+ *   novel_record_review_findings（适用范围 集）回写进分集审读记录
+ *   （草稿区/审核/审-集NNN.json），与语义审读（短剧审读（语义））合流）。
  *
  * 核心实现在 @webnovel/core 的 shortdrama 模块；本文件只做参数校验与包装。
  * 注意：core 的包入口（packages/core/src/index.ts）暂未导出 shortdrama（阶段 3
@@ -25,11 +26,11 @@
 
 import { failureFrom, toolFailure } from './tool-failure'
 import type { NovelToolDefinition } from './novel-tools'
+import { computeEpisodeFindings } from '@webnovel/review'
 import {
   checkSeasonBeats,
   planSeason,
   renderEpisodeScript,
-  reviewShortDramaEpisode,
   type EpisodeBeats,
   type EpisodeOutline,
   type EpisodeScriptInput,
@@ -66,7 +67,7 @@ function run<T>(fn: () => T): T | ReturnType<typeof toolFailure> {
 export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
   {
     name: 'novel_shortdrama_plan_episodes',
-    description: '短剧分集钩子/爽点大纲规划：按集排钩子轮换（第 1 集身份钩、第 2 集情感钩、第 3 集顿悟钩，此后循环）、首胜集与首个付费集。只排结构位，不发明情节；每集内容另填。只在契约输出形态=短剧时用。',
+    description: '短剧分集钩子/爽点大纲规划：按集排钩子轮换（第 1 集身份钩、第 2 集情感钩、第 3 集顿悟钩，此后循环）与平台说明（排播数据）：首胜集、首个付费集。首胜/付费墙是平台说明（排播/变现安排），不是节拍规则，节拍检查不检查这两项。只排结构位，不发明情节；每集内容另填。只在契约输出形态=短剧时用。',
     parameters: {
       type: 'object',
       properties: {
@@ -74,8 +75,8 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
         题材档: { type: 'string', enum: ['中文男频', '中文女频', '海外女性向', '海外男性向', '东南亚通用起步'], description: '题材档，必须属于该市场' },
         画幅: { type: 'string', enum: ['竖屏', '横屏'], description: '竖屏（60–100 集）或横屏（20–30 集）' },
         总集数: { type: 'integer', description: '全季总集数：竖屏 60–100，横屏 20–30' },
-        首胜集: { type: 'integer', description: '第一次真正的胜利所在的集号；不填竖屏默认第 5 集、横屏默认第 3 集' },
-        付费集: { type: 'integer', description: '首个付费集；不填竖屏默认第 11 集，只接受 10 或 11；横屏无此概念，不用传' },
+        首胜集: { type: 'integer', description: '平台说明（排播数据）：第一次真正的胜利所在的集号；不填竖屏默认第 5 集、横屏默认第 3 集。不是节拍规则，节拍检查不检查。' },
+        付费集: { type: 'integer', description: '平台说明（排播数据）：首个付费集；不填竖屏默认第 11 集，只接受 10 或 11；横屏无此概念，不用传。不是节拍规则，节拍检查不检查。' },
       },
       required: ['市场', '题材档', '画幅', '总集数'],
     },
@@ -196,13 +197,13 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
   },
   {
     name: 'novel_shortdrama_check_beats',
-    description: '短剧节拍检查：按调研规则逐项校验每集（竖屏：5 秒内进冲突、无片头、每 20–30 秒一个反转、结尾 5–10 秒留悬念切在问题上、钩子轮换、前三集身份→情感→顿悟、首胜不晚于第 5 集、付费墙第 10–11 集；横屏按放宽的横屏节奏检查），报出哪集哪条规则没过。',
+    description: '短剧节拍检查：竖屏横屏共用一套节拍规则，只按单集时长缩放——3–5 秒内进冲突、无片头无铺垫、每 20–30 秒一个反转（所需反转数 = max(1, ceil((时长秒−30)/30))，首个反转不晚于 30 秒）、结尾 5–10 秒留悬念切在问题上、钩子轮换（身份/情感/顿悟）、前三集身份→情感→顿悟、台词短/对白即动作；起承转合只检查 ≥600 秒的长集。首胜/付费墙是平台说明，不检查。报出哪集哪条规则没过。',
     parameters: {
       type: 'object',
       properties: {
         集数据: {
           type: 'array',
-          description: '每集的节拍时间点：集、画幅、时长秒、开场冲突秒、有片头、有开场铺垫、反转秒（数组）、结尾钩子秒、钩子类型、结尾切在问题上、首次胜利；横屏另加首场冲突、起承转合',
+          description: '每集的节拍时间点：集、画幅、时长秒、开场冲突秒、有片头、有开场铺垫、反转秒（数组）、结尾钩子秒、钩子类型、结尾切在问题上、首次胜利；首场冲突为遗留字段（不检查，统一规则下开场冲突只看秒数）；起承转合只对 ≥600 秒的长集检查',
           items: {
             type: 'object',
             properties: {
@@ -231,7 +232,6 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
             required: ['集', '画幅', '时长秒', '开场冲突秒', '有片头', '有开场铺垫', '反转秒', '结尾钩子秒', '钩子类型', '结尾切在问题上', '首次胜利'],
           },
         },
-        付费集: { type: 'integer', description: '竖屏首个付费集（10 或 11）；不传则付费墙规则为不适用' },
       },
       required: ['集数据'],
     },
@@ -252,16 +252,13 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
     },
     execute: (args) => run(() => {
       const episodes = asArray(args['集数据'], '集数据') as unknown as readonly EpisodeBeats[]
-      const report = checkSeasonBeats(
-        episodes,
-        typeof args['付费集'] === 'number' ? { 付费集: args['付费集'] } : {},
-      )
+      const report = checkSeasonBeats(episodes)
       return { ok: true, ...report }
     }),
   },
   {
     name: 'novel_shortdrama_review_episode',
-    description: '短剧审读确定性检查：台词单句长度、台词总量、场景数、钩子/核心想法/爽点/结尾悬念与大纲的一致性、反转数、节拍表时间点。直接返回发现项（模块名：短剧审读）；零发现不等于审读通过，语义审读仍按底本派发。注意：本工具不走小说章节的 novel_record_review_findings 回写通道（该通道按卷/章寻址，短剧按集/场寻址）。',
+    description: '短剧审读确定性检查：台词单句长度、台词总量、场景数、钩子/核心想法/爽点/结尾悬念与大纲的一致性、反转数、节拍表时间点。经共享审读注册表跑完（范围 集，与章节审读同一套完成判定逻辑），返回发现项（模块名：短剧审读）+ 审核编号 + 审读指纹；零发现不等于审读通过，语义审读（短剧审读（语义））仍按底本派发。发现项与语义审读发现项一并经 novel_record_review_findings（适用范围 集）回写进分集审读记录（草稿区/审核/审-集NNN.json）；全部范围模块回写完毕才算审核完成。',
     parameters: {
       type: 'object',
       properties: {
@@ -309,6 +306,9 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
           ok: { type: 'boolean' },
           模块名: { type: 'string' },
           发现项: { type: 'array' },
+          审核编号: { type: 'string', description: '本次审读的编号（审-集NNN）' },
+          审读指纹: { type: 'string', description: '本次审读输入的指纹；回写发现项时原样传入 novel_record_review_findings' },
+          待回写模块: { type: 'array', items: { type: 'string' }, description: '尚未回写的范围模块（语义审读须派发回写后才算完成）' },
           reason: { type: 'string' },
         },
         required: ['ok'],
@@ -318,8 +318,20 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
     execute: (args) => run(() => {
       const 剧本 = asRecord(args['剧本'], '剧本') as unknown as EpisodeScriptInput
       const 大纲 = asRecord(args['大纲'], '大纲') as unknown as EpisodeOutline
-      const 发现项 = reviewShortDramaEpisode({ 剧本, 大纲 })
-      return { ok: true, 模块名: '短剧审读', 发现项 }
+      const result = computeEpisodeFindings({
+        集: 剧本.集,
+        剧本,
+        大纲,
+        剧本文本: renderEpisodeScript(剧本).内容,
+      })
+      return {
+        ok: true,
+        模块名: '短剧审读',
+        发现项: result.findings,
+        审核编号: result.审核编号,
+        审读指纹: result.审读指纹,
+        待回写模块: ['短剧审读（语义）'],
+      }
     }),
   },
 ]

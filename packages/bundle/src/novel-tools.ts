@@ -127,7 +127,9 @@ import {
 import { writeSettlementDecision } from '@webnovel/core'
 import { ingestAuthorRevision, planSettlement, registerProposal, resolveProposal, retconEventOps } from '@webnovel/core'
 import { importAuthorDraft } from '@webnovel/drafting'
-import { ingestFindings } from '@webnovel/review'
+import { ingestFilmDramaFindings, episodeOutlineText, ingestFindings } from '@webnovel/review'
+import { renderEpisodeScript } from '@webnovel/core'
+import type { EpisodeOutline, EpisodeScriptInput } from '@webnovel/core'
 import { lastCommitOf, type LastCommitResult } from '@webnovel/core'
 import type { OperationProvenance } from '@webnovel/core'
 import type { NativeWrite } from './native-write'
@@ -1545,15 +1547,22 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
     },
     {
       name: 'novel_record_review_findings',
-      description: '把审读子代理产出的发现项回写进审核记录（堵「空审通过」）。返回本模块实际落盘的发现项编号与审核记录哈希，后续处置原样沿用，不缩写或自行拼接编号。同一模块重复回写＝本轮整批替换；跨轮按 模块名+证据位置+问题说明 认亲。全部模块回写仅表示报告齐全；证据须适用当前稿且发现项均有效处置，才能报告审核通过。',
+      description: '把审读子代理产出的发现项回写进审核记录（堵「空审通过」）。返回本模块实际落盘的发现项编号与审核记录哈希，后续处置原样沿用，不缩写或自行拼接编号。同一模块重复回写＝本轮整批替换；跨轮按 模块名+证据位置+问题说明 认亲。全部模块回写仅表示报告齐全；证据须适用当前稿且发现项均有效处置，才能报告审核通过。适用范围 章（默认）：按卷/章/章名寻址章节审读记录；适用范围 剧本：按 剧本草稿（+分场大纲/片长）寻址剧本审读记录（草稿区/审核/审-剧本.json）；适用范围 集：按 集+剧本+大纲 寻址分集审读记录（草稿区/审核/审-集NNN.json）。剧本/集范围的审读指纹须用对应审读工具返回的指纹，不得省略或换成后来取得的值。',
       parameters: {
         type: 'object',
         properties: {
           bookId: { type: 'string', description: '书id（必填）' },
-          卷: { type: 'number', description: '卷号（如 1）' },
-          章: { type: 'number', description: '章号（全书连续，如 1）' },
-          章名: { type: 'string', description: '章名（如 第一章）' },
-          模块名: { type: 'string', description: '审读模块名（如 章节结构审读）' },
+          适用范围: { type: 'string', enum: ['章', '剧本', '集'], description: '审读记录范围：章（默认，章节审读）、剧本（电影剧本审读）、集（短剧分集审读）' },
+          卷: { type: 'number', description: '卷号（如 1）——适用范围 章 时必填' },
+          章: { type: 'number', description: '章号（全书连续，如 1）——适用范围 章 时必填' },
+          章名: { type: 'string', description: '章名（如 第一章）——适用范围 章 时必填' },
+          集: { type: 'number', description: '集号（如 1）——适用范围 集 时必填' },
+          剧本草稿: { type: 'string', description: '剧本草稿全文——适用范围 剧本 时必填（须与审读时同一文本）' },
+          分场大纲: { type: 'string', description: '分场大纲全文——适用范围 剧本 且审读时给了大纲时必填' },
+          片长: { type: 'string', enum: ['长片', '短片'], description: '片长——适用范围 剧本 时与审读一致，默认 长片' },
+          剧本: { type: 'object', description: '单集剧本对象——适用范围 集 时必填（与审读时同一对象）' },
+          大纲: { type: 'object', description: '分集大纲一集对象——适用范围 集 时必填（与审读时同一对象）' },
+          模块名: { type: 'string', description: '审读模块名（如 章节结构审读 / 剧本对白审读 / 短剧审读）' },
           发现项: {
             type: 'array',
             description: '发现项数组（每条含 证据位置/问题说明 等；无问题传空数组）',
@@ -1561,7 +1570,7 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
           },
           审读指纹: { type: 'string', description: '自动模块每次必填：使用派发该模块时的审核输入指纹，不得省略或换成后来取得的值；作者意见可不提供' },
         },
-        required: ['bookId', '卷', '章', '章名', '模块名', '发现项'],
+        required: ['bookId', '模块名', '发现项'],
       },
       output: {
         schema: {
@@ -1585,6 +1594,11 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
       execute: (args, sessionContext) => {
         const book = resolveBook(args, sessionContext)
         if (!book.ok) return book
+        const scope = typeof args['适用范围'] === 'string' && args['适用范围'].trim() !== '' ? args['适用范围'].trim() : '章'
+        if (scope !== '章' && scope !== '剧本' && scope !== '集') {
+          return toolFailure('invalid-argument', `适用范围 只能是 章 / 剧本 / 集，收到：${scope}`)
+        }
+        if (scope !== '章') return recordFilmDramaFindings(book.bookRoot, scope, args)
         const keyResult = chapterKeyOf(args)
         if (!keyResult.ok) return keyResult
         try {
@@ -2211,6 +2225,76 @@ function withFailureFields(output: ToolOutputDefinition): ToolOutputDefinition {
 /** 重置轮次暂存的上一轮处置:明示条数与沿用规则,免得调用方以为上一轮结论凭空消失。 */
 function inheritNote(n: number): string {
   return n === 0 ? '' : `上一轮已给处置 ${n} 条暂存待继承：对应模块重新回写时，模块名、证据位置、问题说明一致的发现项沿用原处置，其余作废。`
+}
+
+/**
+ * 剧本/集范围的发现项回写（novel_record_review_findings 的影视剧分支）：
+ * 剧本 scope 取 剧本草稿文本（+ 分场大纲文本/片长）重算指纹；
+ * 集 scope 取 剧本/大纲对象渲染成文本重算指纹。
+ * 指纹须与对应审读工具返回的指纹一致，否则 ingest 拒绝（已过期）。
+ * 审核通过＝记录完成（影视剧无章节扫描，记录完成即全部范围模块回写完毕
+ * 且证据适用当前稿）；待处置数与 message 口径与章节分支一致。
+ */
+function recordFilmDramaFindings(
+  bookRoot: string,
+  scope: '剧本' | '集',
+  args: Record<string, unknown>,
+): unknown {
+  const 模块名 = typeof args['模块名'] === 'string' ? args['模块名'].trim() : ''
+  if (模块名 === '') return toolFailure('invalid-argument', '模块名 不能为空')
+  const 发现项 = Array.isArray(args['发现项']) ? (args['发现项'] as unknown[]) : []
+  const 审读指纹 = typeof args['审读指纹'] === 'string' ? args['审读指纹'] : undefined
+  try {
+    let r: ReturnType<typeof ingestFilmDramaFindings>
+    if (scope === '剧本') {
+      const 剧本草稿文本 = typeof args['剧本草稿'] === 'string' ? args['剧本草稿'] : ''
+      if (剧本草稿文本.trim() === '') return toolFailure('invalid-argument', '适用范围 剧本 时 剧本草稿 必填（须与审读时同一文本）')
+      const 分场大纲文本 = typeof args['分场大纲'] === 'string' && args['分场大纲'].trim() !== '' ? args['分场大纲'] : undefined
+      const 片长 = args['片长'] === '短片' ? '短片' as const : '长片' as const
+      r = ingestFilmDramaFindings({
+        bookRoot,
+        scope: '剧本',
+        模块名,
+        发现项,
+        审读指纹,
+        剧本草稿文本,
+        ...(分场大纲文本 === undefined ? {} : { 分场大纲文本 }),
+        片长,
+      })
+    } else {
+      const 集 = typeof args['集'] === 'number' ? args['集'] : NaN
+      if (!Number.isInteger(集) || 集 < 1) return toolFailure('invalid-argument', '适用范围 集 时 集 须为 ≥1 的整数')
+      const 剧本 = args['剧本']
+      const 大纲 = args['大纲']
+      if (typeof 剧本 !== 'object' || 剧本 === null || Array.isArray(剧本)) return toolFailure('invalid-argument', '适用范围 集 时 剧本 须为对象（与审读时同一对象）')
+      if (typeof 大纲 !== 'object' || 大纲 === null || Array.isArray(大纲)) return toolFailure('invalid-argument', '适用范围 集 时 大纲 须为对象（与审读时同一对象）')
+      const 剧本文本 = renderEpisodeScript(剧本 as EpisodeScriptInput).内容
+      const 大纲文本 = episodeOutlineText(大纲 as EpisodeOutline)
+      r = ingestFilmDramaFindings({ bookRoot, scope: '集', 集, 模块名, 发现项, 审读指纹, 剧本文本, 大纲文本 })
+    }
+    if (!r.ok || r.record === null) return { ok: false, reason: r.reason ?? '发现项回写未完成' }
+    const 完成 = r.record.完成 === true
+    const 审核通过 = 完成
+    const 待处置数 = r.record.问题.filter(item => !item.处置状态 || item.处置状态 === '待处理').length
+    const pending = r.待回写模块 ?? []
+    const 待继承处置数 = r.record.待继承处置?.length ?? 0
+    return {
+      ok: true,
+      完成,
+      审核通过,
+      待处置数,
+      待回写模块: pending,
+      待继承处置数,
+      发现项编号: r.record.问题.filter(item => item.模块名 === 模块名).map(item => item.发现项编号),
+      审核记录哈希: reviewRecordHashOf(serializeReviewRecord(r.record)),
+      message: 审核通过
+        ? '发现项已回写，全部模块完成，审核通过。'
+        : 完成 ? `全部模块已回写，但审核尚未通过；仍有 ${待处置数} 项待处置，请核对当前证据并完成处置。`
+        : `发现项已回写。尚待回写模块：${pending.join('、')}（全部回写后审核才完成）。${inheritNote(待继承处置数)}`,
+    }
+  } catch (err) {
+    return failureFrom(err, `发现项回写失败：`)
+  }
 }
 
 /** 设计侧确认工具的公共收尾:整批一次 design: 提交(拍板 7),失败返回「已落盘但未提交」。 */
