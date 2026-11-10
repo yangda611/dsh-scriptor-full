@@ -14,7 +14,7 @@
 - 镜头提示在 spec 剧本里应克制，拍摄剧本才详写；景别/角度/运镜属分镜头层。
 - 音效在电影剧本里是动作行内关键音效词大写；`SFX:`/`MUSIC:` 独占一行是 BBC 广播剧格式，不是电影剧本格式——音响/音乐应放在分镜头表单列。
 - 中文格式：无专门协会标准、只是约定俗成；分场景剧本标头为 `场号. 地点 时间 内/外`，对白为 `说话人：内容`；分镜头剧本是导演的表格。
-- **结论：输出两层——编剧层（分场景/master scene）+ 导演层（分镜头表），不要混写。**
+- **结论（2026-11-11 用户决策后）：电影默认输出《痴迷》式分镜剧本（总纲七节 + △分镜块，编剧层与导演层合并为一份生产剧本）；编剧层 master-scene / Fountain 仍保留为次要导出（`--格式 master-scene` / `fountain`，或 `both` 同时出）。草稿阶段仍用分场景格式写，导出时再转分镜。**
 
 **短剧惯例（约 22 条来源）：**
 - 竖屏：9:16，单集 60–120 秒、每集 2–4 场、台词 180–360 字，全季 60–100 集；广电第 16 号令（2026-09-01 生效）定义微短剧为单集 20 分钟以下。
@@ -117,21 +117,21 @@
   - 分集钩子/爽点大纲 → 单集剧本 → 审读（新技能/工具）。
   - 短剧节奏模板（横屏/竖屏两种；每集钩子与爽点规则，来自调研，与电影模板分开）。
 - 落点：新技能 `packages/bundle/skills/novel-shortdrama/SKILL.md`；短剧模板（`packages/core/src/shortdrama/` 或 outline 下新模板）；`paths.ts`（集寻址，不复用卷/章）；`design/contract.ts`（复用 `### 章节篇幅` 模式加单集篇幅/集数子节）；WRITING_ROLES 加短剧角色；review 注册表加短剧检查模块 + 底本。
-- 验证标准：`pnpm build` 通过；`vitest run` 通过；一条示例短剧（至少 3 集）能走完全流程；每集钩子/爽点分布符合短剧节奏模板；横屏/竖屏两种输出都能生成。**已验证：构建通过；新测试 36/36 通过；示例《赘婿归来》3 集竖屏+横屏全流程通过，节拍检查全过。接线：工具 4 个已注册、技能已登记、WRITING_ROLES 加 shortdrama。横屏放宽的三个数是工具约定（已标注，非调研原文）。**
-- **有意不做的事（协调人决定）**：剧本/短剧审读模块不注册进共享审读注册表（registerDefaultChecks）。该表被章节审读的 computeReview / ingestFindings 全量遍历（不过滤适用范围），注册进去会让每轮章节审读多出 4 个永远待回写的模块、完成态永假；且两模块的 run 签名（ScreenplayReviewInput / 集寻址）与 CheckInput（章寻址）不兼容。两工具直接调 runScreenplayReview / reviewShortDramaEpisode 返回发现项，已够用。共享审读表要接剧本/短剧，需先按适用范围过滤完成判定并另建集/场寻址的审读记录，留待后续阶段。
+- 验证标准：`pnpm build` 通过；`vitest run` 通过；一条示例短剧（至少 3 集）能走完全流程；每集钩子/爽点分布符合短剧节奏模板；横屏/竖屏两种输出都能生成。**已验证：构建通过；新测试 36/36 通过；示例《赘婿归来》3 集竖屏+横屏全流程通过，节拍检查全过。接线：工具 4 个已注册、技能已登记、WRITING_ROLES 加 shortdrama。（2026-11-11 用户决策：横屏/竖屏节拍已统一——共用一套节拍规则（`共用节拍规则`），只按单集时长缩放反转数（`requiredTurns`）；起承转合改为按时长检查（≥600 秒）；首胜/付费墙降为平台说明，不再是节拍检查项；横屏放宽的三个数已删除。）**
+- **已接线（2026-11-11 后续轮次，用户决策 3）**：剧本/短剧审读模块已注册进共享审读注册表（`packages/review/src/film-drama.ts`，`registerFilmDramaChecks`；`registerAllReviewChecks` = 章节默认 + 影视剧）。注册表按适用范围过滤（`listChecks(scope)`）；computeReview / ingestFindings 只遍历 章 模块，章节完成判定不受影响（`packages/review/tests/film-drama-review.spec.ts` 有覆盖）。审读记录按范围寻址：剧本 `草稿区/审核/审-剧本.json`，分集 `草稿区/审核/审-集NNN.json`（`packages/core/src/evidence/record.ts` 的 load/write*ReviewRecord）。两工具（novel_screenplay_review / novel_shortdrama_review_episode）经注册表跑确定性模块，返回发现项 + 审核编号 + 审读指纹；发现项经 novel_record_review_findings（适用范围 剧本/集）回写。作者意见通道本次未接（有意延期：影视剧无作者意见模块，见后续轮次节）。
 
 ### 阶段 4 — 专业剧本导出格式
 
 - 交付物：
   - 剧本导出：场景标题、动作、角色、台词、括号提示（停顿/语气）、镜头、音效、音乐提示。
   - 导出模板与示例文件（电影剧本 1 份、短剧 1 集）。
-- 落点：`packages/core/src/export/index.ts`（新增 `computeScreenplayExport`，复用 `inspectExportTarget` / `verifyExportTarget`）；新 `packages/core/src/export/screenplay-format.ts`（Fountain/Markdown 双输出渲染器）；新 `packages/bundle/src/scripts/screenplay-export-cli.ts`（`screenplayExportCli`，`src/cli.ts` / `src/index.ts` 导出、`artifact-contract.mjs` 的 thinScripts 登记）；`novel-export` SKILL.md 加剧本分支或新建技能脚本目录；`paths.ts` + `docs/book-format.md`（剧本定稿目录定义）。
+- 落点：`packages/core/src/export/index.ts`（新增 `computeScreenplayExport`，复用 `inspectExportTarget` / `verifyExportTarget`）；新 `packages/core/src/export/screenplay-format.ts`（storyboard 为默认的 Markdown 分镜渲染器 + Fountain/master-scene 次要导出）；新 `packages/bundle/src/scripts/screenplay-export-cli.ts`（`screenplayExportCli`，`src/cli.ts` / `src/index.ts` 导出、`artifact-contract.mjs` 的 thinScripts 登记）；`novel-export` SKILL.md 加剧本分支或新建技能脚本目录；`paths.ts` + `docs/book-format.md`（剧本定稿目录定义）。
 - 验证标准：`pnpm build` 通过；`vitest run` 通过；导出的剧本文件格式完整、示例可读；导出不破坏现有小说导出。**注意：新增 thinScript 时须同步处理 standalone-cli 验收场景（`check-standalone-cli.mjs` 的 `argumentsByFunction` 加条目 + 夹具），否则全量会报 Missing CLI acceptance scenario（阶段 2 的 `runScreenplayChecksCli` 已因此返工一次）。**
-- **已验证：构建通过；全量 W4b 2444 通过 / 7 跳过 / 0 失败（2451 总），bundle typecheck 通过；新测试 screenplay-export 15 项 + screenplay-export-cli 5 项全绿；示例 `docs/examples/剧本导出示例/`（晚星 Fountain/Markdown + 赘婿集001 Fountain/Markdown + 2 份分镜头表输入）。**
+- **已验证：构建通过；全量 W4b 2444 通过 / 7 跳过 / 0 失败（2451 总），bundle typecheck 通过；新测试 screenplay-export 15 项 + screenplay-export-cli 5 项全绿；示例 `docs/examples/剧本导出示例/`（晚星 Fountain/Markdown + 赘婿集001 Fountain/Markdown + 2 份分镜头表输入）。（2026-11-11 后续轮次：晚星 .md 已改为分镜剧本（默认），.fountain 为次要导出（内容与改前逐字节一致）；全量测试数见最新验证。）**
 
 ### 阶段 4 对齐轮次 — 按《痴迷》参考案例对齐导出格式（2026-11-10 20:28 用户指令）
 
-- 参考案例：`docs/examples/痴迷-12集分镜剧本-参考案例.docx`（《痴迷》Obsession，12 集短剧，全片约 90 分钟，每集分镜剧本约 3,000–5,000 字，已入库 4c21824）。**这是最终输出格式的验收标准。**
+- 参考案例：`docs/examples/痴迷-12集分镜剧本-参考案例.docx`（《痴迷》Obsession，12 集短剧，全片约 90 分钟，每集分镜剧本约 3,000–5,000 字，已入库 4c21824）。**这是最终输出格式的验收标准。** 渲染器现按单集时长推导文字目标（90 秒一集约 1,530—1,710 字，见 `deriveEpisodeWordTarget`），不再使用固定 3,000—5,000 字；电影按页数推导（`deriveFilmWordTarget`，1 页≈55 秒）。
 - 交付物：
   - 总纲（剧本圣经）渲染器：固定七节（类型/形式/文字目标/叙事线 → 故事一句话 → 开篇承诺与中心问题 → 世界硬约束与地理 → 三段核心真相 → 主要人物与人物弧含曾误标统一记录 → 分集结构与时间锚点）。
   - 分镜剧本渲染：场头「集-场 日/夜／内/外 地点」→ 人物行 → 场景环境行 → 镜头块 `△【镜头NN｜时间 MM:SS—MM:SS｜景别｜角度｜运镜】`（五字段缺一不可）→ △站位/动作/表情行 → 对白行（人名 + 语速/音量/语调/尾音标注）→ 【环境声】/【字幕】单独成行；无面部变体（`△【本镜头无人物面部，表情不适用】`等）；集末 `【画面淡出黑场】`；镜头号与时间码每集内累计、集间重置。
@@ -151,6 +151,18 @@
   - 创建引导、默认值、大白话提示复查一遍。
 - 验证标准：`pnpm build` 通过；`vitest run` 通过；仓库 release/smoke 检查能跑的跑通；一个新手按文档能从创建走到导出（走查记录）。
 - **已验证：构建通过；全量 2457 通过 / 7 跳过 / 0 失败（2464 总，211 文件）；走查《巷口面馆》8 步通过 + 自动化走查测试 3/3；文档风格检查通过（97.8%，术语 0）。release:build 与 release:smoke 由协调人根治后重跑通过（见状态行）：standalone-book.ts 内联示例内容（e1ab099）；release:smoke 改用 /var/tmp（2.0G tmpfs，chown 可用）作 --root 与 TMPDIR。终验四件套（协调人，HEAD e1ab099）全部通过。**
+
+### 后续轮次 — 2026-11-11 用户决策（5 项）
+
+用户 2026-11-11 00:02 对完成通知里的 5 项拍板，00:06 追加电影格式决策：
+
+1. **竖屏横屏短剧节拍统一**：横屏竖屏是同一东西，只差显示方向，剧本/文案可以相同。共用一套节拍规则（`packages/core/src/shortdrama/templates.ts` 的 `共用节拍规则`），只按单集时长缩放反转数（`requiredTurns(时长秒) = max(1, ceil((时长秒−30)/30))`；90 秒→2，900 秒→29）；起承转合改为按时长检查（≥600 秒），不再按画幅；首胜/付费墙降为平台说明（排播数据），不再是节拍检查项。画幅只影响取景（竖屏特写 / 横屏宽幅与环境）。横屏放宽的三个数（首场即冲突 / ≥2 转折 / 结尾 1 分钟内留悬念）已删除。测试：横屏竖屏同 durations 节拍结构相同（`shortdrama-beat-checker.spec.ts`）。
+2. **海外合规**：通用基线即可（合法就行），不再做平台审核规则调研。无动作。
+3. **剧本/短剧接入共享审读注册表**：已接线（见阶段 3 的「已接线」段）。长剧本需要完整的审读管线防上下文漂移与人物不一致。作者意见通道本次未接——影视剧暂无作者意见模块；如需接，需在 film-drama 注册时另加一个 scope 为 剧本/集 的作者意见模块（与章节的作者意见同形态），留待后续。
+4. **CLI 退出码**：参数错误=1，执行异常=2，确认不变。无动作。
+5. **样例**：夜市摊主 OK；晚星电影格式用户不熟悉——已按 00:06 决策改为分镜剧本（见下）。
+6. **电影剧本默认输出改为《痴迷》式分镜剧本（2026-11-11 00:06 用户决策）**：用户用 AI 做影视，制作节奏快，合并的生产剧本比传统编剧层/导演层分开更合适。电影导出默认 storyboard（总纲七节，第六节为三幕结构与时间锚点；每场按动作行/台词段出 △分镜块，五字段齐全，景别/角度/运镜填 `—`，时间码按页数×55 秒分配；对白括号提示作语速/音量/语调标注，不编造）。Fountain/master-scene 为次要导出（`--格式 fountain` / `master-scene` / `both`）。分镜头表仍可作派生文件。晚星样例已按同一故事重生成分镜剧本（`.fountain` 内容与改前逐字节一致）。
+- **小修**：(a) 渲染器不再输出空 △行（空描写镜头直接跳过）；(b) 总纲文字目标按时长/页数推导（`deriveEpisodeWordTarget` / `deriveFilmWordTarget`），不再写固定 3,000—5,000 字。
 
 ## 全局验证标准（每个阶段都适用）
 
