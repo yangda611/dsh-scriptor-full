@@ -1,6 +1,6 @@
 # DSH Scriptor 影视剧改造计划（muse-dev）
 
-> 状态：v3（2026-11-10，摸底与调研都已完成）。**基线已变绿（2026-11-10 ~10:43：Git 升到 2.56.0 + 3 处快照遍历容忍维护锁文件，构建通过，全量测试 2325 通过 / 7 跳过）。阶段 0.5 已完成并提交（a90e3ee）。阶段 1 已完成并提交（a1175f6 + 019f6df），全量 2343 通过 / 7 跳过（FULL6_EXIT:0）。阶段 2 和 3 已并行派给子代理执行中。**
+> 状态：v3（2026-11-10，摸底与调研都已完成）。**基线已变绿（2026-11-10 ~10:43：Git 升到 2.56.0 + 3 处快照遍历容忍维护锁文件，构建通过，全量测试 2325 通过 / 7 跳过）。阶段 0.5 已完成并提交（a90e3ee）。阶段 1 已完成并提交（a1175f6 + 019f6df），全量 2343 通过 / 7 跳过（FULL6_EXIT:0）。阶段 2（电影，64724a1）与阶段 3（短剧，7fd176b + d13f8f5）已完成并提交，接线已完成并提交（25bc135）。阶段 4/5 待派。**
 > 最高优先级任务。质量优先于速度；每一步想透再动手；不留“以后再说”的坑。
 > 每个阶段结束都要有可验证的证据（构建/测试输出、示例输出、来源清单），没验证通过不算完成。
 
@@ -103,21 +103,22 @@
 - 落点：`packages/core/src/inspire/concept.ts`（Concept 加字段）；`packages/bundle/src/novel-tools.ts` 的 `novel_create_book` 参数 schema；`packages/core/src/book/create.ts` + `scaffold.ts`（契约 frontmatter 写字段、快照写字段）；`packages/core/src/design/contract.ts`（extraFields 合并）；新文件 `packages/core/src/design/genres.ts`（两套题材库常量表）；`novel-inspiration` / `novel-design` SKILL.md 引用题材库。
 - 验证标准：`pnpm build` 通过；`vitest run` 通过；能新建三种形态的项目并选定市场；题材库内容逐条可追溯到调研来源；小说流程零回归。**已验证：构建通过；新测试 15/15 通过；全量 2343 通过 / 7 跳过（FULL6_EXIT:0）。计数口径已解释：2325（基线）+ 3（阶段 0.5）+ 15（阶段 1）= 2343。海外档合规占位已接受（通用底线 + 目标市场法律，平台成文细则未查到，不编造）。另修：快照遍历排除 .git/ 根治维护锁文件竞态（提交 7289181）。**
 
-### 阶段 2 — 电影剧本改编管线
+### 阶段 2 — 电影剧本改编管线（已完成，提交 64724a1；接线 25bc135）
 
 - 交付物：
   - 故事稿 → 分场大纲 → 剧本草稿 → 审读（新技能/工具，复用现有审读机制）。
   - 电影节奏模板（钩子与爽点分布规则，来自调研）。
 - 落点：新技能 `packages/bundle/skills/novel-screenplay/SKILL.md`（+底本/工序）；新 `packages/core/src/screenplay/`（分场大纲模板/解析）或 `outline/screenplay-template.ts`；`packages/core/src/repo/paths.ts`（剧本目录与路径函数）；`packages/bundle/src/writing-delegation.ts`（WRITING_ROLES 加剧本角色）；`novel-tools.ts`（新工具或复用 outline 工具加形态分支）；`novel-director` 路由表；新技能同步 4 处登记（见摸底结论）。
-- 验证标准：`pnpm build` 通过；`vitest run` 通过；一条示例电影剧本能从故事稿走完改编全流程；输出符合专业剧本格式（抽查场景标题/动作/台词/括号提示齐全）。
+- 验证标准：`pnpm build` 通过；`vitest run` 通过；一条示例电影剧本能从故事稿走完改编全流程；输出符合专业剧本格式（抽查场景标题/动作/台词/括号提示齐全）。**已验证：构建通过；新测试 42 个全通过；示例《晚星》走完全流程 ok:true，审读 0 发现项。停顿写死 `(pause)`（ScreenCraft 反对 (beat) 表停顿）。接线：工具 6 个已注册、技能已登记、CLI `runScreenplayChecksCli` 已建、WRITING_ROLES 加 screenplay、中间稿路径已固化（草稿区/剧本/）。**
 
-### 阶段 3 — 短剧管线
+### 阶段 3 — 短剧管线（已完成，提交 7fd176b + d13f8f5；接线 25bc135）
 
 - 交付物：
   - 分集钩子/爽点大纲 → 单集剧本 → 审读（新技能/工具）。
   - 短剧节奏模板（横屏/竖屏两种；每集钩子与爽点规则，来自调研，与电影模板分开）。
 - 落点：新技能 `packages/bundle/skills/novel-shortdrama/SKILL.md`；短剧模板（`packages/core/src/shortdrama/` 或 outline 下新模板）；`paths.ts`（集寻址，不复用卷/章）；`design/contract.ts`（复用 `### 章节篇幅` 模式加单集篇幅/集数子节）；WRITING_ROLES 加短剧角色；review 注册表加短剧检查模块 + 底本。
-- 验证标准：`pnpm build` 通过；`vitest run` 通过；一条示例短剧（至少 3 集）能走完全流程；每集钩子/爽点分布符合短剧节奏模板；横屏/竖屏两种输出都能生成。
+- 验证标准：`pnpm build` 通过；`vitest run` 通过；一条示例短剧（至少 3 集）能走完全流程；每集钩子/爽点分布符合短剧节奏模板；横屏/竖屏两种输出都能生成。**已验证：构建通过；新测试 36/36 通过；示例《赘婿归来》3 集竖屏+横屏全流程通过，节拍检查全过。接线：工具 4 个已注册、技能已登记、WRITING_ROLES 加 shortdrama。横屏放宽的三个数是工具约定（已标注，非调研原文）。**
+- **有意不做的事（协调人决定）**：剧本/短剧审读模块不注册进共享审读注册表（registerDefaultChecks）。该表被章节审读的 computeReview / ingestFindings 全量遍历（不过滤适用范围），注册进去会让每轮章节审读多出 4 个永远待回写的模块、完成态永假；且两模块的 run 签名（ScreenplayReviewInput / 集寻址）与 CheckInput（章寻址）不兼容。两工具直接调 runScreenplayReview / reviewShortDramaEpisode 返回发现项，已够用。共享审读表要接剧本/短剧，需先按适用范围过滤完成判定并另建集/场寻址的审读记录，留待后续阶段。
 
 ### 阶段 4 — 专业剧本导出格式
 
