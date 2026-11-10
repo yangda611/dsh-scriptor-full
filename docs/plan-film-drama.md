@@ -1,6 +1,6 @@
 # DSH Scriptor 影视剧改造计划（muse-dev）
 
-> 状态：v3（2026-11-10，摸底与调研都已完成）。**基线已变绿（2026-11-10 ~10:43：Git 升到 2.56.0 + 3 处快照遍历容忍维护锁文件，构建通过，全量测试 2325 通过 / 7 跳过）。阶段 0.5 已完成并提交（a90e3ee）。阶段 1 已完成并提交（a1175f6 + 019f6df），全量 2343 通过 / 7 跳过（FULL6_EXIT:0）。阶段 2（电影，64724a1）与阶段 3（短剧，7fd176b + d13f8f5）已完成并提交，接线已完成并提交（25bc135）。接线后全量 W2 的 6 个失败已修完并提交（46a2540）：tool-catalog 计数、standalone-cli 重写、normalizeFailure 中文失败字段、tool-result 结果卡、worker-policy 计数、host-loader/packaging 技能数；全量重跑 W3 变绿：构建通过，全量 2423 通过 / 7 跳过 / 0 失败（2430 总），bundle typecheck 通过。W2 的 51 跳是失败文件导致其余用例被跳过的假象，修完后回到基线 7。阶段 4 已派（2026-11-10 ~12:20），阶段 5 待派。**
+> 状态：v3（2026-11-10，摸底与调研都已完成）。**基线已变绿（2026-11-10 ~10:43：Git 升到 2.56.0 + 3 处快照遍历容忍维护锁文件，构建通过，全量测试 2325 通过 / 7 跳过）。阶段 0.5 已完成并提交（a90e3ee）。阶段 1 已完成并提交（a1175f6 + 019f6df），全量 2343 通过 / 7 跳过（FULL6_EXIT:0）。阶段 2（电影，64724a1）与阶段 3（短剧，7fd176b + d13f8f5）已完成并提交，接线已完成并提交（25bc135）。接线后全量 W2 的 6 个失败已修完并提交（46a2540）：tool-catalog 计数、standalone-cli 重写、normalizeFailure 中文失败字段、tool-result 结果卡、worker-policy 计数、host-loader/packaging 技能数；全量重跑 W3 变绿：构建通过，全量 2423 通过 / 7 跳过 / 0 失败（2430 总），bundle typecheck 通过。W2 的 51 跳是失败文件导致其余用例被跳过的假象，修完后回到基线 7。阶段 4 已完成并提交（47a6c57 + d9e6636 + 561bc94：Fountain/Markdown 双渲染 + 分镜头表 + computeScreenplayExport + screenplayExportCli + 示例）；全量验证 W4：构建通过；首跑因瞬时 EPERM（写临时文件被拒，143 文件失败，事后写操作恢复正常、inode 仅用 1%）失败，重跑 W4b 变绿：全量 2444 通过 / 7 跳过 / 0 失败（2451 总，209 文件），bundle typecheck 通过。参考案例《痴迷》已入库（4c21824）。阶段 4 对齐轮次已派（2026-11-10 ~20:45）：导出格式与短剧模板按《痴迷》对齐。阶段 5 待派。**
 > 最高优先级任务。质量优先于速度；每一步想透再动手；不留“以后再说”的坑。
 > 每个阶段结束都要有可验证的证据（构建/测试输出、示例输出、来源清单），没验证通过不算完成。
 
@@ -127,6 +127,21 @@
   - 导出模板与示例文件（电影剧本 1 份、短剧 1 集）。
 - 落点：`packages/core/src/export/index.ts`（新增 `computeScreenplayExport`，复用 `inspectExportTarget` / `verifyExportTarget`）；新 `packages/core/src/export/screenplay-format.ts`（Fountain/Markdown 双输出渲染器）；新 `packages/bundle/src/scripts/screenplay-export-cli.ts`（`screenplayExportCli`，`src/cli.ts` / `src/index.ts` 导出、`artifact-contract.mjs` 的 thinScripts 登记）；`novel-export` SKILL.md 加剧本分支或新建技能脚本目录；`paths.ts` + `docs/book-format.md`（剧本定稿目录定义）。
 - 验证标准：`pnpm build` 通过；`vitest run` 通过；导出的剧本文件格式完整、示例可读；导出不破坏现有小说导出。**注意：新增 thinScript 时须同步处理 standalone-cli 验收场景（`check-standalone-cli.mjs` 的 `argumentsByFunction` 加条目 + 夹具），否则全量会报 Missing CLI acceptance scenario（阶段 2 的 `runScreenplayChecksCli` 已因此返工一次）。**
+- **已验证：构建通过；全量 W4b 2444 通过 / 7 跳过 / 0 失败（2451 总），bundle typecheck 通过；新测试 screenplay-export 15 项 + screenplay-export-cli 5 项全绿；示例 `docs/examples/剧本导出示例/`（晚星 Fountain/Markdown + 赘婿集001 Fountain/Markdown + 2 份分镜头表输入）。**
+
+### 阶段 4 对齐轮次 — 按《痴迷》参考案例对齐导出格式（2026-11-10 20:28 用户指令）
+
+- 参考案例：`docs/examples/痴迷-12集分镜剧本-参考案例.docx`（《痴迷》Obsession，12 集短剧，全片约 90 分钟，每集分镜剧本约 3,000–5,000 字，已入库 4c21824）。**这是最终输出格式的验收标准。**
+- 交付物：
+  - 总纲（剧本圣经）渲染器：固定七节（类型/形式/文字目标/叙事线 → 故事一句话 → 开篇承诺与中心问题 → 世界硬约束与地理 → 三段核心真相 → 主要人物与人物弧含曾误标统一记录 → 分集结构与时间锚点）。
+  - 分镜剧本渲染：场头「集-场 日/夜／内/外 地点」→ 人物行 → 场景环境行 → 镜头块 `△【镜头NN｜时间 MM:SS—MM:SS｜景别｜角度｜运镜】`（五字段缺一不可）→ △站位/动作/表情行 → 对白行（人名 + 语速/音量/语调/尾音标注）→ 【环境声】/【字幕】单独成行；无面部变体（`△【本镜头无人物面部，表情不适用】`等）；集末 `【画面淡出黑场】`；镜头号与时间码每集内累计、集间重置。
+  - 语言规则（写进模板与 CLI）：说明/场景/动作文字一律中文，对白按目标市场语言（海外题材为英文）。这是“输出永远中文”的边界。
+  - 人名注册表 + 导出前一致性检查：标准名 + 曾误标名清单；全剧人名必须在册且只用标准名，未登记/误标要报错，不准静默输出。
+  - 阶段 3 短剧模板对齐：短剧集渲染（`shortdrama/script.ts` 的 `renderEpisodeSceneBlock` 等）按同一分镜形状出；逐字节测试与示例随之更新。
+  - 导出示例：短剧 1 集按参考案例形状完整输出（总纲节选 + 一集完整分镜）；已有《晚星》《赘婿归来》阶段 2/3 示例不改，导出示例另出新文件。
+- 落点：`packages/core/src/export/screenplay-format.ts`（扩展分镜头表：加 `角度`、`时间`、字幕栏、对白标注位）+ 总纲渲染器（新文件或同文件内）；`packages/bundle/src/scripts/screenplay-export-cli.ts`（接总纲导出与人名检查）；`packages/core/src/shortdrama/script.ts`（短剧渲染对齐）；`docs/book-format.md`（总纲结构说明）。
+- 约束：不推倒阶段 2/3 结构；不新增技能/工具（扩展已有导出，不碰 skills / tool-catalog 计数）；不动小说导出；不改 LICENSE；只提交本地 muse-dev。
+- 验证标准：`pnpm build` 通过；全量 `vitest run` 通过（红了修好再提交）；总纲 + 分镜示例可读且字段齐全；人名一致性检查正反测试通过；导出不破坏现有小说导出。
 
 ### 阶段 5 — 新手文档 + 易用性收尾
 
