@@ -67,13 +67,35 @@ function snapshot(root: string): Record<string, string> {
   const result: Record<string, string> = {}
   const visit = (relative: string): void => {
     const absolute = path.join(root, relative)
-    const stat = fs.lstatSync(absolute)
+    let stat: fs.Stats
+    try {
+      stat = fs.lstatSync(absolute)
+    } catch (error) {
+      // Git 后台自动维护可能在遍历中删除 .git/objects/maintenance.lock；
+      // 遍历中消失的文件直接跳过（与 ef5d046 同类修复：快照是尽力而为，
+      // 消失的文件不计入结果，不应让快照本身抛错）。
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw error
+    }
     if (stat.isSymbolicLink()) { result[relative] = `link:${fs.readlinkSync(absolute)}`; return }
     if (stat.isDirectory()) {
-      const children = fs.readdirSync(absolute).sort()
+      let children: string[]
+      try {
+        children = fs.readdirSync(absolute).sort()
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+        throw error
+      }
       result[relative] = `directory:${JSON.stringify(children)}`
       for (const name of children) visit(relative ? `${relative}/${name}` : name)
-    } else result[relative] = createHash('sha256').update(fs.readFileSync(absolute)).digest('hex')
+    } else {
+      try {
+        result[relative] = createHash('sha256').update(fs.readFileSync(absolute)).digest('hex')
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+        throw error
+      }
+    }
   }
   visit('')
   return result
