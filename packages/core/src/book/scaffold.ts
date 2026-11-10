@@ -6,7 +6,8 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { applyVersionFields, initialVersion } from '../provenance'
 import { 契约六部, 分卷布局八部, 故事骨架九部, 世界书最小模块 } from '../derive/design'
-import { parseConcept, serializeConcept, type Concept } from '../inspire/concept'
+import { parseConcept, serializeConcept, marketOf, outputFormOf, DEFAULT_MARKET, DEFAULT_OUTPUT_FORM, type Concept } from '../inspire/concept'
+import { DOCUMENT_FIELDS, isMarketValue, isOutputFormValue, type Market, type OutputForm } from '../repo/document-fields'
 import { writeBatchAtomic, type FileOp } from '../repo/atomic'
 import { runtimeIgnoreLine } from '../repo/transaction'
 import { parseDocument, serializeDocument } from '../repo/frontmatter'
@@ -20,11 +21,26 @@ function labeledHeadings(names: readonly string[], state: string): string {
   return names.map((n) => `## ${n} 〔${state}〕\n`).join('\n')
 }
 
-export function emptyContractBody(bookId?: string): string {
+/** 影视剧扩展（muse-dev）：建书时选定的市场 / 输出形态，未指定时写默认值（中文 / 小说）。非法值拒绝写入。 */
+export interface ContractFieldOptions {
+  readonly 市场?: Market
+  readonly 输出形态?: OutputForm
+}
+
+export function resolveContractFields(opts: ContractFieldOptions = {}): { readonly 市场: Market; readonly 输出形态: OutputForm } {
+  if (opts.市场 !== undefined && !isMarketValue(opts.市场)) throw new Error(`市场取值非法：${String(opts.市场)}，只接受 海外 / 中文`)
+  if (opts.输出形态 !== undefined && !isOutputFormValue(opts.输出形态)) throw new Error(`输出形态取值非法：${String(opts.输出形态)}，只接受 短剧 / 电影剧本 / 小说`)
+  return { 市场: opts.市场 ?? DEFAULT_MARKET, 输出形态: opts.输出形态 ?? DEFAULT_OUTPUT_FORM }
+}
+
+export function emptyContractBody(bookId?: string, fieldOpts: ContractFieldOptions = {}): string {
+  const fields = resolveContractFields(fieldOpts)
   return serializeDocument({
     ...(bookId === undefined ? {} : { 书id: bookId }),
     [BOOK_FORMAT_VERSION_FIELD]: CURRENT_BOOK_FORMAT_VERSION,
-  }, `# 作品契约\n\n${labeledHeadings(契约六部, '留白')}`, ['书id', BOOK_FORMAT_VERSION_FIELD])
+    [DOCUMENT_FIELDS.market.name]: fields.市场,
+    [DOCUMENT_FIELDS.outputForm.name]: fields.输出形态,
+  }, `# 作品契约\n\n${labeledHeadings(契约六部, '留白')}`, ['书id', BOOK_FORMAT_VERSION_FIELD, DOCUMENT_FIELDS.market.name, DOCUMENT_FIELDS.outputForm.name])
 }
 
 export function emptySkeletonBody(): string {
@@ -58,9 +74,15 @@ export function conceptSnapshotText(concept: Concept | string): string {
   return serializeDocument(applyVersionFields(fields, v), body)
 }
 
-export function scaffoldBookFiles(bookRoot: string, concept: Concept | string, opts: { readonly bookId?: string } = {}): void {
+export function scaffoldBookFiles(bookRoot: string, concept: Concept | string, opts: { readonly bookId?: string } & ContractFieldOptions = {}): void {
+  // 影视剧扩展：市场 / 输出形态优先用显式 opts，否则取构想上的选择，再否则取默认值；构想快照本身也带这两个字段（见 serializeConcept）。
+  const parsedConcept = typeof concept === 'string' ? parseConcept(concept) : concept
+  const fields = resolveContractFields({
+    市场: opts.市场 ?? (parsedConcept === null ? undefined : marketOf(parsedConcept)),
+    输出形态: opts.输出形态 ?? (parsedConcept === null ? undefined : outputFormOf(parsedConcept)),
+  })
   const ops: FileOp[] = [
-    { relPath: paths.契约(), content: emptyContractBody(opts.bookId) },
+    { relPath: paths.契约(), content: emptyContractBody(opts.bookId, fields) },
     { relPath: paths.构想快照(), content: conceptSnapshotText(concept) },
     { relPath: paths.故事骨架(), content: emptySkeletonBody() },
     { relPath: paths.分卷布局(), content: emptyVolumeLayoutBody() },

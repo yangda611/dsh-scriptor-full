@@ -7,7 +7,9 @@ export {
   emptyVolumeLayoutBody,
   emptyVolumeOutlineBody,
   emptyWindowBody,
+  resolveContractFields,
   scaffoldBookFiles,
   本书记忆四文件,
   账本五文件,
+  type ContractFieldOptions,
 } from './scaffold'

@@ -13,6 +13,7 @@ import { paths } from '../repo/paths'
 import { bookWriter } from '../repo/atomic'
 import { parseChapterLength } from './chapter-length'
 import { BOOK_FORMAT_VERSION_FIELD } from '../repo/book-format'
+import { DOCUMENT_FIELDS, isMarketValue, isOutputFormValue } from '../repo/document-fields'
 
 export type ContractPartState = '已确认' | '暂定' | '留白'
 
@@ -95,6 +96,14 @@ function extractContractSectionBodies(body: string): Record<string, string> {
 export function prepareContract(bookRoot: string, parts: ContractParts = {}, extraFields: Record<string, unknown> = {}): FileOp {
   if (Object.hasOwn(extraFields, BOOK_FORMAT_VERSION_FIELD)) {
     throw new Error('书仓格式版本由建书或批准迁移维护，普通契约更新不能设置')
+  }
+  // 影视剧扩展：extraFields 里显式给的市场 / 输出形态只认取值表内的值，非法拒绝写入；
+  // 不给时 mergedFields 保留现有值（旧书读不到字段也不补写、不报错，由读取侧按默认值处理）。
+  if (Object.hasOwn(extraFields, DOCUMENT_FIELDS.market.name) && !isMarketValue(extraFields[DOCUMENT_FIELDS.market.name])) {
+    throw new Error(`市场取值非法：${String(extraFields[DOCUMENT_FIELDS.market.name])}，只接受 海外 / 中文`)
+  }
+  if (Object.hasOwn(extraFields, DOCUMENT_FIELDS.outputForm.name) && !isOutputFormValue(extraFields[DOCUMENT_FIELDS.outputForm.name])) {
+    throw new Error(`输出形态取值非法：${String(extraFields[DOCUMENT_FIELDS.outputForm.name])}，只接受 短剧 / 电影剧本 / 小说`)
   }
   const existing = readExistingContract(bookRoot)
   const mergedFields = { ...existing.fields, ...extraFields }

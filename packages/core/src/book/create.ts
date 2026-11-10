@@ -14,7 +14,8 @@ import { removeSync } from '../repo/remove'
 import { scaffoldBookFiles } from './scaffold'
 import { scanWorkspaceBooks } from './identity'
 import { withBookLock } from '../repo/lock'
-import { checkConceptCompleteness, type Concept } from '../inspire/concept'
+import { checkConceptCompleteness, marketOf, outputFormOf, type Concept } from '../inspire/concept'
+import { isMarketValue, isOutputFormValue } from '../repo/document-fields'
 
 export interface CreateBookInput {
   /** 工作范围根(R20:书建在其下)。 */
@@ -69,6 +70,14 @@ export function createBook(input: CreateBookInput): CreateBookResult {
     return { ok: false, reason: `构想未确认或未完整，拒绝建书(缺失: ${completeness.gaps.join(', ')})` }
   }
 
+  // 影视剧扩展：构想上显式填了市场 / 输出形态但取值非法时拒绝建书（不填则按默认值处理，见 marketOf / outputFormOf）。
+  if (input.concept.市场 !== undefined && !isMarketValue(input.concept.市场)) {
+    return { ok: false, reason: `市场取值非法：${String(input.concept.市场)}，只接受 海外 / 中文` }
+  }
+  if (input.concept.输出形态 !== undefined && !isOutputFormValue(input.concept.输出形态)) {
+    return { ok: false, reason: `输出形态取值非法：${String(input.concept.输出形态)}，只接受 短剧 / 电影剧本 / 小说` }
+  }
+
   try {
     return withBookLock(workspaceRoot, () => {
       const bookId = generateBookId(input.书名)
@@ -79,7 +88,7 @@ export function createBook(input: CreateBookInput): CreateBookResult {
       try {
         fs.mkdirSync(bookRoot)
         created = true
-        scaffoldBookFiles(bookRoot, input.concept, { bookId })
+        scaffoldBookFiles(bookRoot, input.concept, { bookId, 市场: marketOf(input.concept), 输出形态: outputFormOf(input.concept) })
         const commit = initFirstCommit(bookRoot)
         return { ok: true, bookRoot, bookId, commit }
       } catch (err) {

@@ -8,6 +8,24 @@ export {
   type ContractParts,
 } from './contract'
 export { seedMinDesign, type SeedMinDesignInput } from './seed'
+export {
+  GENRE_LIBRARY,
+  GENRE_SOURCES,
+  GENRE_TIER_IDS,
+  createGenreLibrary,
+  getGenreTier,
+  tiersForMarket,
+  validateGenreLibrary,
+  withNaming,
+  type GenreEntry,
+  type GenreLibrary,
+  type GenreLibraryOverrides,
+  type GenreTier,
+  type GenreTierId,
+  type NamedValue,
+  type NamingTable,
+  type TabooEntry,
+} from './genres'
 export * from './chapter-length'
 export { updateSkeleton, updateVolumeLayout, prepareSkeleton, prepareVolumeLayout, prepareDesignDoc, type DesignWriteResult } from './skeleton'
 export {

@@ -1,9 +1,13 @@
 export {
   checkConceptCompleteness,
   confirmConcept,
+  DEFAULT_MARKET,
+  DEFAULT_OUTPUT_FORM,
   elementOf,
   elementStateOf,
   isConceptBlank,
+  marketOf,
+  outputFormOf,
   parseConcept,
   requiredElementNames,
   serializeConcept,
@@ -11,6 +15,8 @@ export {
   构想必填要素,
   type Completeness,
   type Concept,
+  type Market,
+  type OutputForm,
   type 构想确认状态,
   type 构想要素名,
 } from './concept'

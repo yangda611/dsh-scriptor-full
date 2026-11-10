@@ -5,6 +5,19 @@
 
 import { parseLabeledStates } from '../derive/design'
 import { parseDocument, serializeDocument } from '../repo/frontmatter'
+import {
+  DOCUMENT_FIELDS,
+  isMarketValue,
+  isOutputFormValue,
+  type Market,
+  type OutputForm,
+} from '../repo/document-fields'
+
+export type { Market, OutputForm } from '../repo/document-fields'
+
+/** 影视剧扩展（muse-dev）：不填市场时默认 中文，不填输出形态时默认 小说（与旧行为一致）。 */
+export const DEFAULT_MARKET: Market = '中文'
+export const DEFAULT_OUTPUT_FORM: OutputForm = '小说'
 
 export const 构想七要素 = [
   '核心创意',
@@ -31,6 +44,20 @@ export interface Concept {
   readonly 差异化方向?: string
   readonly 明确不要什么?: string
   readonly 要素状态?: Partial<Record<构想要素名, string>>
+  /** 影视剧扩展（muse-dev）：目标市场，决定加载哪套题材库；不填默认 中文。 */
+  readonly 市场?: Market
+  /** 影视剧扩展（muse-dev）：输出形态，决定走哪条流水线；不填默认 小说。 */
+  readonly 输出形态?: OutputForm
+}
+
+/** 读不到或非法时按默认值处理（旧书兼容：不报错、不自动补写）。 */
+export function marketOf(concept: Concept | null | undefined): Market {
+  return concept !== null && concept !== undefined && isMarketValue(concept.市场) ? concept.市场 : DEFAULT_MARKET
+}
+
+/** 读不到或非法时按默认值处理（旧书兼容：不报错、不自动补写）。 */
+export function outputFormOf(concept: Concept | null | undefined): OutputForm {
+  return concept !== null && concept !== undefined && isOutputFormValue(concept.输出形态) ? concept.输出形态 : DEFAULT_OUTPUT_FORM
 }
 
 export type Completeness =
@@ -56,6 +83,7 @@ export function elementStateOf(concept: Concept, name: 构想要素名): string 
 }
 
 export function checkConceptCompleteness(concept: Concept | string | null | undefined): Completeness {
+  // 影视剧扩展：市场 / 输出形态有默认值，不当必填；缺失或非法都按默认值处理，不阻塞建书。
   if (concept === null || concept === undefined) {
     return { ok: false, gaps: ['构想不存在'] }
   }
@@ -85,6 +113,9 @@ export function parseConcept(text: string): Concept | null {
   }
   const bodies = extractElementBodies(r.data.body)
   const 状态: 构想确认状态 = r.data.fields['状态'] === '已确认' ? '已确认' : '候选'
+  // 影视剧扩展：frontmatter 里的市场 / 输出形态只认取值表内的值，其余一律视为未填（按默认值处理）。
+  const 市场 = r.data.fields[DOCUMENT_FIELDS.market.name]
+  const 输出形态 = r.data.fields[DOCUMENT_FIELDS.outputForm.name]
 
   return {
     状态,
@@ -96,6 +127,8 @@ export function parseConcept(text: string): Concept | null {
     差异化方向: bodies['差异化方向'] ?? '',
     明确不要什么: bodies['明确不要什么'] ?? '',
     要素状态: states,
+    ...(isMarketValue(市场) ? { 市场 } : {}),
+    ...(isOutputFormValue(输出形态) ? { 输出形态 } : {}),
   }
 }
 
@@ -109,7 +142,12 @@ export function serializeConcept(concept: Concept): string {
       lines.push(body.trim(), '')
     }
   }
-  return serializeDocument({ 状态: concept.状态 }, lines.join('\n').trimEnd() + '\n')
+  // 影视剧扩展：市场 / 输出形态写入 frontmatter，未填时写解析出的默认值，保证快照往返不丢选择。
+  return serializeDocument({
+    状态: concept.状态,
+    [DOCUMENT_FIELDS.market.name]: marketOf(concept),
+    [DOCUMENT_FIELDS.outputForm.name]: outputFormOf(concept),
+  }, lines.join('\n').trimEnd() + '\n')
 }
 
 export function confirmConcept(concept: Concept): Concept {
