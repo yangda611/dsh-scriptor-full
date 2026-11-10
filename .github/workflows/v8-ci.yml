@@ -1,9 +1,9 @@
 name: v8 CI
 on:
   pull_request:
-    branches: [v8]
+    branches: [main]
   push:
-    branches: [v8]
+    branches: [main]
 permissions:
   contents: read
 concurrency:
@@ -100,9 +100,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm --filter @linfengqaqtat/dsh-scriptor typecheck
-      - run: pnpm --filter @linfengqaqtat/dsh-scriptor dump-config-check
-      - run: pnpm --filter @linfengqaqtat/dsh-scriptor pack-check
+      - run: pnpm --filter @yangda611/dsh-scriptor typecheck
+      - run: pnpm --filter @yangda611/dsh-scriptor dump-config-check
+      - run: pnpm --filter @yangda611/dsh-scriptor pack-check
       - name: Generated notices are current
         run: |
           node --input-type=module -e "import { restoreNoticeLineEndings } from './scripts/release/release-source.mjs'; restoreNoticeLineEndings(process.cwd())"

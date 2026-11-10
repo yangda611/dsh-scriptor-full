@@ -1,18 +1,21 @@
-# 从公开源码开发
+# 从二开源码开发
 
-使用公开 v8 分支，推荐 Node 24.15.0、pnpm 11.27.1（源码构建与宿主插件管理统一为该版本）。无需私人任务文件或原书。
+使用本仓库 `main` 分支，推荐 Node 24.15.0、pnpm 11.27.1（源码构建与宿主插件管理统一为该版本）。无需私人任务文件或原书。
+
+> [!WARNING]
+> 本仓库已将发布包改为 `@yangda611` scope。当前这些包尚未发布到 npm；在完成 npm scope 授权与发行前，文档中的安装标识不能从 registry 安装。可先按下方步骤本地构建和验证。
 
 ```text
-git clone --branch v8 --single-branch https://github.com/lingfengQAQ/webnovel-writer.git
-cd webnovel-writer
+git clone --branch main --single-branch https://github.com/yangda611/dsh-scriptor-full.git
+cd dsh-scriptor-full
 pnpm install --frozen-lockfile
 pnpm lint
 pnpm test
 pnpm test:release
 pnpm build
-pnpm --filter @linfengqaqtat/dsh-scriptor typecheck
-pnpm --filter @linfengqaqtat/dsh-scriptor dump-config-check
-pnpm --filter @linfengqaqtat/dsh-scriptor pack-check
+pnpm --filter @yangda611/dsh-scriptor typecheck
+pnpm --filter @yangda611/dsh-scriptor dump-config-check
+pnpm --filter @yangda611/dsh-scriptor pack-check
 pnpm check:public
 ```
 

@@ -37,10 +37,10 @@ Scriptor 8.4.0 已适配 DSH **0.2.2-rc.1**。允许从此版本开始的0.2系�
 
 | 插件 | 输入框内容 | 用途 |
 | --- | --- | --- |
-| 写作工作台 | `@linfengqaqtat/dsh-scriptor@8.4.0` | 书房、设计、写章、审读、定稿与导出 |
-| 检索增强（可选） | `@linfengqaqtat/dsh-scriptor-retrieval@8.4.0` | 嵌入、场景识别、重排，分别配置和启用 |
-| 鲸鱼娘（可选） | `@linfengqaqtat/dsh-scriptor-companion@8.4.0` | 窗口内陪伴及会话状态反馈 |
-| 完整版（二选一） | `@linfengqaqtat/dsh-scriptor-full@8.4.0` | 一次安装写作与检索，不含桌宠 |
+| 写作工作台 | `@yangda611/dsh-scriptor@8.4.0` | 书房、设计、写章、审读、定稿与导出 |
+| 检索增强（可选） | `@yangda611/dsh-scriptor-retrieval@8.4.0` | 嵌入、场景识别、重排，分别配置和启用 |
+| 鲸鱼娘（可选） | `@yangda611/dsh-scriptor-companion@8.4.0` | 窗口内陪伴及会话状态反馈 |
+| 完整版（二选一） | `@yangda611/dsh-scriptor-full@8.4.0` | 一次安装写作与检索，不含桌宠 |
 
 可安装版本以 npm 和 GitHub Release 的实际发布记录为准。本教程使用精确版本，方便核对配套的 DSH。安装源优先选官方 npm。
 
@@ -100,7 +100,7 @@ DSH 接口会随版本变化。更高的 DSH 版本不代表已经兼容。
 
 1. 停用正在使用的会话。
 2. 移除单独安装的写作工作台和检索增强。
-3. 安装 `@linfengqaqtat/dsh-scriptor-full@8.4.0`。
+3. 安装 `@yangda611/dsh-scriptor-full@8.4.0`。
 4. 应用变更。
    成功时，只剩下完整版这一个入口。
 
@@ -108,7 +108,7 @@ DSH 接口会随版本变化。更高的 DSH 版本不代表已经兼容。
 
 ## 从旧包升级
 
-先阅读 [备份与升级](upgrade-backup.md)。旧检索包是 `webnovel-embedding-provider`。旧桌宠包是 `@linfengqaqtat/dsh-whale-companion`。
+先阅读 [备份与升级](upgrade-backup.md)。旧检索包是 `webnovel-embedding-provider`。旧桌宠包是 `旧版鲸鱼娘桌宠包`。
 
 > [!WARNING]
 > 不要让旧包名和新包名同时启用。
@@ -127,7 +127,7 @@ DSH 接口会随版本变化。更高的 DSH 版本不代表已经兼容。
 
 0.1.0-preview.7 / 旧提供方 0.0.9 对应 DSH 0.1.7-rc.2。8.3.2 对应 DSH 0.2.1-rc.3。旧版资料留在相应的 Release。不要把一个版本的说明套到另一个 DSH 上。
 
-[下载本版及校验和](https://github.com/lingfengQAQ/webnovel-writer/releases/tag/scriptor-v8.4.0) · [配置教程](configuration.md) · [故障排查](troubleshooting.md) · [维护者命令行安装](../maintenance/cli-install.md)
+[下载本版及校验和](https://github.com/yangda611/dsh-scriptor-full/releases/tag/scriptor-v8.4.0) · [配置教程](configuration.md) · [故障排查](troubleshooting.md) · [维护者命令行安装](../maintenance/cli-install.md)
 
 ## 平台与测试范围
 

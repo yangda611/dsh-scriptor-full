@@ -20,7 +20,7 @@ const fullArg = process.argv.indexOf('--full-package')
 if (fullArg >= 0 && !process.argv[fullArg + 1]) throw new Error('--full-package requires an installed meta package directory')
 const testedFull = fullArg >= 0 ? path.resolve(process.argv[fullArg + 1]) : undefined
 if (testedFull && !indexCheck) throw new Error('--full-package requires --index')
-if (JSON.parse(fs.readFileSync(path.join(testedPackage, 'package.json'), 'utf8')).name !== '@linfengqaqtat/dsh-scriptor') throw new Error('Expected the installed Scriptor package')
+if (JSON.parse(fs.readFileSync(path.join(testedPackage, 'package.json'), 'utf8')).name !== '@yangda611/dsh-scriptor') throw new Error('Expected the installed Scriptor package')
 if (!fs.existsSync(cli) || !Number.isInteger(port) || port < 1024) throw new Error('Supply the installed DSH CLI entry and an available port')
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'webnovel-browser-'))
 const profile = path.join(root, 'profiles', 'web')
@@ -33,12 +33,12 @@ const linkPackage = (name, target) => {
   fs.mkdirSync(path.dirname(link), { recursive: true })
   fs.symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir')
 }
-linkPackage('@linfengqaqtat/dsh-scriptor', testedPackage)
-if (indexCheck) linkPackage('@linfengqaqtat/dsh-scriptor-retrieval', testedRetrieval)
-if (testedFull) linkPackage('@linfengqaqtat/dsh-scriptor-full', testedFull)
-const extraBundles = testedFull ? ['@linfengqaqtat/dsh-scriptor-full'] : ['@linfengqaqtat/dsh-scriptor', ...(indexCheck ? ['@linfengqaqtat/dsh-scriptor-retrieval'] : [])]
+linkPackage('@yangda611/dsh-scriptor', testedPackage)
+if (indexCheck) linkPackage('@yangda611/dsh-scriptor-retrieval', testedRetrieval)
+if (testedFull) linkPackage('@yangda611/dsh-scriptor-full', testedFull)
+const extraBundles = testedFull ? ['@yangda611/dsh-scriptor-full'] : ['@yangda611/dsh-scriptor', ...(indexCheck ? ['@yangda611/dsh-scriptor-retrieval'] : [])]
 fs.writeFileSync(path.join(profile, 'package.json'), JSON.stringify({ name: 'webnovel-acceptance-profile', private: true, type: 'module',
-  dependencies: testedFull ? { '@linfengqaqtat/dsh-scriptor-full': 'file:' + testedFull } : { '@linfengqaqtat/dsh-scriptor': 'file:' + testedPackage, ...(indexCheck ? { '@linfengqaqtat/dsh-scriptor-retrieval': 'file:' + testedRetrieval } : {}) },
+  dependencies: testedFull ? { '@yangda611/dsh-scriptor-full': 'file:' + testedFull } : { '@yangda611/dsh-scriptor': 'file:' + testedPackage, ...(indexCheck ? { '@yangda611/dsh-scriptor-retrieval': 'file:' + testedRetrieval } : {}) },
   dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', ...extraBundles], patchReload: 'live' } } }, null, 2))
 // Keep the Host-only fixture outside the source package so Client discovery uses the installed artifact.
 const fixture = path.join(root, 'browser-fixture')

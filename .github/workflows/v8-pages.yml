@@ -1,7 +1,7 @@
 name: v8 Pages
 on:
   push:
-    branches: [v8]
+    branches: [main]
     paths:
       - 'docs/user/**'
       - 'site/**'
@@ -9,7 +9,7 @@ on:
       - 'dsh-baseline.json'
       - '.github/workflows/v8-pages.yml'
   pull_request:
-    branches: [v8]
+    branches: [main]
     paths:
       - 'docs/user/**'
       - 'site/**'

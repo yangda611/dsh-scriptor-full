@@ -96,8 +96,8 @@ export function createBook(input: CreateBookInput): CreateBookResult {
 
 function initFirstCommit(bookRoot: string): string {
   runGit(bookRoot, ['init'])
-  runGit(bookRoot, ['config', 'user.email', 'webnovel-writer@local'])
-  runGit(bookRoot, ['config', 'user.name', 'webnovel-writer'])
+  runGit(bookRoot, ['config', 'user.email', 'dsh-scriptor@local'])
+  runGit(bookRoot, ['config', 'user.name', 'dsh-scriptor'])
   runGit(bookRoot, ['config', 'commit.gpgsign', 'false'])
   runGit(bookRoot, ['add', '-A'])
   runGit(bookRoot, ['commit', '-m', FIRST_COMMIT])

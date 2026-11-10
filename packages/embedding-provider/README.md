@@ -4,7 +4,7 @@ Scriptor 8.4.0 适配 DSH 0.2.2-rc.1。安装范围为 `>=0.2.2-rc.1 <0.3.0-0`�
 
 8.4.0还提供独立的图谱聊天模型入口 `webnovel-graph`。在插件页配置模型，再到每本书的“关系”页预览并启用。它只发送已入档沉淀和实体名称/别名，默认不抽取定稿全文；向量、场景和图谱开关互不联动。抽取关系带原文依据和“沉淀抽取”标记，不回写世界书。插件不设请求或输入额度，输出长度沿用宿主模型设置。API错误或超时保留已完成结果，可显式重试失败项。主包单装仍可读取确定性关系和有效缓存。
 
-[产品主页](https://lingfengqaq.github.io/webnovel-writer/) · [检索配置教程](https://lingfengqaq.github.io/webnovel-writer/docs/enhanced-index.html)
+[产品主页](https://yangda611.github.io/dsh-scriptor-full/) · [检索配置教程](https://yangda611.github.io/dsh-scriptor-full/docs/enhanced-index.html)
 
 > Scriptor 8.4.0 配套 **DSH 0.2.2-rc.1**。旧格式先备份并使用书仓维护预览，按明确批准执行升级。
 
@@ -36,7 +36,7 @@ Gemini 原生每条文本单独构造请求，使用 `batchEmbedContents` 保持
 
 启用后，写作工作台的后台索引会调用提供方发送已启用书仓的定稿切片；检索时仅发送查询文本。后台使用单次 `embedBatch` 请求并统一管理退避重试，已成功批次保存后可继续复用。超时、临时错误有界重试；批次数量、索引、维数或数值异常会明确失败，不过滤输入造成错配。不跟随 HTTP 重定向转交凭据，不回显远端响应正文。取消、设置变更及卸载会终止在途请求。
 
-构建：`pnpm --filter @linfengqaqtat/dsh-scriptor-retrieval build`。本地分发包只包含 `lib/index.js`、`lib/client.js`、包描述、本说明、模型维度表、LICENSE 及第三方声明。安装到 profile 后，Cordis 条目使用 `name: '@linfengqaqtat/dsh-scriptor-retrieval'`，无需把密钥写入条目配置。
+构建：`pnpm --filter @yangda611/dsh-scriptor-retrieval build`。本地分发包只包含 `lib/index.js`、`lib/client.js`、包描述、本说明、模型维度表、LICENSE 及第三方声明。安装到 profile 后，Cordis 条目使用 `name: '@yangda611/dsh-scriptor-retrieval'`，无需把密钥写入条目配置。
 
 协议依据：
 
@@ -54,4 +54,4 @@ Gemini 原生每条文本单独构造请求，使用 `batchEmbedContents` 保持
 
 “检测默认维度”发送一条固定测试文本，可能产生少量费用；只读取默认向量宽度，不代表支持的全部维度。探测成功后关闭请求中的维度参数，实际响应仍严格按配置宽度校验。models.dev 当前没有专用维度契约，不能将其 limit.output 直接当成维度。
 
-第三方许可与版权文本见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，使用说明见 [公开文档](https://github.com/lingfengQAQ/webnovel-writer/tree/v8/docs/user)。
+第三方许可与版权文本见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，使用说明见 [公开文档](https://github.com/yangda611/dsh-scriptor-full/tree/main/docs/user)。

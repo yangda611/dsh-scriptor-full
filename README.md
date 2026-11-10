@@ -1,6 +1,6 @@
 # DSH Scriptor · Webnovel Writer v8
 
-**[🌐 产品主页](https://lingfengqaq.github.io/webnovel-writer/) · [📖 新手教程](https://lingfengqaq.github.io/webnovel-writer/docs/beginner.html) · [下载正式版](https://github.com/lingfengQAQ/webnovel-writer/releases/latest)**
+**[🌐 产品主页](https://yangda611.github.io/dsh-scriptor-full/) · [📖 新手教程](https://yangda611.github.io/dsh-scriptor-full/docs/beginner.html) · [下载正式版](https://github.com/yangda611/dsh-scriptor-full/releases/latest)**
 
 > Scriptor 8.4.0 配套 **DSH 0.2.2-rc.1**。旧格式先备份并使用书仓维护预览，按明确批准执行升级。
 
@@ -63,8 +63,8 @@ Scriptor 将长篇小说的生产拆分为**作品设计**与**章节闭环**两
 
 | 产品线 | 运行环境 | 入口 |
 | --- | --- | --- |
-| v6 | Claude Code 插件 | [v6 文档与安装](https://github.com/lingfengQAQ/webnovel-writer/tree/master) |
-| v8（本分支） | DeepSeek Harness 工作台 | [版本发行页](https://github.com/lingfengQAQ/webnovel-writer/releases/tag/scriptor-v8.4.0) · [安装教程](docs/user/install.md) |
+| v6 | Claude Code 插件 | 当前仓库不提供 v6 安装文档 |
+| v8（本分支） | DeepSeek Harness 工作台 | [版本发行页](https://github.com/yangda611/dsh-scriptor-full/releases/tag/scriptor-v8.4.0) · [安装教程](docs/user/install.md) |
 
 两个版本安装方式不同。当前没有经过验证的 v6/v7 书仓直接迁移方案。`v8` 是产品线名称，`8.4.0` 是安装包版本。
 
@@ -82,17 +82,20 @@ Scriptor 将长篇小说的生产拆分为**作品设计**与**章节闭环**两
 
 ## 开始使用
 
+> [!WARNING]
+> 本仓库的插件包名已切换到 `@yangda611` scope。该 scope 下的 8.4.0 包尚未发布到 npm；在完成 npm 发布前，下方安装标识不可从 registry 安装。源码构建步骤见[开发指南](docs/development.md)。
+
 1. 安装配套的 **DSH 0.2.2-rc.1** 桌面端，打开侧栏 **插件 → 添加插件**。
-2. 输入 `@linfengqaqtat/dsh-scriptor@8.4.0`，核对预览并安装，按提示应用变更。
+2. 输入 `@yangda611/dsh-scriptor@8.4.0`，核对预览并安装，按提示应用变更。
 3. 配置聊天模型与凭据，新建对话并选择 **写作模式**，打开作品工作区，按 [第一本书与第一章](docs/user/first-book.md) 开始。
 
 逐步说明见 [安装教程](docs/user/install.md) 和 [新手教程](docs/user/beginner.md)。正式版发布到 npm latest，教程使用精确版本便于核对宿主。
 
 | 可选插件 | 安装标识 | 用途 |
 | --- | --- | --- |
-| 检索增强 | `@linfengqaqtat/dsh-scriptor-retrieval@8.4.0` | 嵌入、场景识别、重排，分别配置和启用 |
-| 鲸鱼娘 | `@linfengqaqtat/dsh-scriptor-companion@8.4.0` | 窗口内陪伴与会话状态反馈，不调用模型 |
-| 完整版 | `@linfengqaqtat/dsh-scriptor-full@8.4.0` | 聚合写作和检索，不含桌宠；与单独安装二选一 |
+| 检索增强 | `@yangda611/dsh-scriptor-retrieval@8.4.0` | 嵌入、场景识别、重排，分别配置和启用 |
+| 鲸鱼娘 | `@yangda611/dsh-scriptor-companion@8.4.0` | 窗口内陪伴与会话状态反馈，不调用模型 |
+| 完整版 | `@yangda611/dsh-scriptor-full@8.4.0` | 聚合写作和检索，不含桌宠；与单独安装二选一 |
 
 旧包迁移与备份见 [升级说明](docs/user/upgrade-backup.md)，不要同时启用旧检索包和新检索包。
 
@@ -111,18 +114,10 @@ Scriptor 将长篇小说的生产拆分为**作品设计**与**章节闭环**两
 - [从源码构建](docs/development.md) · [书仓格式与修改边界](docs/book-format.md)
 - [贡献与 PR 规范](CONTRIBUTING.md) · [发行规范](docs/maintenance/releasing.md) · [更新记录](CHANGELOG.md)
 
-## 赞助与交流
+## 交流与反馈
 
-欢迎在 [Discussions](https://github.com/lingfengQAQ/webnovel-writer/discussions) 交流使用体验。不便公开的交流或合作事宜，可以发邮件到 [ksdflisjdf@gmail.com](mailto:ksdflisjdf@gmail.com)。
-
-### 赞助商与广告合作
-
-欢迎支持项目的持续维护，也欢迎洽谈 README 赞助商展示与广告合作。有意合作请通过上述邮箱介绍品牌或产品、希望展示的内容及合作周期，具体形式另行沟通。合作展示会明确标注为赞助或广告。
-
-## 反馈与许可证
-
-[Bug / 功能建议](https://github.com/lingfengQAQ/webnovel-writer/issues/new/choose) 请注明 **v8 和精确安装包版本**。使用交流到 [Discussions](https://github.com/lingfengQAQ/webnovel-writer/discussions)。安全问题按 [SECURITY.md](SECURITY.md) 私下报告，不公开粘贴密钥或作品。
+欢迎在 [Discussions](https://github.com/yangda611/dsh-scriptor-full/discussions) 交流使用体验。提交 [Bug / 功能建议](https://github.com/yangda611/dsh-scriptor-full/issues/new/choose) 时请注明 **v8 和精确安装包版本**。安全问题按 [SECURITY.md](SECURITY.md) 私下报告，不公开粘贴密钥或作品。
 
 项目继承 [GPL-3.0-only](LICENSE)，可依照许可证使用、修改及分发，包括商用；保留必要声明，并在分发时履行相应源码等义务。仅使用本工具创作不会自动要求你的小说采用 GPL。模型服务及第三方素材适用各自条款。
 
-保留 Webnovel Writer 项目来源及贡献者署名。主包的 [第三方声明](packages/bundle/THIRD_PARTY_NOTICES.md) 随发行件提供。
+版权与许可证声明见各包附带的 LICENSE 及第三方声明文件。

@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    if: github.repository == 'lingfengQAQ/webnovel-writer' && (github.event_name == 'workflow_dispatch' || (startsWith(github.event.release.tag_name, 'scriptor-v') && !github.event.release.prerelease))
+    if: github.repository == 'yangda611/dsh-scriptor-full' && (github.event_name == 'workflow_dispatch' || (startsWith(github.event.release.tag_name, 'scriptor-v') && !github.event.release.prerelease))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -36,7 +36,7 @@ jobs:
       - name: Check out reviewed publication tooling
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: v8
+          ref: main
           path: publisher
           persist-credentials: false
       - name: Validate requested tag
@@ -51,7 +51,7 @@ jobs:
           persist-credentials: false
       - name: Tag belongs to accepted public v8
         working-directory: source
-        run: git merge-base --is-ancestor HEAD origin/v8
+        run: git merge-base --is-ancestor HEAD origin/main
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24.15.0'
@@ -87,7 +87,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: v8
+          ref: main
           path: publisher
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -110,8 +110,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $manifest = Get-Content .tmp/npm-release/release-manifest.json -Raw | ConvertFrom-Json
           $main = Join-Path .tmp/npm-release $manifest.filename
-          $embedding = Join-Path .tmp/npm-release ($manifest.optionalPackages | Where-Object name -eq '@linfengqaqtat/dsh-scriptor-retrieval').tarball
-          $meta = Join-Path .tmp/npm-release ($manifest.optionalPackages | Where-Object name -eq '@linfengqaqtat/dsh-scriptor-full').tarball
+          $embedding = Join-Path .tmp/npm-release ($manifest.optionalPackages | Where-Object name -eq '@yangda611/dsh-scriptor-retrieval').tarball
+          $meta = Join-Path .tmp/npm-release ($manifest.optionalPackages | Where-Object name -eq '@yangda611/dsh-scriptor-full').tarball
           node scripts/release/install-smoke.mjs $main $embedding $meta --registry
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   finalize:

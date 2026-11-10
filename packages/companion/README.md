@@ -2,7 +2,7 @@
 
 Scriptor 8.4.0 适配 DSH 0.2.2-rc.1。安装范围为 `>=0.2.2-rc.1 <0.3.0-0`，Node最低24.9；实际验证按具体版本记录。
 
-[产品主页](https://lingfengqaq.github.io/webnovel-writer/) · [安装教程](https://lingfengqaq.github.io/webnovel-writer/docs/install.html)
+[产品主页](https://yangda611.github.io/dsh-scriptor-full/) · [安装教程](https://yangda611.github.io/dsh-scriptor-full/docs/install.html)
 
 独立 DSH 插件，在窗口内陪你写作。可单独安装，也可与 DSH Scriptor 小说插件一起使用。
 
@@ -10,9 +10,9 @@ Scriptor 8.4.0 适配 DSH 0.2.2-rc.1。安装范围为 `>=0.2.2-rc.1 <0.3.0-0`�
 
 ## 安装
 
-配套 DSH 0.2.2-rc.1。在 DSH 侧栏“插件 → 添加插件”输入 `@linfengqaqtat/dsh-scriptor-companion@8.4.0`，核对预览后安装，按提示启用或重启。
+配套 DSH 0.2.2-rc.1。在 DSH 侧栏“插件 → 添加插件”输入 `@yangda611/dsh-scriptor-companion@8.4.0`，核对预览后安装，按提示启用或重启。
 
-安装包携带全部运行素材，无需 Dola 网络连接、Python、FFmpeg 或额外模型配置。桌宠仍在 DSH 窗口内显示，不是 Windows 全局悬浮窗。旧 @linfengqaqtat/dsh-whale-companion 先撤销安装入口，不要与新包同时启用；详见 [安装与迁移](https://github.com/lingfengQAQ/webnovel-writer/blob/v8/docs/user/install.md)。
+安装包携带全部运行素材，无需 Dola 网络连接、Python、FFmpeg 或额外模型配置。桌宠仍在 DSH 窗口内显示，不是 Windows 全局悬浮窗。旧 旧版鲸鱼娘桌宠包 先撤销安装入口，不要与新包同时启用；详见 [安装与迁移](https://github.com/yangda611/dsh-scriptor-full/blob/main/docs/user/install.md)。
 
 ## 使用
 
@@ -27,16 +27,16 @@ Scriptor 8.4.0 适配 DSH 0.2.2-rc.1。安装范围为 `>=0.2.2-rc.1 <0.3.0-0`�
 退出/卸载仅移除桌宠，作品和对话不受影响。CLI 卸载前关闭该 profile 的运行实例：
 
 ```sh
-dsh plugin --profile writing remove @linfengqaqtat/dsh-scriptor-companion
+dsh plugin --profile writing remove @yangda611/dsh-scriptor-companion
 ```
 
 ## 开发
 
 ```sh
-pnpm --filter @linfengqaqtat/dsh-scriptor-companion typecheck
-pnpm --filter @linfengqaqtat/dsh-scriptor-companion test
-pnpm --filter @linfengqaqtat/dsh-scriptor-companion build
-pnpm --filter @linfengqaqtat/dsh-scriptor-companion pack-check
+pnpm --filter @yangda611/dsh-scriptor-companion typecheck
+pnpm --filter @yangda611/dsh-scriptor-companion test
+pnpm --filter @yangda611/dsh-scriptor-companion build
+pnpm --filter @yangda611/dsh-scriptor-companion pack-check
 ```
 
 素材制作方式和来源见 MEDIA.md。此包独立版本管理，未自动加入小说 full 安装组合。

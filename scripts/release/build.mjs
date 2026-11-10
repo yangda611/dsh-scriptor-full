@@ -41,15 +41,15 @@ pack('packages/bundle', info.filename)
 const main = path.join(output, info.filename)
 pnpm(['--filter', info.packageName, 'pack-check', main])
 const embedding = JSON.parse(fs.readFileSync(path.join(root, 'packages/embedding-provider/package.json'), 'utf8'))
-const embeddingTarball = `linfengqaqtat-dsh-scriptor-retrieval-${embedding.version}.tgz`
+const embeddingTarball = `yangda611-dsh-scriptor-retrieval-${embedding.version}.tgz`
 pack('packages/embedding-provider', embeddingTarball)
 checkEmbeddingPackage(path.join(output, embeddingTarball), embedding.version)
 const meta = JSON.parse(fs.readFileSync(path.join(root, 'packages/meta/package.json'), 'utf8'))
-const metaTarball = `linfengqaqtat-dsh-scriptor-full-${meta.version}.tgz`
+const metaTarball = `yangda611-dsh-scriptor-full-${meta.version}.tgz`
 pack('packages/meta', metaTarball)
 checkMetaPackage(path.join(output, metaTarball), info.version, embedding.version)
 const companion = JSON.parse(fs.readFileSync(path.join(root, 'packages/companion/package.json'), 'utf8'))
-const companionTarball = `linfengqaqtat-dsh-scriptor-companion-${companion.version}.tgz`
+const companionTarball = `yangda611-dsh-scriptor-companion-${companion.version}.tgz`
 pack('packages/companion', companionTarball)
 pnpm(['--filter', companion.name, 'pack-check', path.join(output, companionTarball)])
 const source = `dsh-scriptor-${info.version}-source.tar.gz`

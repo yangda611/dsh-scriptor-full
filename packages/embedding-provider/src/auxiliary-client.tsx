@@ -39,7 +39,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-export const RETRIEVAL_BUNDLES = ['@linfengqaqtat/dsh-scriptor-full', '@linfengqaqtat/dsh-scriptor-retrieval'] as const
+export const RETRIEVAL_BUNDLES = ['@yangda611/dsh-scriptor-full', '@yangda611/dsh-scriptor-retrieval'] as const
 
 type Draft = SceneSettings & RerankSettings & GraphSettings
 type Group = { readonly id: string; readonly name: string; readonly models: readonly { readonly id: string; readonly name: string }[] }

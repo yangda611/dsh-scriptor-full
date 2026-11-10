@@ -587,10 +587,10 @@ importers:
 
   packages/meta:
     dependencies:
-      '@linfengqaqtat/dsh-scriptor':
+      '@yangda611/dsh-scriptor':
         specifier: workspace:*
         version: link:../bundle
-      '@linfengqaqtat/dsh-scriptor-retrieval':
+      '@yangda611/dsh-scriptor-retrieval':
         specifier: workspace:*
         version: link:../embedding-provider
 

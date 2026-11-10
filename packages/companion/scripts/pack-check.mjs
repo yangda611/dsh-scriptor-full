@@ -18,10 +18,10 @@ if (!tarball) {
 const files = packageFiles(tarball)
 const text = name => { assert.ok(files.has(name), 'Missing ' + name); return files.get(name).toString('utf8') }
 const manifest = JSON.parse(text('package.json'))
-assert.equal(manifest.name, '@linfengqaqtat/dsh-scriptor-companion')
+assert.equal(manifest.name, '@yangda611/dsh-scriptor-companion')
 checkPublishableManifest(manifest)
 assert.equal(manifest.exports['./client'], './lib/client.js')
-assert.ok(text('cordis.patch.yml').includes("name: '@linfengqaqtat/dsh-scriptor-companion'"))
+assert.ok(text('cordis.patch.yml').includes("name: '@yangda611/dsh-scriptor-companion'"))
 assert.equal(manifest.dsh.client.platform, 'web')
 const allowed = ['package.json','lib/index.js','lib/client.js','assets/manifest.json','cordis.patch.yml','README.md','LICENSE','MEDIA.md'].sort()
 assert.deepEqual([...files.keys()].sort(), allowed)

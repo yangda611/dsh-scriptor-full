@@ -29,22 +29,22 @@ const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding:
 /** Build release assets whose bytes and manifest match what the publisher validates. */
 function writeAssets(directory) {
   const entries = [
-    ['@linfengqaqtat/dsh-scriptor', version, `linfengqaqtat-dsh-scriptor-${version}.tgz`],
-    ['@linfengqaqtat/dsh-scriptor-retrieval', version, 'linfengqaqtat-dsh-scriptor-retrieval-8.0.0.tgz'],
-    ['@linfengqaqtat/dsh-scriptor-full', version, `linfengqaqtat-dsh-scriptor-full-${version}.tgz`],
-    ['@linfengqaqtat/dsh-scriptor-companion', version, `linfengqaqtat-dsh-scriptor-companion-${version}.tgz`],
+    ['@yangda611/dsh-scriptor', version, `yangda611-dsh-scriptor-${version}.tgz`],
+    ['@yangda611/dsh-scriptor-retrieval', version, 'yangda611-dsh-scriptor-retrieval-8.0.0.tgz'],
+    ['@yangda611/dsh-scriptor-full', version, `yangda611-dsh-scriptor-full-${version}.tgz`],
+    ['@yangda611/dsh-scriptor-companion', version, `yangda611-dsh-scriptor-companion-${version}.tgz`],
   ]
   const packages = entries.map(([name, v, tarball]) => ({ name, version: v, tarball }))
   for (const [index, item] of packages.entries()) {
     const manifest = { name: item.name, version: item.version, license: 'GPL-3.0-only', publishConfig, engines,
-      repository: { url: 'https://github.com/lingfengQAQ/webnovel-writer.git' } }
+      repository: { url: 'https://github.com/yangda611/dsh-scriptor-full.git' } }
     const files = { 'package.json': manifest, LICENSE: 'GNU GENERAL PUBLIC LICENSE', 'README.md': 'Example' }
     if (index === 1) {
       manifest.exports = { './scenes': './lib/scenes.js', './reranking': './lib/reranking.js', './graph': './lib/graph.js' }
       Object.assign(files, { 'lib/index.js': '', 'lib/scenes.js': '', 'lib/reranking.js': '', 'lib/graph.js': '', 'lib/client.js': `window.__ModuleLoader__.load({ id: ${JSON.stringify(item.name)},`, 'cordis.patch.yml': fs.readFileSync(path.join(root, 'packages/embedding-provider/cordis.patch.yml'), 'utf8'), 'MODEL_DIMENSIONS.md': '', 'THIRD_PARTY_NOTICES.md': 'Original notices' })
     }
     if (index === 2) {
-      manifest.dependencies = { '@linfengqaqtat/dsh-scriptor': version, '@linfengqaqtat/dsh-scriptor-retrieval': version }
+      manifest.dependencies = { '@yangda611/dsh-scriptor': version, '@yangda611/dsh-scriptor-retrieval': version }
       manifest.dsh = { bundle: { patch: ['./cordis.patch.yml', './presets/writing.patch.yml'] } }
       files['cordis.patch.yml'] = fs.readFileSync(path.join(root, 'packages/meta/cordis.patch.yml'), 'utf8')
       files['presets/writing.patch.yml'] = fs.readFileSync(path.join(root, 'packages/meta/presets/writing.patch.yml'), 'utf8')

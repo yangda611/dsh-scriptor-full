@@ -22,9 +22,9 @@ assert.equal(run(['--version'],'version').trim(),baseline.registry.version)
 run(['--profile','whale-test','--from-default-profile','web','--dump-config'],'initial')
 const tarball=path.join(root,'companion.tgz');fs.copyFileSync(path.resolve(tarArg),tarball)
 run(['plugin','--profile','whale-test','add',tarball],'install')
-assert.ok(run(['--profile','whale-test','--dump-config'],'installed').includes('@linfengqaqtat/dsh-scriptor-companion'))
-run(['plugin','--profile','whale-test','remove','@linfengqaqtat/dsh-scriptor-companion'],'uninstall')
-assert.ok(!run(['--profile','whale-test','--dump-config'],'removed').includes('@linfengqaqtat/dsh-scriptor-companion'))
+assert.ok(run(['--profile','whale-test','--dump-config'],'installed').includes('@yangda611/dsh-scriptor-companion'))
+run(['plugin','--profile','whale-test','remove','@yangda611/dsh-scriptor-companion'],'uninstall')
+assert.ok(!run(['--profile','whale-test','--dump-config'],'removed').includes('@yangda611/dsh-scriptor-companion'))
 run(['plugin','--profile','whale-test','add',tarball],'reinstall')
 if (process.env.WHALE_SCRIPTOR_TGZ) {
   const scriptor = path.join(root, 'scriptor.tgz')
@@ -33,7 +33,7 @@ if (process.env.WHALE_SCRIPTOR_TGZ) {
 }
 const profile=path.join(home,'profiles','whale-test')
 const installed=JSON.parse(fs.readFileSync(path.join(profile,'package.json'),'utf8'))
-assert.ok(installed.dependencies?.['@linfengqaqtat/dsh-scriptor-companion'])
+assert.ok(installed.dependencies?.['@yangda611/dsh-scriptor-companion'])
 installed.dsh.profile.patchReload = 'live'
 fs.writeFileSync(path.join(profile, 'package.json'), JSON.stringify(installed, null, 2))
 const patch=path.join(profile,'cordis.patch.yml')

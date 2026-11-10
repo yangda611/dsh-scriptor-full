@@ -1,5 +1,5 @@
 {
-  "name": "@linfengqaqtat/dsh-scriptor-full",
+  "name": "@yangda611/dsh-scriptor-full",
   "version": "8.4.0",
   "description": "网文写作工作台完整版（含可选嵌入提供方）",
   "keywords": [
@@ -11,14 +11,14 @@
     "ai-writing",
     "full-package"
   ],
-  "homepage": "https://lingfengqaq.github.io/webnovel-writer/",
+  "homepage": "https://yangda611.github.io/dsh-scriptor-full/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lingfengQAQ/webnovel-writer.git",
+    "url": "https://github.com/yangda611/dsh-scriptor-full.git",
     "directory": "packages/meta"
   },
   "bugs": {
-    "url": "https://github.com/lingfengQAQ/webnovel-writer/issues"
+    "url": "https://github.com/yangda611/dsh-scriptor-full/issues"
   },
   "license": "GPL-3.0-only",
   "dsh": {
@@ -36,10 +36,9 @@
     "LICENSE",
     "presets/*.yml"
   ],
-  "author": "lingfengQAQ",
   "dependencies": {
-    "@linfengqaqtat/dsh-scriptor": "workspace:*",
-    "@linfengqaqtat/dsh-scriptor-retrieval": "workspace:*"
+    "@yangda611/dsh-scriptor": "workspace:*",
+    "@yangda611/dsh-scriptor-retrieval": "workspace:*"
   },
   "publishConfig": {
     "access": "public",

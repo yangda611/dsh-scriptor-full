@@ -9,10 +9,10 @@ import { packageFiles, checkPublishableManifest, checkEmbeddingPackage, checkMet
 // The official registry is the only release target. The environment override exists so
 // the publish path itself can be exercised against a first-publication fixture.
 const registry = process.env.SCRIPTOR_NPM_REGISTRY ?? 'https://registry.npmjs.org/'
-const mainName = '@linfengqaqtat/dsh-scriptor'
-const embeddingName = '@linfengqaqtat/dsh-scriptor-retrieval'
-const companionName = '@linfengqaqtat/dsh-scriptor-companion'
-const metaName = '@linfengqaqtat/dsh-scriptor-full'
+const mainName = '@yangda611/dsh-scriptor'
+const embeddingName = '@yangda611/dsh-scriptor-retrieval'
+const companionName = '@yangda611/dsh-scriptor-companion'
+const metaName = '@yangda611/dsh-scriptor-full'
 const digest = (bytes, algorithm = 'sha256', encoding = 'hex') => createHash(algorithm).update(bytes).digest(encoding)
 
 export function validateReleaseAssets(directory, expectedTag, expectedCommit) {
@@ -43,19 +43,19 @@ export function validateReleaseAssets(directory, expectedTag, expectedCommit) {
   assert.equal(manifest.publicCommit, expectedCommit)
   assert.equal(manifest.prerelease, false)
   assert.equal(manifest.packageName, mainName)
-  assert.equal(manifest.filename, `linfengqaqtat-dsh-scriptor-${manifest.version}.tgz`)
+  assert.equal(manifest.filename, `yangda611-dsh-scriptor-${manifest.version}.tgz`)
   assert.equal(manifest.optionalPackages?.length, 3)
   const optional = new Map(manifest.optionalPackages.map(item => [item.name, item]))
   assert.deepEqual([...optional.keys()].sort(), [embeddingName, metaName, companionName].sort())
   const companion = optional.get(companionName)
   assert.equal(companion.version, manifest.version)
-  assert.equal(companion.tarball, `linfengqaqtat-dsh-scriptor-companion-${companion.version}.tgz`)
+  assert.equal(companion.tarball, `yangda611-dsh-scriptor-companion-${companion.version}.tgz`)
   const embedding = optional.get(embeddingName)
   const meta = optional.get(metaName)
   assert.match(embedding.version, /^\d+\.\d+\.\d+$/)
-  assert.equal(embedding.tarball, `linfengqaqtat-dsh-scriptor-retrieval-${embedding.version}.tgz`)
+  assert.equal(embedding.tarball, `yangda611-dsh-scriptor-retrieval-${embedding.version}.tgz`)
   assert.equal(meta.version, manifest.version)
-  assert.equal(meta.tarball, `linfengqaqtat-dsh-scriptor-full-${meta.version}.tgz`)
+  assert.equal(meta.tarball, `yangda611-dsh-scriptor-full-${meta.version}.tgz`)
   const assets = new Map()
   for (const item of manifest.assets) {
     assert.ok(!assets.has(item.file), 'Duplicate manifest asset')
@@ -73,7 +73,7 @@ export function validateReleaseAssets(directory, expectedTag, expectedCommit) {
     const pkg = JSON.parse(files.get('package.json'))
     assert.equal(pkg.name, item.name)
     assert.equal(pkg.version, item.version)
-    assert.equal(pkg.repository?.url, 'https://github.com/lingfengQAQ/webnovel-writer.git')
+    assert.equal(pkg.repository?.url, 'https://github.com/yangda611/dsh-scriptor-full.git')
     checkPublishableManifest(pkg)
     return { ...item, filename, integrity: `sha512-${digest(bytes, 'sha512', 'base64')}` }
   })

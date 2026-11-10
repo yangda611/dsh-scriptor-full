@@ -12,7 +12,7 @@ import { DEFAULT_PALETTE, PALETTE_KEYS, PALETTES } from './palettes.mjs'
 const here = path.dirname(fileURLToPath(import.meta.url))
 export const defaultRoot = path.resolve(here, '..')
 export const defaultOut = path.join(defaultRoot, '.tmp', 'pages')
-const BRANCH = 'v8'
+const BRANCH = 'main'
 const GUIDES = 'docs/user/'
 
 /** Sidebar order. Guides not listed here are appended to the last group automatically. */
@@ -208,7 +208,7 @@ function readContext(root) {
   return {
     version: bundle.version, dsh, dshWebsite: 'https://www.deepseek.com/harness/', repo, branch: BRANCH, siteUrl,
     tree: `${repo}/tree/${BRANCH}`, release: `${repo}/releases/tag/scriptor-v${bundle.version}`,
-    pkg: name => `@linfengqaqtat/${name}@${bundle.version}`,
+    pkg: name => `@yangda611/${name}@${bundle.version}`,
   }
 }
 
@@ -625,18 +625,10 @@ function renderHome(ctx, groups, guides) {
     const guide = guides.get(page.name)
     return `<a class="doc-card" href="docs/${encodeURIComponent(page.name)}.html"><strong>${esc(page.label || guide.title)}</strong><span aria-hidden="true">↗</span></a>`
   }).join('')}</div>`).join('')}
-    <p class="home-links"><a href="${esc(ctx.repo)}/tree/master" target="_blank" rel="noopener noreferrer" title="Claude Code v6：安装方式不同，暂无直接迁移方案">Claude Code 版（v6）↗</a></p>
+    <p class="home-links"><a href="${esc(ctx.repo)}/tree/main" target="_blank" rel="noopener noreferrer" title="Claude Code v6：安装方式不同，暂无直接迁移方案">Claude Code 版（v6）↗</a></p>
   </div>
 </section>
-<section class="section" aria-labelledby="community-title">
-  <div class="section-inner">
-    <h2 id="community-title">赞助与交流</h2>
-    <div class="community-grid">
-      <article class="community-card"><div class="feature-icon">${infoIcons.feedback}</div><h3>交流与反馈</h3><p>公开问题欢迎讨论；不便公开的交流，请邮件联系。</p><div class="home-links"><a href="${esc(ctx.repo)}/discussions">参与讨论 ↗</a><a class="contact-mail" href="mailto:ksdflisjdf@gmail.com">${infoIcons.mail}<span>ksdflisjdf@gmail.com</span></a></div></article>
-      <article class="community-card"><div class="feature-icon">${infoIcons.heart}</div><h3>赞助与合作</h3><p>支持项目维护，或洽谈 README 赞助商展示与广告合作。</p><div class="home-links"><a href="mailto:ksdflisjdf@gmail.com?subject=Scriptor%20%E8%B5%9E%E5%8A%A9%E4%B8%8E%E5%90%88%E4%BD%9C">邮件沟通 ↗</a><a href="${esc(ctx.repo)}/blob/${ctx.branch}/README.md#赞助商与广告合作">合作说明 ↗</a></div></article>
-    </div>
-  </div>
-</section>`
+`
   return layout(ctx, { title: 'DSH Scriptor', description: '基于 DeepSeek Harness 的本地优先长篇小说写作工作台：构想、设定、大纲、写章、审读、定稿、记忆与导出一体化。', rel: '', pathname: '', body, page: 'home' })
 }
 

@@ -1,10 +1,10 @@
 # 贡献指南
 
-感谢帮助改进写作工作台。请先确认版本：**v8 的 PR 目标是 v8；v6 的 PR 目标是 master**。Fork 后默认展示 master 并不表示应从那里开发 v8。
+感谢帮助改进写作工作台。请先确认版本：**本仓库的 PR 目标是 main**。
 
 ## 本地开发
 
-从公开分支建立主题分支，例如 `git switch -c fix/install-help origin/v8`。使用 Node 24.15.0、pnpm 11.27.1，按 [开发说明](docs/development.md) 安装依赖和运行检查。无需任何内部开发工具或私人资料。
+从公开分支建立主题分支，例如 `git switch -c fix/install-help origin/main`。使用 Node 24.15.0、pnpm 11.27.1，按 [开发说明](docs/development.md) 安装依赖和运行检查。无需任何内部开发工具或私人资料。
 
 常规检查不需要模型密钥。测试与截图使用合成书仓；不要提交自己的 API key、启动 token、完整对话或私人小说。
 
@@ -12,7 +12,7 @@
 
 - Bug：精确安装包版本、Node/DSH/OS、安装方式、最小复现、预期与实际、脱敏日志；模型相关问题另填 provider/model。
 - 功能建议：描述写作场景、遇到的问题和希望获得的结果。较大的流程或格式改动先讨论方案。
-- 文档：给出文档路径和失效步骤。普通使用交流进入 [Discussions](https://github.com/lingfengQAQ/webnovel-writer/discussions)。
+- 文档：给出文档路径和失效步骤。普通使用交流进入 [Discussions](https://github.com/yangda611/dsh-scriptor-full/discussions)。
 - 安全问题按 [安全政策](SECURITY.md) 私下报告。
 
 ## Pull Request

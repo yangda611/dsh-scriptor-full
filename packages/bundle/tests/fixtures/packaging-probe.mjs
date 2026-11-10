@@ -30,7 +30,7 @@ export async function apply(ctx, config) {
     if (config.installed) {
       progress('module identity')
       const hostRequire = createRequire(config.hostAnchor)
-      const packedRequire = createRequire(hostRequire.resolve('@linfengqaqtat/dsh-scriptor', { paths: [config.profile] }))
+      const packedRequire = createRequire(hostRequire.resolve('@yangda611/dsh-scriptor', { paths: [config.profile] }))
       report.peers = {}
       // React is supplied by the browser module loader, not Node's Host resolver.
       for (const peer of ['@deepseek-ai/cordis', '@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-llm', '@deepseek-ai/dsh-skill-filesystem']) {
@@ -38,7 +38,7 @@ export async function apply(ctx, config) {
         assert.equal(installed, fs.realpathSync(hostRequire.resolve(peer)), `Duplicate shared runtime: ${peer}`)
         report.peers[peer] = 'same host module'
       }
-      const packageRoot = path.dirname(packedRequire.resolve('@linfengqaqtat/dsh-scriptor/package.json'))
+      const packageRoot = path.dirname(packedRequire.resolve('@yangda611/dsh-scriptor/package.json'))
       for (const summary of skills) {
         const skill = await ctx.skills.get(summary.name, { cwd: config.workspace, scope: agent })
         assert.ok(skill.content.length > 100)

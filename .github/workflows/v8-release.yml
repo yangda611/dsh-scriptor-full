@@ -69,7 +69,7 @@ jobs:
           persist-credentials: false
       - name: Tag belongs to accepted public v8
         shell: bash
-        run: git merge-base --is-ancestor HEAD origin/v8
+        run: git merge-base --is-ancestor HEAD origin/main
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 11.27.1
@@ -88,13 +88,13 @@ jobs:
           # 以构建清单为准定位主包与可选包；glob 会把 *-full-*.tgz 误并入主包位置。
           $manifest = Get-Content .tmp/release/release-manifest.json -Raw | ConvertFrom-Json
           $mainPackage = Join-Path .tmp/release $manifest.filename
-          $embeddingTarball = ($manifest.optionalPackages | Where-Object { $_.name -eq '@linfengqaqtat/dsh-scriptor-retrieval' }).tarball
+          $embeddingTarball = ($manifest.optionalPackages | Where-Object { $_.name -eq '@yangda611/dsh-scriptor-retrieval' }).tarball
           if (-not $embeddingTarball) { throw 'Embedding package missing from release manifest' }
           $embeddingPackage = Join-Path .tmp/release $embeddingTarball
-          $metaTarball = ($manifest.optionalPackages | Where-Object { $_.name -eq '@linfengqaqtat/dsh-scriptor-full' }).tarball
+          $metaTarball = ($manifest.optionalPackages | Where-Object { $_.name -eq '@yangda611/dsh-scriptor-full' }).tarball
           if (-not $metaTarball) { throw 'Full package missing from release manifest' }
           $metaPackage = Join-Path .tmp/release $metaTarball
-          $companionPackage = Join-Path .tmp/release ($manifest.optionalPackages | Where-Object name -eq '@linfengqaqtat/dsh-scriptor-companion').tarball
+          $companionPackage = Join-Path .tmp/release ($manifest.optionalPackages | Where-Object name -eq '@yangda611/dsh-scriptor-companion').tarball
           pnpm release:smoke -- $mainPackage $embeddingPackage $metaPackage --companion $companionPackage
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Validate npm publish inputs without publishing

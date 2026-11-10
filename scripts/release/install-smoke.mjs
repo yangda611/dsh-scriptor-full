@@ -74,9 +74,9 @@ try {
   report.installSource = fromRegistry ? 'npm' : 'tarball'
   const profile = path.join(home, 'profiles/scriptor-test')
   const dump = run(cli, ['--profile', 'scriptor-test', '--dump-config'])
-  assert.ok(dump.includes('@linfengqaqtat/dsh-scriptor'))
+  assert.ok(dump.includes('@yangda611/dsh-scriptor'))
   report.checks.configuration = true
-  const installed = require.resolve('@linfengqaqtat/dsh-scriptor/package.json', { paths: [profile] })
+  const installed = require.resolve('@yangda611/dsh-scriptor/package.json', { paths: [profile] })
   const installedRoot = path.dirname(installed)
   assert.ok(installedRoot.startsWith(root + path.sep))
   const prepare = path.join(root, 'prepare-profile.mjs')
@@ -99,26 +99,26 @@ try {
     const spec = fromRegistry ? packageSpec(companion) : copied
     log('add-companion', run(cli, ['plugin', '--profile', companionName, 'add', spec]))
     const companionDump = () => run(cli, ['--profile', companionName, '--dump-config'])
-    assert.ok(companionDump().includes('@linfengqaqtat/dsh-scriptor-companion'))
-    log('remove-companion', run(cli, ['plugin', '--profile', companionName, 'remove', '@linfengqaqtat/dsh-scriptor-companion']))
-    assert.ok(!companionDump().includes('@linfengqaqtat/dsh-scriptor-companion'))
+    assert.ok(companionDump().includes('@yangda611/dsh-scriptor-companion'))
+    log('remove-companion', run(cli, ['plugin', '--profile', companionName, 'remove', '@yangda611/dsh-scriptor-companion']))
+    assert.ok(!companionDump().includes('@yangda611/dsh-scriptor-companion'))
     log('reinstall-companion', run(cli, ['plugin', '--profile', companionName, 'add', spec]))
-    assert.ok(companionDump().includes('@linfengqaqtat/dsh-scriptor-companion'))
+    assert.ok(companionDump().includes('@yangda611/dsh-scriptor-companion'))
     report.checks.companionStandaloneLifecycle = true
   }
   if (embedding) {
     const copiedEmbedding = path.join(root, 'embedding.tgz')
     fs.copyFileSync(embedding, copiedEmbedding)
     log('add-embedding', run(cli, ['plugin', '--profile', 'scriptor-test', 'add', fromRegistry ? packageSpec(embedding) : copiedEmbedding]))
-    assert.ok(run(cli, ['--profile', 'scriptor-test', '--dump-config']).includes('@linfengqaqtat/dsh-scriptor-retrieval'))
+    assert.ok(run(cli, ['--profile', 'scriptor-test', '--dump-config']).includes('@yangda611/dsh-scriptor-retrieval'))
     report.checks.embeddingInstalled = true
   }
   fs.writeFileSync(path.join(workspace, 'author-sentinel.txt'), 'synthetic author asset')
-  log('remove-main', run(cli, ['plugin', '--profile', 'scriptor-test', 'remove', '@linfengqaqtat/dsh-scriptor']))
-  assert.ok(!/@linfengqaqtat\/dsh-scriptor(?!-)/.test(run(cli, ['--profile', 'scriptor-test', '--dump-config'])))
+  log('remove-main', run(cli, ['plugin', '--profile', 'scriptor-test', 'remove', '@yangda611/dsh-scriptor']))
+  assert.ok(!/@yangda611\/dsh-scriptor(?!-)/.test(run(cli, ['--profile', 'scriptor-test', '--dump-config'])))
   assert.equal(fs.readFileSync(path.join(workspace, 'author-sentinel.txt'), 'utf8'), 'synthetic author asset')
   log('reinstall-main', run(cli, ['plugin', '--profile', 'scriptor-test', 'add', mainSpec]))
-  assert.ok(/@linfengqaqtat\/dsh-scriptor(?!-)/.test(run(cli, ['--profile', 'scriptor-test', '--dump-config'])))
+  assert.ok(/@yangda611\/dsh-scriptor(?!-)/.test(run(cli, ['--profile', 'scriptor-test', '--dump-config'])))
   assert.equal(fs.readFileSync(path.join(workspace, 'author-sentinel.txt'), 'utf8'), 'synthetic author asset')
   report.checks.uninstallReinstall = true
   if (meta) {
@@ -165,9 +165,9 @@ try {
 // the remaining tree, so the unpublished dependencies are located through the
 // profile's own npmrc instead.
     if (fixtureRegistryUrl) fs.writeFileSync(path.join(fullProfile, '.npmrc'), `registry=${fixtureRegistryUrl}\n`)
-    log('remove-meta', run(cli, ['plugin', '--profile', fullName, 'remove', '@linfengqaqtat/dsh-scriptor-full']))
-    assert.ok(!fullDump().includes('@linfengqaqtat/dsh-scriptor'))
-    assert.ok(!fullDump().includes('@linfengqaqtat/dsh-scriptor-retrieval'))
+    log('remove-meta', run(cli, ['plugin', '--profile', fullName, 'remove', '@yangda611/dsh-scriptor-full']))
+    assert.ok(!fullDump().includes('@yangda611/dsh-scriptor'))
+    assert.ok(!fullDump().includes('@yangda611/dsh-scriptor-retrieval'))
     log('reinstall-meta', run(cli, ['plugin', '--profile', fullName, 'add', fullSpec, ...registryArgs]))
     verifyFull('full-reinstall')
     report.checks.metaFreshProfile = true

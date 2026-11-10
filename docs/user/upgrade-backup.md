@@ -69,7 +69,7 @@ Scriptor 8.4.0 使用 DSH 0.2.2-rc.1，最低Node为24.9。桌面端使用自带
 
 ## 旧包名迁移（8.0.0 起）
 
-8.0.0 起，旧的 webnovel-embedding-provider 更名为 @linfengqaqtat/dsh-scriptor-retrieval。旧的 @linfengqaqtat/dsh-whale-companion 更名为 @linfengqaqtat/dsh-scriptor-companion。本次安装包都是 8.4.0，使用 DSH 0.2.2-rc.1。
+8.0.0 起，旧的 webnovel-embedding-provider 更名为 @yangda611/dsh-scriptor-retrieval。旧的 旧版鲸鱼娘桌宠包 更名为 @yangda611/dsh-scriptor-companion。本次安装包都是 8.4.0，使用 DSH 0.2.2-rc.1。
 
 > [!WARNING]
 > 不要同时启用旧包和新包。
@@ -103,13 +103,13 @@ Scriptor 8.4.0 使用 DSH 0.2.2-rc.1，最低Node为24.9。桌面端使用自带
    成功时，书房可以打开，并且书仓状态与备份前的预期一致。
 
 ```powershell
-dsh plugin --profile scriptor add @linfengqaqtat/dsh-scriptor@8.4.0
+dsh plugin --profile scriptor add @yangda611/dsh-scriptor@8.4.0
 dsh --profile scriptor --dump-config
 ```
 
 上面展示的是命令写法。更新时换成实际的目标版本。
 
-完整版安装使用 `@linfengqaqtat/dsh-scriptor-full@8.4.0`。不要在保留完整版时另外安装主包。从单装转到 full，按 [切换步骤](install.md#从单装切换为完整版) 操作。切回单装时，先停机并移除 full，再安装所需的单包。
+完整版安装使用 `@yangda611/dsh-scriptor-full@8.4.0`。不要在保留完整版时另外安装主包。从单装转到 full，按 [切换步骤](install.md#从单装切换为完整版) 操作。切回单装时，先停机并移除 full，再安装所需的单包。
 
 ## 回退
 
@@ -145,16 +145,16 @@ dsh --profile scriptor --dump-config
 
 | 实际安装组合 | `dsh plugin --profile scriptor remove` 后的参数 |
 | --- | --- |
-| 仅 full，或已切换完成 | `@linfengqaqtat/dsh-scriptor-full` |
-| 仅主包 | `@linfengqaqtat/dsh-scriptor` |
-| 仅提供方 | `@linfengqaqtat/dsh-scriptor-retrieval` |
-| 主包与提供方分别安装 | `@linfengqaqtat/dsh-scriptor @linfengqaqtat/dsh-scriptor-retrieval` |
+| 仅 full，或已切换完成 | `@yangda611/dsh-scriptor-full` |
+| 仅主包 | `@yangda611/dsh-scriptor` |
+| 仅提供方 | `@yangda611/dsh-scriptor-retrieval` |
+| 主包与提供方分别安装 | `@yangda611/dsh-scriptor @yangda611/dsh-scriptor-retrieval` |
 | full 与单装包混装 | full 加上列表中实际存在的单装包名 |
 
 例如两个单包都装过，并且希望整套卸载：
 
 ```powershell
-dsh plugin --profile scriptor remove @linfengqaqtat/dsh-scriptor @linfengqaqtat/dsh-scriptor-retrieval
+dsh plugin --profile scriptor remove @yangda611/dsh-scriptor @yangda611/dsh-scriptor-retrieval
 dsh --profile scriptor --dump-config
 ```
 

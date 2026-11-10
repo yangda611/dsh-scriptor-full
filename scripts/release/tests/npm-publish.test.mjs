@@ -15,7 +15,7 @@ import { root } from '../version.mjs'
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 
 test('optional companion is never polled; writing packages still gate readiness and integrity', async () => {
-  const names = ['', '-retrieval', '-full', '-companion'].map(suffix => '@linfengqaqtat/dsh-scriptor' + suffix)
+  const names = ['', '-retrieval', '-full', '-companion'].map(suffix => '@yangda611/dsh-scriptor' + suffix)
   const packages = names.map(name => ({ name, version: '8.2.0', integrity: 'sha512-original' }))
   assert.equal(packagesToVerify(packages).length, 4)
   const required = packagesToVerify(packages, true)
@@ -67,22 +67,22 @@ function archive(files) {
 async function fixture(callback) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'scriptor-npm-test-'))
   const entries = [
-    ['@linfengqaqtat/dsh-scriptor', version, `linfengqaqtat-dsh-scriptor-${version}.tgz`],
-    ['@linfengqaqtat/dsh-scriptor-retrieval', version, 'linfengqaqtat-dsh-scriptor-retrieval-8.0.0.tgz'],
-    ['@linfengqaqtat/dsh-scriptor-full', version, `linfengqaqtat-dsh-scriptor-full-${version}.tgz`],
-    ['@linfengqaqtat/dsh-scriptor-companion', version, `linfengqaqtat-dsh-scriptor-companion-${version}.tgz`],
+    ['@yangda611/dsh-scriptor', version, `yangda611-dsh-scriptor-${version}.tgz`],
+    ['@yangda611/dsh-scriptor-retrieval', version, 'yangda611-dsh-scriptor-retrieval-8.0.0.tgz'],
+    ['@yangda611/dsh-scriptor-full', version, `yangda611-dsh-scriptor-full-${version}.tgz`],
+    ['@yangda611/dsh-scriptor-companion', version, `yangda611-dsh-scriptor-companion-${version}.tgz`],
   ]
   const packages = entries.map(([name, v, tarball]) => ({ name, version: v, tarball }))
   for (const [index, item] of packages.entries()) {
     const manifest = { name: item.name, version: item.version, license: 'GPL-3.0-only', publishConfig, engines,
-      repository: { url: 'https://github.com/lingfengQAQ/webnovel-writer.git' } }
+      repository: { url: 'https://github.com/yangda611/dsh-scriptor-full.git' } }
     const files = { 'package.json': manifest, LICENSE: 'GNU GENERAL PUBLIC LICENSE', 'README.md': 'Example' }
     if (index === 1) {
       manifest.exports = { './scenes': './lib/scenes.js', './reranking': './lib/reranking.js', './graph': './lib/graph.js' }
       Object.assign(files, { 'lib/index.js': '', 'lib/scenes.js': '', 'lib/reranking.js': '', 'lib/graph.js': '', 'lib/client.js': `window.__ModuleLoader__.load({ id: ${JSON.stringify(item.name)},`, 'cordis.patch.yml': fs.readFileSync(path.join(root, 'packages/embedding-provider/cordis.patch.yml'), 'utf8'), 'MODEL_DIMENSIONS.md': '', 'THIRD_PARTY_NOTICES.md': 'Original notices' })
     }
     if (index === 2) {
-      manifest.dependencies = { '@linfengqaqtat/dsh-scriptor': version, '@linfengqaqtat/dsh-scriptor-retrieval': version }
+      manifest.dependencies = { '@yangda611/dsh-scriptor': version, '@yangda611/dsh-scriptor-retrieval': version }
       manifest.dsh = { bundle: { patch: ['./cordis.patch.yml', './presets/writing.patch.yml'] } }
       files['cordis.patch.yml'] = fs.readFileSync(path.join(root, 'packages/meta/cordis.patch.yml'), 'utf8')
       files['presets/writing.patch.yml'] = fs.readFileSync(path.join(root, 'packages/meta/presets/writing.patch.yml'), 'utf8')
@@ -109,7 +109,7 @@ async function fixture(callback) {
 
 test('release assets bind tag, public commit, package identities, bytes and dependency order', () => fixture(({ directory }) => {
   const packages = validateReleaseAssets(directory, `scriptor-v${version}`, commit)
-  assert.deepEqual(packages.map(item => item.name), ['@linfengqaqtat/dsh-scriptor', '@linfengqaqtat/dsh-scriptor-retrieval', '@linfengqaqtat/dsh-scriptor-full', '@linfengqaqtat/dsh-scriptor-companion'])
+  assert.deepEqual(packages.map(item => item.name), ['@yangda611/dsh-scriptor', '@yangda611/dsh-scriptor-retrieval', '@yangda611/dsh-scriptor-full', '@yangda611/dsh-scriptor-companion'])
   assert.throws(() => validateReleaseAssets(directory, 'scriptor-v0.1.0-preview.9', commit))
   assert.throws(() => validateReleaseAssets(directory, `scriptor-v${version}`, 'b'.repeat(40)))
   fs.appendFileSync(packages[0].filename, 'tampered')
@@ -153,7 +153,7 @@ test('full package requires exact dependencies and a DSH bundle declaration', ()
   assert.throws(() => checkMetaPackage(filename, version, '0.0.9'))
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'packages/meta/package.json'), 'utf8'))
   manifest.version = version
-  manifest.dependencies = { '@linfengqaqtat/dsh-scriptor': version, '@linfengqaqtat/dsh-scriptor-retrieval': version }
+  manifest.dependencies = { '@yangda611/dsh-scriptor': version, '@yangda611/dsh-scriptor-retrieval': version }
   delete manifest.dsh
   fs.writeFileSync(filename, archive({ 'package.json': manifest }))
   assert.throws(() => checkMetaPackage(filename, version, version))

@@ -32,7 +32,7 @@ try{
      const response=await fetch(new URL('/__whale-fixture?disabled=false',url),{method:'POST',headers:{'x-whale-fixture':runtime.controlToken}})
      assert.equal(response.status,200)
      const body=await response.json()
-     if(body.graph.entries.some(e=>e.id==='@linfengqaqtat/dsh-scriptor-companion'))break
+     if(body.graph.entries.some(e=>e.id==='@yangda611/dsh-scriptor-companion'))break
      await new Promise(resolve=>setTimeout(resolve,30))
    }
  }
@@ -158,7 +158,7 @@ try{
          const response=await fetch('/__whale-fixture?disabled='+disabled,{method:'POST',headers:{'x-whale-fixture':token}})
          const body=await response.json()
          if(!response.ok)return {status:response.status,body:JSON.stringify(body)}
-         if(body.graph.entries.some(e=>e.id==='@linfengqaqtat/dsh-scriptor-companion')!==disabled){
+         if(body.graph.entries.some(e=>e.id==='@yangda611/dsh-scriptor-companion')!==disabled){
            return {status:response.status,body:JSON.stringify({ok:body.ok})}
          }
          await new Promise(resolve=>setTimeout(resolve,30))

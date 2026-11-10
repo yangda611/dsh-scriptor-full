@@ -4,7 +4,7 @@ import type { ClientHost } from './host'
 import { preferencesFor, usePreferences } from './preferences'
 import type { WebnovelPreferences } from '../preferences'
 
-export const SCRIPTOR_BUNDLES = ['@linfengqaqtat/dsh-scriptor-full', '@linfengqaqtat/dsh-scriptor'] as const
+export const SCRIPTOR_BUNDLES = ['@yangda611/dsh-scriptor-full', '@yangda611/dsh-scriptor'] as const
 
 export function ScriptorBundleConfig({ host }: { host: ClientHost }) {
   const state = usePreferences(host), store = preferencesFor(host), id = useId()

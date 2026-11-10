@@ -2,7 +2,7 @@
 
 ## 分支与提交
 
-公开 v8 只接受基于公开历史的主题 PR。提交标题使用 fix/feat/docs/chore 等类型，写清最终行为；不上传内部开发记录。v6 仍以 master 为默认入口，两条产品线不互相整树合并。
+本仓库的主线为 `main`，CI 与 Pages 部署均针对 `main`。提交标题使用 fix/feat/docs/chore 等类型，写清最终行为；不上传内部开发记录。
 
 有额外私有开发仓的维护者必须先把公共 PR 回流，再同步新的公共改动。同步应核对增删改和上游 HEAD；不得覆盖未知贡献、强推公开主线或用 `push --all`、`--mirror`、批量标签推送发布。开发仓推送由 pre-push hook 按私有路径硬拦截（`tools/git-hooks/pre-push`，`pnpm install` 自动启用）；`--no-verify` 绕过视同违反公开边界。
 
@@ -49,9 +49,9 @@ pnpm release:build
 
 从已接受的公共 v8 提交创建唯一 `scriptor-v*` tag，显式推送该 tag。v8 Release 工作流会确认提交归属、重复必要检查、生成并验收附件，再创建 draft。工作流不覆盖已经存在的 Release。
 
-Issue/PR 模板在默认 master 生效。v8 的 CI 使用 push/pull_request；发行使用 tag push。只放在 v8 的 workflow_dispatch/schedule 不能作为默认分支上的常规操作入口。
+Issue/PR 模板与 CI 均以默认分支 `main` 为准；常规变更由 `main` 的 push/pull_request 工作流检查，发行由 tag push 触发。
 
-维护者核对 draft 的 tag、公共 SHA、版本、SHA256、附件和说明后发布。正式版设 prerelease=false、latest=true，README 下载链接指向明确版本；默认分支保持 master，v6 历史与安装入口不变。
+维护者核对 draft 的 tag、公共 SHA、版本、SHA256、附件和说明后发布。正式版设 prerelease=false、latest=true，README 下载链接指向明确版本；默认分支为 `main`。
 
 ## npm 正式包发布
 
@@ -68,7 +68,7 @@ Release 草稿生成时，发布器核对公共 SHA、tag、四包身份、版�
 确认版本已可见后，以同一标签运行 `phase=verify`：
 
 ```text
-gh workflow run v8-npm-publish.yml --ref v8 -f release_tag=scriptor-v8.2.0 -f phase=verify
+gh workflow run v8-npm-publish.yml --ref main -f release_tag=scriptor-v8.4.0 -f phase=verify
 ```
 
 verify 阶段不运行 npm publish、不携带 npm token。四包附件及 manifest 仍完整校验；registry 核对通过 `--exclude-companion` 只检查主包、检索、完整版的版本、latest 与 SHA512，再对这三包做独立 registry 安装验收，成功才公开草稿。任何必需包缺失、哈希不符、HTTP 错误或安装失败仍使流程失败。该排除选项不能用于上传模式，已提交的桌宠不重传。新 Release 标题为 `DSH Scriptor v<version>`，标签仍为 `scriptor-v<version>`。
@@ -89,7 +89,7 @@ npm 会把包的**首个版本**同时标为 `latest`，即使上传指定了 `-
 
 - 首发后 `latest` 与 `preview` 同指首个预览版是正常状态，不需要也无法「恢复」。发布器只在 registry 已有正式版本、而 `latest` 仍指向预览版时才判定为污染。
 - 首个正式版发布时 npm 会自动把 `latest` 移过去；之后的预览版用 `--tag preview` 上传不会再碰 `latest`。
-- 面向用户的安装命令一律写 `@preview` 或精确版本；`dsh plugin add @linfengqaqtat/dsh-scriptor` 不带标签会装到 `latest`，首发期间恰好也是预览版，正式版发布后则装到正式版。
+- 面向用户的安装命令一律写 `@preview` 或精确版本；`dsh plugin add @yangda611/dsh-scriptor` 不带标签会装到 `latest`，首发期间恰好也是预览版，正式版发布后则装到正式版。
 
 2026-09-22 的真实首发（`scriptor-v0.1.0-preview.5`）确认了两个 registry 行为：发布前的 404 可被 CDN 缓存五分钟；三个新包在显式 `--tag preview` 上传后都同时出现 `preview` 与 `latest`。当时的发布器把后者当作污染而在上传后的校验阶段失败（三包已上传、字节与附件一致、provenance 正常），随后尝试清除 `latest` 的恢复工作流在 registry 处 403，两者都已按上述规则修正。发布器现用独立查询参数绕过旧缓存，并为每包进行至多 40 轮、间隔 3 秒的可见性检查（单次请求超时 30 秒）。不能仅凭 CLI 的上传成功行或指定过 `--tag preview` 就宣布发行验收通过。
 
@@ -99,7 +99,7 @@ npm 会把包的**首个版本**同时标为 `latest`，即使上传指定了 `-
 
 npm >=11.5.1、Node >=22.14.0 支持 GitHub-hosted Actions 的 OIDC 发布；工作流固定安装 npm 12.0.1，授予 id-token: write，发布器要求 Actions 的 OIDC 环境而非长期 npm token。
 
-每个包的 npm Settings → Trusted Publisher 使用 GitHub Actions，owner 为 lingfengQAQ，repository 为 webnovel-writer，workflow 为 v8-npm-publish.yml，environment 留空。启用 Allow npm publish，才能直接发布；只允许 stage publish 时仍须维护者批准候选。
+每个包的 npm Settings → Trusted Publisher 使用 GitHub Actions，owner 为 yangda611，repository 为 dsh-scriptor-full，workflow 为 v8-npm-publish.yml，environment 留空。启用 Allow npm publish，才能直接发布；只允许 stage publish 时仍须维护者批准候选。
 
 包必须先存在才能配置 trust。npm 最新 [staged publishing](https://docs.npmjs.com/staged-publishing/)（2026-09-29 更新）支持新包：交互登录后暂存真实发行 tgz，会公开创建 0.0.0-stage 占位；维护者通过网页或 CLI 加 2FA 批准后才发布候选内容。npm stage 要求 >=11.15.0。不能从 GitHub OIDC 直接初始化完全不存在、尚未配置 trust 的包；也不要为占位随意发布虚假代码。
 
@@ -119,4 +119,4 @@ npm >=11.5.1、Node >=22.14.0 支持 GitHub-hosted Actions 的 OIDC 发布；工
 
 外部贡献由维护者审核；单维护者不设置无法满足的第二人必审。保护 v8 的必要检查、已解决讨论和禁强推/禁删除规则。Actions 使用固定 commit、最小权限，fork PR 不获得秘密或发版权限。
 
-依赖变更审查 lockfile、实际内联清单和原始许可；高风险漏洞需修复或给出可核对的范围/处置记录。若未来启用定期更新，在 master 配置并显式指向 v8，避免误改旧产品线。
+依赖变更审查 lockfile、实际内联清单和原始许可；高风险漏洞需修复或给出可核对的范围/处置记录。若未来启用定期更新，在 `main` 配置并显式限制到所需分支，避免误改不相关产品线。

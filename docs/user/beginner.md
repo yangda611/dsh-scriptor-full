@@ -31,7 +31,7 @@
 1. 从 [DSH 官网](https://www.deepseek.com/harness/) 安装配套的 DSH 0.2.2-rc.1 客户端。
    成功时，桌面端可以打开。
 2. 打开侧栏 **插件 → 添加插件**。
-3. 输入 `@linfengqaqtat/dsh-scriptor@8.4.0`。
+3. 输入 `@yangda611/dsh-scriptor@8.4.0`。
 4. 核对预览，然后安装。
 5. 按页面提示启用、应用变更或重启。
    成功时，已安装列表显示 8.4.0，并且可以打开书房。

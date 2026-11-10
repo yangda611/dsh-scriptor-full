@@ -10,9 +10,9 @@ assert.throws(() => fs.readFileSync(blockedSource), { code: 'ERR_ACCESS_DENIED' 
 const require = createRequire(hostAnchor)
 const checkEmbedding = process.argv.includes('--embedding')
 const packageRequire = checkEmbedding
-  ? createRequire(require.resolve('@linfengqaqtat/dsh-scriptor-full/package.json', { paths: [profile] }))
+  ? createRequire(require.resolve('@yangda611/dsh-scriptor-full/package.json', { paths: [profile] }))
   : createRequire(path.join(profile, 'package.json'))
-const packageEntry = packageRequire.resolve('@linfengqaqtat/dsh-scriptor')
+const packageEntry = packageRequire.resolve('@yangda611/dsh-scriptor')
 const { boot, PluginPackages } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-app-boot')).href)
 const resolution = JSON.parse(fs.readFileSync(path.join(profile, 'scriptor-probe-resolution.json'), 'utf8'))
 const configPath = path.join(path.dirname(reportPath), 'isolation-loader.json')
@@ -30,13 +30,13 @@ const config = [
   { id: 'agent-loop', name: pathToFileURL(require.resolve('@deepseek-ai/dsh-agent-loop')).href },
   { id: 'webnovel', name: pathToFileURL(packageEntry).href },
   { id: 'agent-preset-registry', name: pathToFileURL(require.resolve('@deepseek-ai/dsh-agent-preset-registry')).href, config: { default: 'scriptor' } },
-  { id: 'preset-scriptor', name: pathToFileURL(require.resolve('@deepseek-ai/dsh-agent-preset')).href, config: { id: 'scriptor', name: '写作模式', plugins: [{ id: 'scriptor-agent', name: pathToFileURL(packageRequire.resolve('@linfengqaqtat/dsh-scriptor/preset')).href, isolate: { webnovelWriting: true } }] } },
+  { id: 'preset-scriptor', name: pathToFileURL(require.resolve('@deepseek-ai/dsh-agent-preset')).href, config: { id: 'scriptor', name: '写作模式', plugins: [{ id: 'scriptor-agent', name: pathToFileURL(packageRequire.resolve('@yangda611/dsh-scriptor/preset')).href, isolate: { webnovelWriting: true } }] } },
 ]
 if (checkEmbedding) {
   config.push({ id: 'credentials', name: pathToFileURL(require.resolve('@deepseek-ai/dsh-credentials-local')).href,
     config: { path: path.join(path.dirname(reportPath), 'full-credentials.yaml'), watch: false } })
   for (const [id, subpath] of [['webnovel-embeddings', ''], ['webnovel-scenes', '/scenes'], ['webnovel-reranking', '/reranking'], ['webnovel-graph', '/graph']]) {
-    config.push({ id, name: pathToFileURL(packageRequire.resolve(`@linfengqaqtat/dsh-scriptor-retrieval${subpath}`)).href })
+    config.push({ id, name: pathToFileURL(packageRequire.resolve(`@yangda611/dsh-scriptor-retrieval${subpath}`)).href })
   }
 }
 fs.writeFileSync(configPath, JSON.stringify(config))

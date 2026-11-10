@@ -220,7 +220,7 @@
 
 ### Changed
 
-- 检索增强由 webnovel-embedding-provider 更名为 @linfengqaqtat/dsh-scriptor-retrieval；桌宠由 @linfengqaqtat/dsh-whale-companion 更名为 @linfengqaqtat/dsh-scriptor-companion。主包与 full 包名保持不变。
+- 检索增强由 webnovel-embedding-provider 更名为 dsh-scriptor-retrieval；桌宠由 dsh-whale-companion 更名为 dsh-scriptor-companion。主包与 full 包名保持不变。
 - 配置条目 id、凭据引用和桌宠本地偏好标识保持稳定；升级时先备份并卸载旧包入口，再安装新包，不要同时启用新旧包。
 - 新手通过 DSH 侧栏“插件 → 添加插件”安装；完整版仅包含写作与检索增强，桌宠仍独立可选。
 
@@ -288,8 +288,8 @@ preview.4 的发行构建在 Windows runner 上失败，本版只修发行链路
 
 ### Added
 
-- **npm 发行流程**：为 `@linfengqaqtat/dsh-scriptor@0.1.0-preview.4`、`webnovel-embedding-provider@0.0.8`、`@linfengqaqtat/dsh-scriptor-full@0.1.0-preview.4` 增加 Release 发布后的自动上传（dist-tag `preview`）。校验全部包与 SHA256 后上传同一 tarball；重跑只跳过 registry 字节完全一致的版本。npm 工作流成功后可执行 `dsh plugin add @linfengqaqtat/dsh-scriptor@preview`，GitHub Release 保留同字节 tarball。
-- **完整版恢复**：增加 DSH 组合配置，`dsh plugin add @linfengqaqtat/dsh-scriptor-full@preview` 同时安装并启用主插件与可选嵌入提供方；增加独立 profile 的加载与卸载重装验收。
+- **npm 发行流程**：为 `dsh-scriptor@0.1.0-preview.4`、`webnovel-embedding-provider@0.0.8`、`dsh-scriptor-full@0.1.0-preview.4` 增加 Release 发布后的自动上传（dist-tag `preview`）。校验全部包与 SHA256 后上传同一 tarball；重跑只跳过 registry 字节完全一致的版本。npm 工作流成功后可执行 `dsh plugin add dsh-scriptor@preview`，GitHub Release 保留同字节 tarball。
+- **完整版恢复**：增加 DSH 组合配置，`dsh plugin add dsh-scriptor-full@preview` 同时安装并启用主插件与可选嵌入提供方；增加独立 profile 的加载与卸载重装验收。
 
 ### Changed
 
@@ -304,7 +304,7 @@ preview.4 的发行构建在 Windows runner 上失败，本版只修发行链路
 ### Changed
 
 - **包命名统一**：可选嵌入提供方由 `@webnovel/embedding-provider` 更名为 `webnovel-embedding-provider`，公开分发包不再使用内部 scope
-- **完整版 meta 包暂缓提供**：`@linfengqaqtat/dsh-scriptor-full` 的依赖（主包与嵌入包）尚未发布到 npm，本地 tarball 安装会被 pnpm 解析到 registry 而 404；待包发布到 registry 后再随发行提供
+- **完整版 meta 包暂缓提供**：`dsh-scriptor-full` 的依赖（主包与嵌入包）尚未发布到 npm，本地 tarball 安装会被 pnpm 解析到 registry 而 404；待包发布到 registry 后再随发行提供
 
 ### Migration
 
@@ -329,7 +329,7 @@ preview.4 的发行构建在 Windows runner 上失败，本版只修发行链路
 
 ### Packaging
 
-- 主包 `@linfengqaqtat/dsh-scriptor`，运行技能与脚本随包交付。
+- 主包 `dsh-scriptor`，运行技能与脚本随包交付。
 - 可选 `@webnovel/embedding-provider` 0.0.8：嵌入、场景识别与重排；首次安装默认停用。
 - 继承 GPL-3.0-only，补齐实际内联依赖的许可证与源码材料。
 

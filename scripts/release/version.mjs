@@ -34,7 +34,7 @@ export function releaseVersion(directory = root, tag) {
     const optional = JSON.parse(fs.readFileSync(path.join(directory, `packages/${name}/package.json`), 'utf8'))
     assert.equal(optional.version, bundle.version, 'All Scriptor release versions must agree')
   }
-  assert.equal(bundle.name, '@linfengqaqtat/dsh-scriptor')
+  assert.equal(bundle.name, '@yangda611/dsh-scriptor')
   const expectedTag = `scriptor-v${bundle.version}`
   if (tag) assert.equal(tag, expectedTag, 'Release tag must match the package version')
   const changelog = fs.readFileSync(path.join(directory, 'CHANGELOG.md'), 'utf8')
@@ -46,7 +46,7 @@ export function releaseVersion(directory = root, tag) {
   for (const file of documents) {
     const text = fs.readFileSync(path.join(directory, file), 'utf8')
     checkCurrentInstructions(text, file, bundle.version, bundle.devDependencies['@deepseek-ai/dsh-llm'])
-    for (const match of text.matchAll(/linfengqaqtat-dsh-scriptor-(?:(?:full|retrieval|companion)-)?([\d][\w.-]*)\.tgz/g)) {
+    for (const match of text.matchAll(/yangda611-dsh-scriptor-(?:(?:full|retrieval|companion)-)?([\d][\w.-]*)\.tgz/g)) {
       assert.equal(match[1], bundle.version, `Stale installation example in ${file}`)
     }
     for (const match of text.matchAll(/releases\/tag\/scriptor-v([\d][\w.-]*)/g)) {
@@ -57,7 +57,7 @@ export function releaseVersion(directory = root, tag) {
     }
   }
   return { version: bundle.version, tag: expectedTag, prerelease: bundle.version.includes('-'),
-    packageName: bundle.name, filename: `linfengqaqtat-dsh-scriptor-${bundle.version}.tgz` }
+    packageName: bundle.name, filename: `yangda611-dsh-scriptor-${bundle.version}.tgz` }
 }
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {

@@ -34,7 +34,7 @@
           - id: tool-jobs
             name: '@deepseek-ai/dsh-tool-jobs'
           - id: scriptor-agent
-            name: '@linfengqaqtat/dsh-scriptor/preset'
+            name: '@yangda611/dsh-scriptor/preset'
             isolate:
               webnovelWriting: true
           - id: tool-skill

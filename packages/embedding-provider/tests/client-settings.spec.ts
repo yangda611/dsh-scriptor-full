@@ -117,7 +117,7 @@ function setupHost(options?: { packages?: readonly { name: string; rows?: readon
             ensure: vi.fn(async () => {}),
             hooks: {
               pluginManager: {
-                getSnapshot: () => ({ status: 'ready', packages: options?.packages ?? [{ name: '@linfengqaqtat/dsh-scriptor-full', installed: true, rows: [{ rowId: 'webnovel-embeddings' }, { rowId: 'webnovel-scenes' }, { rowId: 'webnovel-reranking' }] }] }),
+                getSnapshot: () => ({ status: 'ready', packages: options?.packages ?? [{ name: '@yangda611/dsh-scriptor-full', installed: true, rows: [{ rowId: 'webnovel-embeddings' }, { rowId: 'webnovel-scenes' }, { rowId: 'webnovel-reranking' }] }] }),
               },
             },
           }),
@@ -143,7 +143,7 @@ describe('检索增强插件管理页配置与模型设置页轻提示', () => {
   it('图谱和场景设置只展示模型与超时，不展示额度字段', async () => {
     const { rowConfigs } = setupHost()
     for (const kind of ['graph', 'scenes']) {
-      const Page = rowConfigs.get('@linfengqaqtat/dsh-scriptor-full#webnovel-' + kind)!
+      const Page = rowConfigs.get('@yangda611/dsh-scriptor-full#webnovel-' + kind)!
       let renderer!: ReactTestRenderer
       await act(async () => { renderer = create(React.createElement(Page, { view: 'page' })) })
       renderers.push(renderer)
@@ -157,23 +157,23 @@ describe('检索增强插件管理页配置与模型设置页轻提示', () => {
   })
   it('双包键注册四项 plugins.row.config，支持 summary 与 page 视图，并在 settings.models.footer 提供轻提示与跳转按钮', async () => {
     const { rowConfigs, footers, openBundle } = setupHost({
-      packages: [{ name: '@linfengqaqtat/dsh-scriptor-retrieval', rows: [{ rowId: 'webnovel-embeddings' }, { rowId: 'webnovel-scenes' }, { rowId: 'webnovel-reranking' }] }],
+      packages: [{ name: '@yangda611/dsh-scriptor-retrieval', rows: [{ rowId: 'webnovel-embeddings' }, { rowId: 'webnovel-scenes' }, { rowId: 'webnovel-reranking' }] }],
     })
     const expectedKeys = [
-      '@linfengqaqtat/dsh-scriptor-full#webnovel-embeddings',
-      '@linfengqaqtat/dsh-scriptor-retrieval#webnovel-embeddings',
-      '@linfengqaqtat/dsh-scriptor-full#webnovel-scenes',
-      '@linfengqaqtat/dsh-scriptor-retrieval#webnovel-scenes',
-      '@linfengqaqtat/dsh-scriptor-full#webnovel-reranking',
-      '@linfengqaqtat/dsh-scriptor-retrieval#webnovel-reranking',
-      '@linfengqaqtat/dsh-scriptor-full#webnovel-graph',
-      '@linfengqaqtat/dsh-scriptor-retrieval#webnovel-graph',
+      '@yangda611/dsh-scriptor-full#webnovel-embeddings',
+      '@yangda611/dsh-scriptor-retrieval#webnovel-embeddings',
+      '@yangda611/dsh-scriptor-full#webnovel-scenes',
+      '@yangda611/dsh-scriptor-retrieval#webnovel-scenes',
+      '@yangda611/dsh-scriptor-full#webnovel-reranking',
+      '@yangda611/dsh-scriptor-retrieval#webnovel-reranking',
+      '@yangda611/dsh-scriptor-full#webnovel-graph',
+      '@yangda611/dsh-scriptor-retrieval#webnovel-graph',
     ]
     expect([...rowConfigs.keys()].sort()).toEqual([...expectedKeys].sort())
-    expect(rowConfigs.get('@linfengqaqtat/dsh-scriptor-full#webnovel-embeddings')!({ view: 'summary' })).toBe('配置混合检索使用的接口、向量模型和维度。')
-    expect(rowConfigs.get('@linfengqaqtat/dsh-scriptor-full#webnovel-scenes')!({ view: 'summary' })).toBe('复用已配置的聊天模型，每章识别一次并缓存场景边界。')
-    expect(rowConfigs.get('@linfengqaqtat/dsh-scriptor-full#webnovel-reranking')!({ view: 'summary' })).toBe('对少量正文候选重新排序，提高相关片段的可见性。')
-    expect(rowConfigs.get('@linfengqaqtat/dsh-scriptor-full#webnovel-graph')!({ view: 'summary' })).toContain('每本书的关系页单独启用')
+    expect(rowConfigs.get('@yangda611/dsh-scriptor-full#webnovel-embeddings')!({ view: 'summary' })).toBe('配置混合检索使用的接口、向量模型和维度。')
+    expect(rowConfigs.get('@yangda611/dsh-scriptor-full#webnovel-scenes')!({ view: 'summary' })).toBe('复用已配置的聊天模型，每章识别一次并缓存场景边界。')
+    expect(rowConfigs.get('@yangda611/dsh-scriptor-full#webnovel-reranking')!({ view: 'summary' })).toBe('对少量正文候选重新排序，提高相关片段的可见性。')
+    expect(rowConfigs.get('@yangda611/dsh-scriptor-full#webnovel-graph')!({ view: 'summary' })).toContain('每本书的关系页单独启用')
 
     expect([...footers.keys()]).toEqual(['webnovel-embeddings'])
     const Footer = footers.get('webnovel-embeddings')!
@@ -188,7 +188,7 @@ describe('检索增强插件管理页配置与模型设置页轻提示', () => {
     await act(async () => {
       jumpBtn.props.onClick()
     })
-    expect(openBundle).toHaveBeenCalledWith('@linfengqaqtat/dsh-scriptor-retrieval')
+    expect(openBundle).toHaveBeenCalledWith('@yangda611/dsh-scriptor-retrieval')
   })
 
   it('插件页清单未加载时先乐观打开完整版，加载后改到实际安装的检索包并打开行配置页', async () => {
@@ -205,19 +205,19 @@ describe('检索增强插件管理页配置与模型设置页轻提示', () => {
         store: { create: () => ({ actions: { setView } }) },
       }] },
     }
-    const opened = openPluginTarget(host as unknown as Context, ['@linfengqaqtat/dsh-scriptor-full', '@linfengqaqtat/dsh-scriptor-retrieval'], 'webnovel-embeddings')
-    expect(opened).toBe('@linfengqaqtat/dsh-scriptor-full')
+    const opened = openPluginTarget(host as unknown as Context, ['@yangda611/dsh-scriptor-full', '@yangda611/dsh-scriptor-retrieval'], 'webnovel-embeddings')
+    expect(opened).toBe('@yangda611/dsh-scriptor-full')
     expect(ensure).toHaveBeenCalled()
-    snapshot = { status: 'ready', packages: [{ name: '@linfengqaqtat/dsh-scriptor-retrieval', installed: true, rows: [{ rowId: 'webnovel-embeddings' }] }] }
+    snapshot = { status: 'ready', packages: [{ name: '@yangda611/dsh-scriptor-retrieval', installed: true, rows: [{ rowId: 'webnovel-embeddings' }] }] }
     for (const listener of [...listeners]) listener()
-    expect(openBundle).toHaveBeenLastCalledWith('@linfengqaqtat/dsh-scriptor-retrieval')
-    expect(setView).toHaveBeenLastCalledWith({ kind: 'row', name: '@linfengqaqtat/dsh-scriptor-retrieval', rowId: 'webnovel-embeddings' })
+    expect(openBundle).toHaveBeenLastCalledWith('@yangda611/dsh-scriptor-retrieval')
+    expect(setView).toHaveBeenLastCalledWith({ kind: 'row', name: '@yangda611/dsh-scriptor-retrieval', rowId: 'webnovel-embeddings' })
     expect(listeners.size).toBe(0)
   })
 
   it('plugins.row.config 页面视图默认展开表单，支持保存配置与凭据、冲突提示及失败保留草稿', async () => {
     const { rowConfigs, scopes, setCredential } = setupHost()
-    const RowPage = rowConfigs.get('@linfengqaqtat/dsh-scriptor-full#webnovel-embeddings')!
+    const RowPage = rowConfigs.get('@yangda611/dsh-scriptor-full#webnovel-embeddings')!
     let renderer!: ReactTestRenderer
     await act(async () => {
       renderer = create(React.createElement(RowPage, { view: 'page' }))

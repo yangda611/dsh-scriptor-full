@@ -1,7 +1,7 @@
 {
-  "name": "@linfengqaqtat/dsh-scriptor-companion",
+  "name": "@yangda611/dsh-scriptor-companion",
   "version": "8.4.0",
-  "homepage": "https://lingfengqaq.github.io/webnovel-writer/",
+  "homepage": "https://yangda611.github.io/dsh-scriptor-full/",
   "description": "鲸鱼娘桌宠：DSH 窗口内的写作陪伴",
   "type": "module",
   "main": "./lib/index.js",
@@ -69,7 +69,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/lingfengQAQ/webnovel-writer.git",
+    "url": "https://github.com/yangda611/dsh-scriptor-full.git",
     "directory": "packages/companion"
   }
 }

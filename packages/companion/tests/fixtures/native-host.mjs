@@ -13,7 +13,7 @@ export async function apply(ctx) {
     }
     try {
       const url = new URL(req.url, 'http://localhost')
-      const change = await ctx.pluginManager.setBundleEnabled('@linfengqaqtat/dsh-scriptor-companion', url.searchParams.get('disabled') !== 'true')
+      const change = await ctx.pluginManager.setBundleEnabled('@yangda611/dsh-scriptor-companion', url.searchParams.get('disabled') !== 'true')
       if (change.application !== 'applied') throw Error(JSON.stringify(change))
       res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, graph: ctx.clientModules.graph() }))
     } catch (error) { res.writeHead(500); res.end(String(error)) }

@@ -18,9 +18,9 @@ Pages 发布前的 audit 命中 `source-map-js` 的高危公告 [GHSA-68fv-2mgg-
 
 | 类别 | 证据与处理 |
 | --- | --- |
-| 补偿测试超过 15 秒 | [8.1.0 发布](https://github.com/lingfengQAQ/webnovel-writer/actions/runs/37133126010) 两次 attempt，以及 [preview.7](https://github.com/lingfengQAQ/webnovel-writer/actions/runs/36428968244) 都命中 `retcon-retry-receipt.spec.ts`。现复用一次真实建书准备，各用例完整复制为独立书仓和 Git 历史；断言、用例数和超时保持原值。 |
-| Windows 测试进程意外退出 | [8.1.1 首次发行测试](https://github.com/lingfengQAQ/webnovel-writer/actions/runs/37191335305) 与历史三次 attempt 出现 `Worker exited unexpectedly`。日志不足以证明具体原生崩溃原因；不把重跑成功当作根治。新增父进程检查点与 Node fatal report，继续保留失败语义。 |
-| npm 接收上传但版本尚不可见 | [8.1.1 npm 发布](https://github.com/lingfengQAQ/webnovel-writer/actions/runs/37192544632) 与多次历史发布均超过原来的短轮询窗口。现把提交和验证分阶段；尚未就绪保留 draft，待可见后使用 `phase=verify`，不重传原件。 |
+| 补偿测试超过 15 秒 | 原 8.1.0 发布的两次 attempt，以及 preview.7 都命中 `retcon-retry-receipt.spec.ts`。现复用一次真实建书准备，各用例完整复制为独立书仓和 Git 历史；断言、用例数和超时保持原值。 |
+| Windows 测试进程意外退出 | 原 8.1.1 首次发行测试与历史三次 attempt 出现 `Worker exited unexpectedly`。日志不足以证明具体原生崩溃原因；不把重跑成功当作根治。新增父进程检查点与 Node fatal report，继续保留失败语义。 |
+| npm 接收上传但版本尚不可见 | 原 8.1.1 npm 发布与多次历史发布均超过原来的短轮询窗口。现把提交和验证分阶段；尚未就绪保留 draft，待可见后使用 `phase=verify`，不重传原件。 |
 | 旧路径、权限、包名或错误契约 | 早期包括 Windows 短路径、隔离安装权限、未发布依赖名、旧宿主错误格式和许可证行尾。对应修复已进入基线；相关检查继续保留，不能把这些真实错误一概归为超时。 |
 
 ## 诊断材料
