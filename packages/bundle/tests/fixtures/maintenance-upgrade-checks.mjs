@@ -11,7 +11,12 @@ function snapshot(root) {
     const absolute = path.join(root, relative), stat = fs.lstatSync(absolute)
     if (stat.isDirectory()) {
       result[relative + '/'] = 'directory'
-      for (const name of fs.readdirSync(absolute).sort()) walk(relative ? `${relative}/${name}` : name)
+      // 根治 .git/objects/maintenance.lock 竞态（第 8 处）：Git 2.56 后台维护在两次快照之间
+      // 建/删该锁文件，lstat 直接报 ENOENT；git 状态另由 rev-parse / rev-list 核对。
+      for (const name of fs.readdirSync(absolute).sort()) {
+        if (relative === '' && name === '.git') continue
+        walk(relative ? `${relative}/${name}` : name)
+      }
     } else result[relative] = createHash('sha256').update(fs.readFileSync(absolute)).digest('hex')
   }
   walk('')

@@ -65,6 +65,9 @@ function snapshot(): Record<string, string> {
   const result: Record<string, string> = {}
   const walk = (relative: string): void => {
     for (const entry of fs.readdirSync(path.join(root, relative), { withFileTypes: true })) {
+      // 根治 .git/objects/maintenance.lock 竞态（第 7 处）：Git 2.56 后台维护在两次快照之间
+      // 建/删该锁文件，快照含 .git/ 时必有一次对不上；git 状态另由 fixtureGit 命令核对。
+      if (relative === '' && entry.name === '.git') continue
       const file = path.posix.join(relative, entry.name)
       if (entry.isSymbolicLink()) result[file] = `link:${fs.readlinkSync(path.join(root, file))}`
       else if (entry.isDirectory()) { result[`${file}/`] = ''; walk(file) }
