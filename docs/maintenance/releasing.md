@@ -68,7 +68,7 @@ Release 草稿生成时，发布器核对公共 SHA、tag、四包身份、版�
 确认版本已可见后，以同一标签运行 `phase=verify`：
 
 ```text
-gh workflow run v8-npm-publish.yml --ref main -f release_tag=scriptor-v8.4.0 -f phase=verify
+gh workflow run v8-npm-publish.yml --ref main -f release_tag=scriptor-v8.4.1 -f phase=verify
 ```
 
 verify 阶段不运行 npm publish、不携带 npm token。四包附件及 manifest 仍完整校验；registry 核对通过 `--exclude-companion` 只检查主包、检索、完整版的版本、latest 与 SHA512，再对这三包做独立 registry 安装验收，成功才公开草稿。任何必需包缺失、哈希不符、HTTP 错误或安装失败仍使流程失败。该排除选项不能用于上传模式，已提交的桌宠不重传。新 Release 标题为 `DSH Scriptor v<version>`，标签仍为 `scriptor-v<version>`。
