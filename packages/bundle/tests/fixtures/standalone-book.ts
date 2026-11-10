@@ -16,4 +16,15 @@ export function createStandaloneBook(book: string): void {
   const exampleDir = path.resolve(__dirname, '../../../..', 'docs/examples/电影剧本示例')
   fs.copyFileSync(path.join(exampleDir, '剧本.md'), path.join(screenplayDir, '剧本草稿.md'))
   fs.copyFileSync(path.join(exampleDir, '分场大纲.md'), path.join(screenplayDir, '分场大纲.md'))
+  // 剧本导出验收用：同一份《晚星》剧本放进剧本定稿目录（电影全文一份），
+  // 《赘婿归来》竖屏集001 放进短剧定稿目录（每集一份）。
+  const filmFinalDir = path.join(book, '剧本/电影')
+  fs.mkdirSync(filmFinalDir, { recursive: true })
+  fs.copyFileSync(path.join(exampleDir, '剧本.md'), path.join(filmFinalDir, '剧本.md'))
+  const episodeFinalDir = path.join(book, '剧本/短剧')
+  fs.mkdirSync(episodeFinalDir, { recursive: true })
+  fs.copyFileSync(
+    path.resolve(__dirname, '../../../..', 'examples/shortdrama/赘婿逆袭/竖屏/集001.md'),
+    path.join(episodeFinalDir, '集001.md'),
+  )
 }

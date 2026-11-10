@@ -1,6 +1,7 @@
 /** Standalone Node entry. Keep Host services and plugin registration out of this graph. */
 export { runChecksCli } from './scripts/deterministic-checks'
 export { runScreenplayChecksCli } from './scripts/screenplay-checks-cli'
+export { screenplayExportCli } from './scripts/screenplay-export-cli'
 export { draftLengthCli } from './scripts/draft-length-cli'
 export { analyzeImpactCli } from './scripts/impact-cli'
 export { materialsCli } from './scripts/materials-cli'

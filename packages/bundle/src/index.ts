@@ -89,6 +89,8 @@ export { analyzeImpactCli } from './scripts/impact-cli'
 export { materialsCli } from './scripts/materials-cli'
 export { packCli } from './scripts/pack-cli'
 export { exportCli } from './scripts/export-cli'
+/** 专业剧本导出脚本的 CLI 能力（阶段 4）：只算不写，薄入口经 lib 调用。 */
+export { screenplayExportCli } from './scripts/screenplay-export-cli'
 /** 卷摘要候选脚本的 CLI 能力（任务21, 件一）：只算不写，薄入口经 lib 调用。 */
 export { volumeSummaryCli } from './scripts/volume-summary-cli'
 
