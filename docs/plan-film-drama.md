@@ -1,6 +1,6 @@
 # DSH Scriptor 影视剧改造计划（muse-dev）
 
-> 状态：v3（2026-11-10，摸底与调研都已完成）。**基线已变绿（2026-11-10 ~10:43：Git 升到 2.56.0 + 3 处快照遍历容忍维护锁文件，构建通过，全量测试 2325 通过 / 7 跳过）。阶段 0.5 已完成并提交（a90e3ee）。阶段 1 已完成并提交（a1175f6 + 019f6df），全量 2343 通过 / 7 跳过（FULL6_EXIT:0）。阶段 2（电影，64724a1）与阶段 3（短剧，7fd176b + d13f8f5）已完成并提交，接线已完成并提交（25bc135）。阶段 4/5 待派。**
+> 状态：v3（2026-11-10，摸底与调研都已完成）。**基线已变绿（2026-11-10 ~10:43：Git 升到 2.56.0 + 3 处快照遍历容忍维护锁文件，构建通过，全量测试 2325 通过 / 7 跳过）。阶段 0.5 已完成并提交（a90e3ee）。阶段 1 已完成并提交（a1175f6 + 019f6df），全量 2343 通过 / 7 跳过（FULL6_EXIT:0）。阶段 2（电影，64724a1）与阶段 3（短剧，7fd176b + d13f8f5）已完成并提交，接线已完成并提交（25bc135）。接线后全量 W2 的 6 个失败已修完并提交（46a2540）：tool-catalog 计数、standalone-cli 重写、normalizeFailure 中文失败字段、tool-result 结果卡、worker-policy 计数、host-loader/packaging 技能数；全量重跑 W3 变绿：构建通过，全量 2423 通过 / 7 跳过 / 0 失败（2430 总），bundle typecheck 通过。W2 的 51 跳是失败文件导致其余用例被跳过的假象，修完后回到基线 7。阶段 4 已派（2026-11-10 ~12:20），阶段 5 待派。**
 > 最高优先级任务。质量优先于速度；每一步想透再动手；不留“以后再说”的坑。
 > 每个阶段结束都要有可验证的证据（构建/测试输出、示例输出、来源清单），没验证通过不算完成。
 
@@ -126,7 +126,7 @@
   - 剧本导出：场景标题、动作、角色、台词、括号提示（停顿/语气）、镜头、音效、音乐提示。
   - 导出模板与示例文件（电影剧本 1 份、短剧 1 集）。
 - 落点：`packages/core/src/export/index.ts`（新增 `computeScreenplayExport`，复用 `inspectExportTarget` / `verifyExportTarget`）；新 `packages/core/src/export/screenplay-format.ts`（Fountain/Markdown 双输出渲染器）；新 `packages/bundle/src/scripts/screenplay-export-cli.ts`（`screenplayExportCli`，`src/cli.ts` / `src/index.ts` 导出、`artifact-contract.mjs` 的 thinScripts 登记）；`novel-export` SKILL.md 加剧本分支或新建技能脚本目录；`paths.ts` + `docs/book-format.md`（剧本定稿目录定义）。
-- 验证标准：`pnpm build` 通过；`vitest run` 通过；导出的剧本文件格式完整、示例可读；导出不破坏现有小说导出。
+- 验证标准：`pnpm build` 通过；`vitest run` 通过；导出的剧本文件格式完整、示例可读；导出不破坏现有小说导出。**注意：新增 thinScript 时须同步处理 standalone-cli 验收场景（`check-standalone-cli.mjs` 的 `argumentsByFunction` 加条目 + 夹具），否则全量会报 Missing CLI acceptance scenario（阶段 2 的 `runScreenplayChecksCli` 已因此返工一次）。**
 
 ### 阶段 5 — 新手文档 + 易用性收尾
 
