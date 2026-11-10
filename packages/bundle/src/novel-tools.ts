@@ -109,6 +109,14 @@ import {
   type Concept,
   type ContractParts,
   type ContractPartState,
+  type Market,
+  type OutputForm,
+  MARKET_VALUES,
+  OUTPUT_FORM_VALUES,
+  isMarketValue,
+  isOutputFormValue,
+  marketOf,
+  outputFormOf,
   type 处置状态,
   askAuthor,
   type AskFn,
@@ -336,11 +344,13 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
     },
     {
       name: 'novel_create_book',
-      description: '新建一部长篇小说并初始化规范书仓。前置要求：七个构想字段齐全、核心创意与题材目标读者明确，其余可留白；作者已确认立项。',
+      description: '新建一部长篇小说并初始化规范书仓。前置要求：七个构想字段齐全、核心创意与题材目标读者明确，其余可留白；作者已确认立项。建书时先问作者两个问题再调：这个项目面向海外还是中文市场（市场，不填默认中文，决定加载哪套题材库），要出短剧、电影剧本还是小说（输出形态，不填默认小说，决定走哪条流水线）。',
       parameters: {
         type: 'object',
         properties: {
           bookName: { type: 'string', description: '小说书名（不可含路径字符与保留字）' },
+          市场: { type: 'string', enum: [...MARKET_VALUES], description: '目标市场：海外（海外题材库）或中文（中文题材库）；可选，不填默认中文。顶层参数优先于 concept 里的同名字段。' },
+          输出形态: { type: 'string', enum: [...OUTPUT_FORM_VALUES], description: '输出形态：短剧、电影剧本或小说；可选，不填默认小说。短剧走按集流水线，电影剧本走剧本流水线，小说走原长篇流水线。顶层参数优先于 concept 里的同名字段。' },
           concept: {
             type: 'object',
             description: '作品构想七要素（状态必须为已确认）',
@@ -353,6 +363,8 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
               核心看点: { type: 'string' },
               差异化方向: { type: 'string' },
               明确不要什么: { type: 'string' },
+              市场: { type: 'string', enum: [...MARKET_VALUES], description: '目标市场：海外或中文；可选，不填默认中文' },
+              输出形态: { type: 'string', enum: [...OUTPUT_FORM_VALUES], description: '输出形态：短剧、电影剧本或小说；可选，不填默认小说' },
             },
             required: ['状态', '核心创意', '题材与目标读者', '主角核心欲望', '主要冲突', '核心看点', '差异化方向', '明确不要什么'],
           },
@@ -378,7 +390,14 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
         if (root === undefined) return toolFailure('host-unavailable', '工作范围未就绪：工作台还没有加载工作区')
         const bookName = String(args['bookName']).trim()
         const concept = args['concept'] as Concept
-        const res = createBook({ workspaceRoot: root, 书名: bookName, concept })
+        // 影视剧扩展：市场 / 输出形态可在顶层参数或 concept 里给，顶层优先；都不给按默认值处理。
+        const 市场: Market = marketOf({ ...concept, 市场: (args['市场'] as Market | undefined) ?? concept.市场 })
+        const 输出形态: OutputForm = outputFormOf({ ...concept, 输出形态: (args['输出形态'] as OutputForm | undefined) ?? concept.输出形态 })
+        if (args['市场'] !== undefined && !isMarketValue(args['市场'])) return toolFailure('invalid-argument', `市场取值非法：${String(args['市场'])}，只接受 海外 / 中文`)
+        if (args['输出形态'] !== undefined && !isOutputFormValue(args['输出形态'])) return toolFailure('invalid-argument', `输出形态取值非法：${String(args['输出形态'])}，只接受 短剧 / 电影剧本 / 小说`)
+        if (concept.市场 !== undefined && !isMarketValue(concept.市场)) return toolFailure('invalid-argument', `concept.市场取值非法：${String(concept.市场)}，只接受 海外 / 中文`)
+        if (concept.输出形态 !== undefined && !isOutputFormValue(concept.输出形态)) return toolFailure('invalid-argument', `concept.输出形态取值非法：${String(concept.输出形态)}，只接受 短剧 / 电影剧本 / 小说`)
+        const res = createBook({ workspaceRoot: root, 书名: bookName, concept: { ...concept, 市场, 输出形态 } })
         // 裁决 12：建书后不自动切书，由模型显式调 novel_select_book
         return res
       },
