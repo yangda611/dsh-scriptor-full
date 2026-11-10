@@ -66,14 +66,17 @@ function finish(root: string, extraPaths: readonly string[] = []): void {
 function snapshot(root: string): Record<string, string> {
   const result: Record<string, string> = {}
   const visit = (relative: string): void => {
+    // .git/ 由 git 后台自动维护随时改写（maintenance.lock 等），不是书仓内容；
+    // 快照只覆盖书仓文件。排除 .git/ 才能稳定比较——否则维护锁文件在
+    // 两次快照之间出现/消失会导致 91 vs 92 的误报（b8b4704 的跳过修复
+    // 治标不治本：跳过消失文件会让两次快照条目数不一致）。
+    if (relative === '.git' || relative.startsWith('.git/')) return
     const absolute = path.join(root, relative)
     let stat: fs.Stats
     try {
       stat = fs.lstatSync(absolute)
     } catch (error) {
-      // Git 后台自动维护可能在遍历中删除 .git/objects/maintenance.lock；
-      // 遍历中消失的文件直接跳过（与 ef5d046 同类修复：快照是尽力而为，
-      // 消失的文件不计入结果，不应让快照本身抛错）。
+      // 遍历中消失的其他文件直接跳过（与 ef5d046 同类修复）。
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
       throw error
     }

@@ -59,6 +59,10 @@ function allBytes(): Record<string, string> {
     }
     for (const entry of entries) {
       const file = path.posix.join(relative, entry.name)
+      // .git/ 由 git 后台自动维护随时改写，不是书仓内容；快照排除它，
+      // 否则维护锁文件在两次快照之间出现/消失会导致前后比对误报
+      //（只靠跳过消失文件不够：跳过会让两次快照条目数不一致）。
+      if (file === '.git' || file.startsWith('.git/')) continue
       try {
         if (entry.isSymbolicLink()) result[file] = `link:${fs.readlinkSync(path.join(root, file))}`
         else if (entry.isDirectory()) { result[`${file}/`] = ''; walk(file) }

@@ -43,6 +43,10 @@ function fixture(unversioned = true) {
 function bytes(root: string): Record<string, string> {
   const found: Record<string, string> = {}
   const walk = (relative: string) => {
+    // .git/ 由 git 后台自动维护随时改写，不是书仓内容；快照排除它，
+    // 否则维护锁文件在两次快照之间出现/消失会导致前后比对误报
+    //（只靠跳过消失文件不够：跳过会让两次快照条目数不一致）。
+    if (relative === '.git' || relative.startsWith('.git/')) return
     const target = path.join(root, relative)
     let stat: fs.Stats
     try {

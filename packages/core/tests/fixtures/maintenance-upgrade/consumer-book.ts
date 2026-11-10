@@ -96,6 +96,10 @@ export function createConsumerBook(workspace: string): string {
 export function consumerSnapshot(root: string): Record<string, string> {
   const result: Record<string, string> = {}
   const walk = (directory: string): void => {
+    // .git/ 由 git 后台自动维护随时改写，不是书仓内容；快照排除它，
+    // 否则维护锁文件在两次快照之间出现/消失会导致前后比对误报
+    //（只靠跳过消失文件不够：跳过会让两次快照条目数不一致）。
+    if (directory === '.git' || directory.startsWith('.git/')) return
     let entries: fs.Dirent[]
     try {
       entries = fs.readdirSync(path.join(root, directory), { withFileTypes: true })
