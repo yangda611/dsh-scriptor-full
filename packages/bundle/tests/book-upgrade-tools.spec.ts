@@ -43,11 +43,33 @@ function fixture(unversioned = true) {
 function bytes(root: string): Record<string, string> {
   const found: Record<string, string> = {}
   const walk = (relative: string) => {
-    const target = path.join(root, relative), stat = fs.lstatSync(target)
+    const target = path.join(root, relative)
+    let stat: fs.Stats
+    try {
+      stat = fs.lstatSync(target)
+    } catch (err) {
+      // 目标在遍历中消失（如 .git/objects/maintenance.lock 被 git 后台维护删掉），跳过
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw err
+    }
     if (stat.isDirectory()) {
       found[relative + '/'] = 'directory'
-      for (const name of fs.readdirSync(target).sort()) walk(relative ? `${relative}/${name}` : name)
-    } else found[relative] = createHash('sha256').update(fs.readFileSync(target)).digest('hex')
+      let names: string[]
+      try {
+        names = fs.readdirSync(target).sort()
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') return
+        throw err
+      }
+      for (const name of names) walk(relative ? `${relative}/${name}` : name)
+    } else {
+      try {
+        found[relative] = createHash('sha256').update(fs.readFileSync(target)).digest('hex')
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') return
+        throw err
+      }
+    }
   }
   walk('')
   return found

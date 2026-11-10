@@ -96,10 +96,24 @@ export function createConsumerBook(workspace: string): string {
 export function consumerSnapshot(root: string): Record<string, string> {
   const result: Record<string, string> = {}
   const walk = (directory: string): void => {
-    for (const entry of fs.readdirSync(path.join(root, directory), { withFileTypes: true })) {
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(path.join(root, directory), { withFileTypes: true })
+    } catch (err) {
+      // 目录在遍历中消失（如 git 后台维护删锁文件），跳过
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw err
+    }
+    for (const entry of entries) {
       const relative = path.posix.join(directory, entry.name)
-      if (entry.isDirectory()) { result[relative + '/'] = 'directory'; walk(relative) }
-      else result[relative] = createHash('sha256').update(fs.readFileSync(path.join(root, relative))).digest('hex')
+      try {
+        if (entry.isDirectory()) { result[relative + '/'] = 'directory'; walk(relative) }
+        else result[relative] = createHash('sha256').update(fs.readFileSync(path.join(root, relative))).digest('hex')
+      } catch (err) {
+        // 文件在列出与读取之间消失（如 .git/objects/maintenance.lock 被 git 后台维护删掉），跳过
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') continue
+        throw err
+      }
     }
   }
   walk(''); return result

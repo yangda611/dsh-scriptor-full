@@ -49,11 +49,25 @@ function init(legacy = true, memory = false): void {
 function allBytes(): Record<string, string> {
   const result: Record<string, string> = {}
   const walk = (relative: string): void => {
-    for (const entry of fs.readdirSync(path.join(root, relative), { withFileTypes: true })) {
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(path.join(root, relative), { withFileTypes: true })
+    } catch (err) {
+      // 目录在遍历中消失（如 git 后台维护删锁文件），跳过
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw err
+    }
+    for (const entry of entries) {
       const file = path.posix.join(relative, entry.name)
-      if (entry.isSymbolicLink()) result[file] = `link:${fs.readlinkSync(path.join(root, file))}`
-      else if (entry.isDirectory()) { result[`${file}/`] = ''; walk(file) }
-      else result[file] = contentHash(fs.readFileSync(path.join(root, file)))
+      try {
+        if (entry.isSymbolicLink()) result[file] = `link:${fs.readlinkSync(path.join(root, file))}`
+        else if (entry.isDirectory()) { result[`${file}/`] = ''; walk(file) }
+        else result[file] = contentHash(fs.readFileSync(path.join(root, file)))
+      } catch (err) {
+        // 文件在列出与读取之间消失（如 .git/objects/maintenance.lock 被 git 后台维护删掉），跳过
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') continue
+        throw err
+      }
     }
   }
   walk(''); return result
