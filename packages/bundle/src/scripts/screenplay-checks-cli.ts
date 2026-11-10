@@ -3,20 +3,31 @@
  *
  * 本模块经薄入口 `skills/novel-screenplay/scripts/剧本格式检查.mjs` 动态引 lib 调用。
  * 只算不写：读剧本草稿 + 分场大纲 → parseScreenplay + parseSceneOutline →
- * runScreenplayReview，把逐模块发现项打到 stdout。函数保持纯函数形态
+ * runScreenplayReview，把结果以纯 JSON 打到 stdout（独立 CLI 验收要求 stdout
+ * 可 JSON.parse；人读的摘要行不打到 stdout）。函数保持纯函数形态
  * （argv 进、退出码出），模块顶层不得有副作用。
  *
+ * 参数：--book <书仓路径>（必填）；--草稿 <路径>（可选，相对书仓或绝对路径，
+ * 默认 草稿区/剧本/剧本草稿.md）；--大纲 <路径>（可选，相对书仓或绝对路径；
+ * 不传则只审草稿本身，不自动找默认大纲）；--片长 长片|短片（可选，默认 长片）。
+ *
  * 退出码：0 完成（发现项可能是空）；1 前置参数错误 / 文件不存在 / 解析失败；
- * 2 执行异常。约定与 deterministic-checks.ts 一致（阶段 2 汇报里“参数错误退出 2”
- * 与薄入口“2 执行异常”的说法不一致，以此处为准：参数错误是 1）。
+ * 2 执行异常。约定与 deterministic-checks.ts 一致。
  */
 import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { parseSceneOutline, parseScreenplay, runScreenplayReview, type FilmLength } from '@webnovel/core'
 
 interface Args {
+  readonly book: string
   readonly 草稿: string
   readonly 大纲?: string
   readonly 片长: FilmLength
+}
+
+function resolveInBook(book: string, value: string, fallback: string): string {
+  const raw = value.trim() === '' ? fallback : value
+  return path.isAbsolute(raw) ? raw : path.join(book, raw)
 }
 
 function parseArgs(argv: readonly string[]): Args {
@@ -30,12 +41,14 @@ function parseArgs(argv: readonly string[]): Args {
     values.set(name, value)
     i += 1
   }
-  const 草稿 = values.get('草稿')?.trim()
-  const 大纲 = values.get('大纲')?.trim()
+  const book = values.get('book')?.trim()
+  if (!book) throw new Error('必须传 --book 书仓路径')
   const 片长 = values.get('片长')?.trim() ?? '长片'
-  if (!草稿) throw new Error('必须传 --草稿 剧本草稿路径')
   if (片长 !== '长片' && 片长 !== '短片') throw new Error('--片长 必须是 长片 或 短片')
-  return { 草稿, ...(大纲 !== undefined && 大纲 !== '' ? { 大纲 } : {}), 片长 }
+  const 草稿 = resolveInBook(book, values.get('草稿') ?? '', '草稿区/剧本/剧本草稿.md')
+  const 大纲raw = values.get('大纲')
+  const 大纲 = 大纲raw === undefined || 大纲raw.trim() === '' ? undefined : resolveInBook(book, 大纲raw, '')
+  return { book, 草稿, ...(大纲 !== undefined ? { 大纲 } : {}), 片长 }
 }
 
 export function runScreenplayChecksCli(argv: readonly string[]): number {
@@ -44,6 +57,10 @@ export function runScreenplayChecksCli(argv: readonly string[]): number {
     args = parseArgs(argv)
   } catch (err) {
     console.error(`前置参数错误：${err instanceof Error ? err.message : String(err)}`)
+    return 1
+  }
+  if (!fs.existsSync(args.book) || !fs.statSync(args.book).isDirectory()) {
+    console.error(`书仓不存在：${path.resolve(args.book)}`)
     return 1
   }
   if (!fs.existsSync(args.草稿) || !fs.statSync(args.草稿).isFile()) {
@@ -74,13 +91,12 @@ export function runScreenplayChecksCli(argv: readonly string[]): number {
       ...(outline !== undefined ? { 分场大纲: outline } : {}),
       片长: args.片长,
     })
-    const counts = (Object.entries(result.按模块) as Array<[string, readonly unknown[]]>)
-      .map(([name, findings]) => `${name}:${findings.length}`)
-      .join('、') || '（无）'
-    console.log(`剧本格式检查完成：${counts}`)
-    console.log(`是否阻断：${result.是否阻断 ? 'true' : 'false'}`)
-    console.log('发现项（逐模块）:')
-    console.log(JSON.stringify(result.按模块, null, 2))
+    console.log(JSON.stringify({
+      ok: true,
+      是否阻断: result.是否阻断,
+      发现项: result.findings,
+      按模块: result.按模块,
+    }, null, 2))
     return 0
   } catch (err) {
     console.error(`剧本格式检查异常：${err instanceof Error ? err.message : String(err)}`)

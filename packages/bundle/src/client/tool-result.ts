@@ -16,6 +16,11 @@ export const novelToolTitles: Readonly<Record<string, string>> = {
   novel_resolve_proposal: '处置提案', novel_apply_retcon: '应用吃书补偿', novel_record_memory: '记录记忆',
   novel_note_pending: '记录待补事项', novel_get_book_progress: '查看作品进度',
   novel_editor_suggest: '交回编辑建议',
+  novel_screenplay_check_contract: '核对电影剧本管线', novel_screenplay_validate_story: '校验故事稿',
+  novel_screenplay_build_outline: '生成分场大纲', novel_screenplay_build_draft: '生成剧本草稿',
+  novel_screenplay_review: '剧本审读', novel_screenplay_render: '渲染剧本',
+  novel_shortdrama_plan_episodes: '规划短剧分集', novel_shortdrama_render_episode: '渲染短剧单集',
+  novel_shortdrama_check_beats: '短剧节拍检查', novel_shortdrama_review_episode: '短剧单集审读',
 }
 
 export interface NovelResultModel {

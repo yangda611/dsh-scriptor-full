@@ -1,18 +1,18 @@
 # 当前源码的工具清单
 
-完整写作模式共有 **37 个 Scriptor 工具：36 个业务工具 + 1 个条件委派工具**。这里不包含 DSH 自带的文件、Shell、普通子代理等工具，也不包含测试专用工具。
+完整写作模式共有 **47 个 Scriptor 工具：46 个业务工具 + 1 个条件委派工具**。这里不包含 DSH 自带的文件、Shell、普通子代理等工具，也不包含测试专用工具。
 
 唯一名称清单位于 `packages/bundle/src/tool-catalog.ts`：`NOVEL_TOOL_NAMES` 对应业务工厂，`NOVEL_CONDITIONAL_TOOL_NAMES` 对应条件注册，`NOVEL_PRODUCTION_TOOL_NAMES` 是二者合并后的完整清单。
 
 | 环境 | Scriptor 工具数 |
 | --- | --- |
-| 写作主控，原生 `subagent` 可用 | 37 |
-| 写作主控，原生 `subagent` 不可用 | 36 |
+| 写作主控，原生 `subagent` 可用 | 47 |
+| 写作主控，原生 `subagent` 不可用 | 46 |
 | 普通模式或 Scriptor 已卸载 | 0 |
 
-`novel_delegate` 随原生 `subagent` 注册和撤销。五种 role 共用这一个工具，不算五个工具。模型选择、后台执行和取消沿用原生委派；普通研究仍走原生 `subagent`。只有明确角色的目标实例才获得对应写作规则与权限。
+`novel_delegate` 随原生 `subagent` 注册和撤销。七种 role 共用这一个工具，不算七个工具。模型选择、后台执行和取消沿用原生委派；普通研究仍走原生 `subagent`。只有明确角色的目标实例才获得对应写作规则与权限。
 
-## 业务工具（36 个）
+## 业务工具（46 个）
 
 | 工具 | 用途 |
 | --- | --- |
@@ -52,14 +52,24 @@
 | `novel_note_pending` | 记录待补事项 |
 | `novel_get_book_progress` | 查询作品进度 |
 | `novel_editor_suggest` | 交回编辑器建议 |
+| `novel_screenplay_check_contract` | 核对作品能否走电影剧本改编管线 |
+| `novel_screenplay_validate_story` | 校验故事稿 |
+| `novel_screenplay_build_outline` | 生成分场大纲 |
+| `novel_screenplay_build_draft` | 生成剧本草稿 |
+| `novel_screenplay_review` | 剧本审读（对白/节奏/场次完整性） |
+| `novel_screenplay_render` | 渲染剧本草稿 |
+| `novel_shortdrama_plan_episodes` | 规划分集钩子/爽点大纲 |
+| `novel_shortdrama_render_episode` | 渲染单集剧本 |
+| `novel_shortdrama_check_beats` | 节拍检查 |
+| `novel_shortdrama_review_episode` | 短剧单集审读 |
 
 ## 条件委派工具（1 个）
 
 | 工具 | 注册条件与用途 |
 | --- | --- |
-| `novel_delegate` | 写作主控的原生 `subagent` 可用时注册；按 role 派发起草、润色、改稿、审读或沉淀对账 |
+| `novel_delegate` | 写作主控的原生 `subagent` 可用时注册；按 role 派发起草、润色、改稿、审读、沉淀对账、电影剧本改编或短剧管线 |
 
-业务结果卡只覆盖上述 36 个业务工具；委派结果沿用原生格式，不套用业务工具的 `ok` 结果协议。
+业务结果卡只覆盖上述 46 个业务工具；委派结果沿用原生格式，不套用业务工具的 `ok` 结果协议。
 
 作者明确开始新章时，用一次 `novel_begin_chapter` 替换原状态查询，不前后再补调 `novel_get_story_status`。普通查询、同章恢复和改稿取审核哈希仍用原状态工具，不附加全仓检查。主动检查使用 `novel_check_book`，不必假装开始新章。
 
@@ -72,6 +82,6 @@
 ## 数量验证
 
 - 工具清单测试核对名称唯一、业务工厂与清单一致、本文列举完整。
-- 不配置原生委派的 Loader 夹具核对业务清单，共 36 个。
-- 原生委派集成测试核对完整名称集，共 37 个；停用原生委派后回到 36，恢复后回到 37，卸载 Scriptor 后为 0。
-- 技能和文件打包另行核对：12 个技能、17 份参考文档、8 个脚本入口。打包文件数不代替运行时工具注册数量。
+- 不配置原生委派的 Loader 夹具核对业务清单，共 46 个。
+- 原生委派集成测试核对完整名称集，共 47 个；停用原生委派后回到 46，恢复后回到 47，卸载 Scriptor 后为 0。
+- 技能和文件打包另行核对：14 个技能、25 份参考文档、9 个脚本入口。打包文件数不代替运行时工具注册数量。

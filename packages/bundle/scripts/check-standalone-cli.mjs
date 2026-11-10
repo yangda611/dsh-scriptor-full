@@ -38,6 +38,7 @@ export function checkStandaloneScripts(installedPackage, book, reportPath, block
     analyzeImpactCli: ['--变更路径', '世界书/人物档案/主角.md'],
     materialsCli: chapter, packCli: chapter, volumeSummaryCli: ['--卷', '1'],
     exportCli: ['--卷', '1', '--目标', target],
+    runScreenplayChecksCli: ['--草稿', '草稿区/剧本/剧本草稿.md', '--大纲', '草稿区/剧本/分场大纲.md', '--片长', '短片'],
   }
   try {
     if (blockedSource) {

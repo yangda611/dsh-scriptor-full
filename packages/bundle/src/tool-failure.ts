@@ -98,17 +98,32 @@ export function classifyReason(reason: string): ToolFailureCode {
 /**
  * 把任意 `{ ok: false, reason }` 结果补齐为统一结构：保留已有字段，
  * 缺 code 时按 reason 归类，缺 next 时给出该类的默认下一步。
+ *
+ * 失败原因也可能在中文领域字段里（剧本/短剧工具返回 `原因` 或 `问题`，
+ * 而不是英文 `reason`）：先从这些字段推导 reason 字符串，再按同一规则
+ * 补 code/next；推导出的 reason 一并写回结果，保证失败结果总有 reason。
  */
 export function normalizeFailure<T>(result: T): T {
   if (result === null || typeof result !== 'object') return result
   const value = result as Record<string, unknown>
-  if (value['ok'] !== false || typeof value['reason'] !== 'string') return result
+  if (value['ok'] !== false) return result
+  let reason = typeof value['reason'] === 'string' ? value['reason'] : undefined
+  if (reason === undefined || reason.trim() === '') {
+    reason = chineseReason(value['原因']) ?? chineseReason(value['问题'])
+  }
+  if (reason === undefined || reason.trim() === '') return result
   const known = typeof value['code'] === 'string' && value['code'] in NEXT_STEP ? value['code'] as ToolFailureCode : undefined
-  const code = typeof value['code'] === 'string' ? value['code'] : classifyReason(value['reason'])
+  const code = typeof value['code'] === 'string' ? value['code'] : classifyReason(reason)
   const next = typeof value['next'] === 'string' && value['next'] !== ''
     ? value['next']
-    : NEXT_STEP[known ?? (code in NEXT_STEP ? code as ToolFailureCode : classifyReason(value['reason']))]
-  return { ...value, code, next } as T
+    : NEXT_STEP[known ?? (code in NEXT_STEP ? code as ToolFailureCode : classifyReason(reason))]
+  return { ...value, reason, code, next } as T
+}
+
+function chineseReason(field: unknown): string | undefined {
+  if (typeof field === 'string' && field.trim() !== '') return field
+  if (Array.isArray(field) && field.length > 0) return field.map(String).join('；')
+  return undefined
 }
 
 /** 输出 schema 中统一追加的字段说明。 */
