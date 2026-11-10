@@ -93,10 +93,28 @@ function saved(value: string, names: readonly string[]): Readonly<Record<string,
 function allBytes(value: string): Readonly<Record<string, string>> {
   const result: Record<string, string> = {}
   const visit = (directory: string): void => {
-    for (const entry of fs.readdirSync(path.join(value, directory), { withFileTypes: true })) {
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(path.join(value, directory), { withFileTypes: true })
+    } catch (error) {
+      // 目录在列出时消失（如 git 后台维护删掉 .git 下文件），跳过；快照只覆盖书仓内容。
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw error
+    }
+    for (const entry of entries) {
       const relative = directory ? `${directory}/${entry.name}` : entry.name
+      // .git/ 由 git 后台自动维护随时改写（maintenance.lock 等），不是书仓内容；跳过可根治列出与读取之间的竞态。
+      if (relative === '.git' || relative.startsWith('.git/')) continue
       if (entry.isDirectory()) { result[`${relative}/`] = ''; visit(relative) }
-      else result[relative] = contentHash(fs.readFileSync(path.join(value, relative)))
+      else {
+        try {
+          result[relative] = contentHash(fs.readFileSync(path.join(value, relative)))
+        } catch (error) {
+          // 文件在列出与读取之间消失，跳过。
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
+          throw error
+        }
+      }
     }
   }
   visit(''); return result

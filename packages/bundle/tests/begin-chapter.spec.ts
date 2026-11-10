@@ -28,7 +28,17 @@ function fixture() {
 function filesystem(root: string): Record<string, string> {
   const result: Record<string, string> = {}
   const visit = (relative: string) => {
-    const absolute = path.join(root, relative), stat = fs.lstatSync(absolute)
+    const absolute = path.join(root, relative)
+    let stat: fs.Stats
+    try {
+      stat = fs.lstatSync(absolute)
+    } catch (error) {
+      // 文件在列出与读取之间消失，跳过。
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw error
+    }
+    // .git/ 由 git 后台自动维护随时改写（maintenance.lock 等），不是书仓内容；跳过可根治列出与读取之间的竞态。
+    if (relative === '.git' || relative.startsWith('.git/')) return
     if (stat.isDirectory()) {
       result[relative + '/'] = 'directory'
       for (const name of fs.readdirSync(absolute).sort()) visit(relative ? `${relative}/${name}` : name)
