@@ -23,12 +23,32 @@
  *
  * 对白要短：中文指南约每行 <12 字（来源：调研 §2.2）。超长台词不丢稿，
  * 渲染结果带警告，归短剧审读处置。
+ *
+ * 对齐轮次（阶段 4 对齐，格式取自《痴迷》参考案例
+ * docs/examples/痴迷-12集分镜剧本-参考案例.docx，全 12 集 911 镜实测）：
+ * - 场头：`1-1 日／内 餐厅卡座`（集-场 日/夜／内/外 地点）。
+ * - 人物行：`人物：贝尔（毛衣男子）、伊恩（棒球帽男子）`（人名 + 括号内形象标识）。
+ * - 场景环境行：`场景环境：美式复古风格餐厅室内。……`（中文描写）。
+ * - 镜头块头：`△【镜头01｜时间：00:00—00:42｜景别：近景｜角度：平视正面｜运镜：固定镜头】`
+ *   五字段缺一不可；镜头号与时间码都是集内累计、集间重置。
+ * - 镜头块内：△站位/动作/表情行各独立成行；对白行 `角色（语速…，音量…，语调…，尾音…）：对白`，
+ *   画外音在标注最前面加「画外音，」；`【环境声：……】` / `【字幕：……】` 各单独成行；
+ *   无人物面部时用 `△【本镜头无人物面部，表情不适用】` 等变体行。
+ * - 集末：`【画面淡出黑场】`，下一集镜头号与时间码从 01 / 00:00 重新开始。
+ * - 语言规则：说明/场景/动作文字一律中文，对白按目标市场语言（海外题材为英文）。
+ *   这是“输出永远中文”的边界：团队看的说明文字是中文，演员说的对白是目标市场语言。
+ * - 景别/角度/运镜词表见本文件的 SHOT_SIZE_VOCAB / SHOT_ANGLE_VOCAB / SHOT_MOVEMENT_VOCAB
+ *   （从案例全文词频提取；不在词表里只警告、不判错——案例本身也有长尾写法）。
+ * - 渲染—解析往返一致：renderEpisodeScript 的输出经 parseEpisodeScript 读回
+ *   必须逐字节还原（逐字节测试见 screenplay-export.spec.ts 与 shortdrama-example.spec.ts）。
  */
 
 import { paths } from '../repo/paths'
 import { RHYTHM_TEMPLATES } from './templates'
 import {
+  type EpisodeCharacter,
   type EpisodeScriptInput,
+  type EpisodeShot,
   type RenderedEpisodeScript,
   type ScriptLine,
   type ScriptScene,
@@ -40,15 +60,105 @@ export const PAUSE_MARK = '(pause)'
 /** 单句台词上限（字）：中文指南约每句 <12 字（调研 §2.2）。 */
 export const MAX_DIALOGUE_CHARS = 12
 
+/**
+ * 景别词表（《痴迷》案例全文词频：近景 536 / 中景 195 / 特写 78 / 全景 47 /
+ * 大特写 9 / 中近景 8；另有 `中景→近景` 等过渡写法，用 `→` 连接两个基本词）。
+ */
+export const SHOT_SIZE_VOCAB = ['近景', '中景', '特写', '全景', '大特写', '中近景', '远景', '中远景', '极远景'] as const
+
+/**
+ * 角度词表（《痴迷》案例全文词频前列：平视正面 170 / 正面平视 120 /
+ * 侧面平视 97 / 微侧平视 65 / 平视 63 / 平视侧面 54 / 平视微侧 34 /
+ * 平视正面微侧 31 / 侧面俯拍 / 俯拍 / 极低仰角平视地面 / 极低角度俯拍）。
+ */
+export const SHOT_ANGLE_VOCAB = [
+  '平视正面', '正面平视', '侧面平视', '微侧平视', '平视', '平视侧面', '平视微侧',
+  '平视正面微侧', '侧面俯拍', '俯拍', '极低仰角平视地面', '极低角度俯拍',
+] as const
+
+/**
+ * 运镜词表（《痴迷》案例全文词频：固定镜头 763，占绝对多数；其余为
+ * 手持微晃 / 微晃动 / 缓慢推进 / 手持剧烈晃动 / 微晃手持 / 由远及近缓慢下推 /
+ * 低机位平移推进 / 向内缓慢推进）。
+ */
+export const SHOT_MOVEMENT_VOCAB = [
+  '固定镜头', '手持微晃', '微晃动', '缓慢推进', '手持剧烈晃动', '微晃手持',
+  '由远及近缓慢下推', '低机位平移推进', '向内缓慢推进',
+] as const
+
+/** 集末淡出黑场行（《痴迷》案例集末写法；每集末尾一行，下一集从 01 / 00:00 重置）。 */
+export const EPISODE_FADE_OUT = '【画面淡出黑场】'
+
+/** 无人物面部时的 △ 变体行（案例写法；放进镜头块的 描写 里）。 */
+export const NO_FACE_SHOT_NOTE = '【本镜头无人物面部，表情不适用】'
+
+/** 秒数 → `MM:SS`（分可超 59，如横屏长集 12:34）。 */
+export function formatTimecode(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+/** `MM:SS` → 秒；非法返回 null。 */
+export function parseTimecode(value: string): number | null {
+  const m = /^(\d{1,3}):(\d{2})$/.exec(value.trim())
+  if (m === null) return null
+  const seconds = Number(m[1]) * 60 + Number(m[2])
+  return Number(m[2]) < 60 ? seconds : null
+}
+
+/** 一场全部台词：有分镜头时取各镜台词扁平汇总，否则取场台词（供字数统计与 Fountain 导出复用）。 */
+export function sceneDialogueLines(scene: ScriptScene): readonly ScriptLine[] {
+  if (scene.镜头 === undefined) return scene.台词
+  return scene.镜头.flatMap((shot) => shot.台词)
+}
+
+/** 一集全部台词角色（按出场顺序去重；供人名一致性检查用）。 */
+export function episodeCharacterNames(episode: EpisodeScriptInput): string[] {
+  const names: string[] = []
+  for (const scene of episode.场景) {
+    for (const line of sceneDialogueLines(scene)) {
+      if (!names.includes(line.角色)) names.push(line.角色)
+    }
+  }
+  return names
+}
+
+/** 一场分镜头总数：有镜头取镜数，否则模板出一镜（供镜头号跨场连续计数用）。 */
+export function countEpisodeShots(scene: ScriptScene): number {
+  return scene.镜头 === undefined ? 1 : scene.镜头.length
+}
+
+/**
+ * 场头的日/夜：从场景 `时间` 推导——含 夜/晚/凌晨/深夜 → 夜；含
+ * 日/白天/上午/下午/清晨/黄昏 → 日；其余原样透传（如 `黄昏` 以外的时间词）。
+ */
+export function dayNightLabel(时间: string): string {
+  if (/夜|晚|凌晨|深夜/.test(时间)) return '夜'
+  if (/日|白天|上午|下午|清晨|黄昏/.test(时间)) return '日'
+  return 时间
+}
+
+function checkShotVocab(value: string, vocab: readonly string[], label: string, where: string, warnings: string[]): void {
+  if (value.trim() === '' || value.trim() === '—') return
+  const parts = value.trim().split('→')
+  for (const part of parts) {
+    if (!(vocab as readonly string[]).includes(part.trim())) {
+      warnings.push(`${where}：${label}「${value}」不在常用词表里（${vocab.join('/')}），核对是不是笔误`)
+      return
+    }
+  }
+}
+
 /** 台词字数：数非空白字符（中文按字计，含标点）。 */
 export function dialogueChars(line: string): number {
   return [...line].filter((ch) => !/\s/.test(ch)).length
 }
 
-/** 一集台词总字数（竖屏 180–360 字，见 templates.ts）。 */
+/** 一集台词总字数（竖屏 180–360 字，见 templates.ts；有分镜头时按各镜台词计）。 */
 export function totalDialogueChars(scenes: readonly ScriptScene[]): number {
   let n = 0
-  for (const scene of scenes) for (const line of scene.台词) n += dialogueChars(line.台词)
+  for (const scene of scenes) for (const line of sceneDialogueLines(scene)) n += dialogueChars(line.台词)
   return n
 }
 
@@ -89,7 +199,15 @@ function validate(input: EpisodeScriptInput): string[] {
     seen.add(scene.场)
     if (scene.地点.trim() === '' || scene.时间.trim() === '') fail(`集${input.集} 场${scene.场}：地点与时间不能为空`)
     if (scene.动作.trim() === '') fail(`集${input.集} 场${scene.场}：动作行不能为空`)
-    for (const line of scene.台词) {
+    if (scene.人物 !== undefined) {
+      const names = new Set<string>()
+      for (const person of scene.人物) {
+        if (person.角色.trim() === '') fail(`集${input.集} 场${scene.场}：人物行里有人名为空`)
+        if (names.has(person.角色)) fail(`集${input.集} 场${scene.场}：人物行里 ${person.角色} 重复`)
+        names.add(person.角色)
+      }
+    }
+    for (const line of sceneDialogueLines(scene)) {
       if (line.角色.trim() === '') fail(`集${input.集} 场${scene.场}：台词缺少说话人`)
       if (line.台词.trim() === '') fail(`集${input.集} 场${scene.场}：${line.角色}的台词为空`)
       const n = dialogueChars(line.台词)
@@ -104,6 +222,38 @@ function validate(input: EpisodeScriptInput): string[] {
       }
     }
   }
+  // 分镜头校验（对齐轮次）：镜头号集内连续、时间码集内累计且不超出单集时长、
+  // 景别/角度/运镜必填（模板镜除外：时间未知时三项可填 `—`，只警告）。
+  let expectedShot = 1
+  for (const scene of [...input.场景].sort((a, b) => a.场 - b.场)) {
+    if (scene.镜头 === undefined) {
+      expectedShot += 1
+      continue
+    }
+    for (const shot of scene.镜头) {
+      const where = `集${input.集} 场${scene.场} 镜头${String(shot.镜头号).padStart(2, '0')}`
+      if (shot.镜头号 !== expectedShot) fail(`集${input.集}：镜头号须从 1 起集内连续（第 ${expectedShot} 镜应为镜头${String(expectedShot).padStart(2, '0')}，收到镜头${String(shot.镜头号).padStart(2, '0')}）`)
+      expectedShot += 1
+      if (shot.描写.length === 0) fail(`${where}：至少要有一行 △站位/动作/表情行（无面部时用「${NO_FACE_SHOT_NOTE}」）`)
+      if (shot.开始秒 !== null && shot.结束秒 !== null) {
+        if (!Number.isSafeInteger(shot.开始秒) || !Number.isSafeInteger(shot.结束秒) || shot.开始秒 < 0 || shot.结束秒 <= shot.开始秒) {
+          fail(`${where}：时间码须为 00:00—MM:SS 且开始早于结束（收到：${formatTimecode(shot.开始秒)}—${formatTimecode(shot.结束秒)}）`)
+        }
+        if (shot.结束秒 > input.时长秒) fail(`${where}：时间码超出单集时长（结束 ${formatTimecode(shot.结束秒)}，本集 ${input.时长秒} 秒）`)
+      } else if ((shot.开始秒 === null) !== (shot.结束秒 === null)) {
+        fail(`${where}：时间码开始与结束须同时给或同时空（模板镜填 —）`)
+      }
+      for (const [label, value] of [['景别', shot.景别], ['角度', shot.角度], ['运镜', shot.运镜]] as const) {
+        if (value.trim() === '' || value.trim() === '—') {
+          if (shot.开始秒 !== null) fail(`${where}：${label}不能为空（有时间码的镜必须填实；模板镜才填 —）`)
+          warnings.push(`${where}：${label}待填（填 — 表示暂无，导演补）`)
+        }
+      }
+      checkShotVocab(shot.景别, SHOT_SIZE_VOCAB, '景别', where, warnings)
+      checkShotVocab(shot.角度, SHOT_ANGLE_VOCAB, '角度', where, warnings)
+      checkShotVocab(shot.运镜, SHOT_MOVEMENT_VOCAB, '运镜', where, warnings)
+    }
+  }
   const sorted = [...input.场景].map((s) => s.场).sort((a, b) => a - b)
   for (let i = 0; i < sorted.length; i++) {
     if (sorted[i] !== i + 1) fail(`集${input.集}：场号须从 1 起连续（收到：${sorted.join('、')}）`)
@@ -116,15 +266,62 @@ function renderLine(line: ScriptLine): string {
   return `${line.角色}${mark}：${line.台词}`
 }
 
+function renderShotBlock(shot: EpisodeShot): string {
+  const 时间 = shot.开始秒 === null || shot.结束秒 === null
+    ? '—'
+    : `${formatTimecode(shot.开始秒)}—${formatTimecode(shot.结束秒)}`
+  const lines: string[] = [
+    `△【镜头${String(shot.镜头号).padStart(2, '0')}｜时间：${时间}｜景别：${shot.景别}｜角度：${shot.角度}｜运镜：${shot.运镜}】`,
+  ]
+  for (const desc of shot.描写) lines.push(`△${desc}`)
+  for (const line of shot.台词) lines.push(renderLine(line))
+  for (const env of shot.环境声 ?? []) lines.push(`【环境声：${env}】`)
+  for (const sub of shot.字幕 ?? []) lines.push(`【字幕：${sub}】`)
+  return lines.join('\n')
+}
+
+function renderTemplateShot(scene: ScriptScene, 镜头号: number): string {
+  return renderShotBlock({
+    镜头号,
+    开始秒: null,
+    结束秒: null,
+    景别: '—',
+    角度: '—',
+    运镜: '—',
+    描写: [scene.动作],
+    台词: scene.台词,
+  })
+}
+
 /**
- * 渲染一场（`## 场01. 地点 时间 内外` + 动作 + 台词），供 renderEpisodeScript
- * 与阶段 4 剧本导出复用同一口径；改动渲染格式时只改这里。
+ * 渲染一场（对齐轮次，分镜剧本形状，供 renderEpisodeScript 与阶段 4 剧本导出复用同一口径；
+ * 改动渲染格式时只改这里）。
+ *
+ * ```
+ * 1-1 日／内 苏家客厅
+ * 人物：顾霆琛（赘婿）、苏晚（妻子）
+ * 场景环境：苏家客厅。……
+ * △【镜头01｜时间：00:00—00:30｜景别：近景｜角度：平视正面｜运镜：固定镜头】
+ * △顾霆琛站在客厅中央，面向苏晚。
+ * 顾霆琛（语速缓慢，音量偏低，语调平稳，尾音轻落）：这婚，我不离。
+ * 【环境声：客厅空调轻响】
+ * ```
+ *
+ * `集` 是本集集号（场头用）；`镜头起始号` 是本场第一镜的集内编号
+ * （镜头号集内连续，调用方按场顺序累加，见 countEpisodeShots）。
+ * 没有分镜头数据的场出一镜模板行（五字段填 `—`），不编造导演的决定。
  */
-export function renderEpisodeSceneBlock(scene: ScriptScene): string {
-  const sceneNo = String(scene.场).padStart(2, '0')
-  const lines: string[] = [`## 场${sceneNo}. ${scene.地点} ${scene.时间} ${scene.内外}`, '', scene.动作, '']
-  for (const line of scene.台词) lines.push(renderLine(line))
-  lines.push('')
+export function renderEpisodeSceneBlock(scene: ScriptScene, 集: number, 镜头起始号 = 1): string {
+  const lines: string[] = [`${集}-${scene.场} ${dayNightLabel(scene.时间)}／${scene.内外} ${scene.地点}`, '']
+  if (scene.人物 !== undefined && scene.人物.length > 0) {
+    lines.push(`人物：${scene.人物.map((p) => (p.形象标识 === undefined ? p.角色 : `${p.角色}（${p.形象标识}）`)).join('、')}`, '')
+  }
+  lines.push(`场景环境：${scene.场景环境 ?? scene.动作}`, '')
+  if (scene.镜头 === undefined) {
+    lines.push(renderTemplateShot(scene, 镜头起始号), '')
+  } else {
+    for (const shot of scene.镜头) lines.push(renderShotBlock(shot), '')
+  }
   return lines.join('\n')
 }
 
@@ -157,7 +354,12 @@ export function renderEpisodeScript(input: EpisodeScriptInput): RenderedEpisodeS
     `- 结尾悬念：${input.结尾悬念}`,
     '',
   ]
-  for (const scene of [...input.场景].sort((a, b) => a.场 - b.场)) lines.push(renderEpisodeSceneBlock(scene))
+  let 镜头号 = 1
+  for (const scene of [...input.场景].sort((a, b) => a.场 - b.场)) {
+    lines.push(renderEpisodeSceneBlock(scene, input.集, 镜头号))
+    镜头号 += countEpisodeShots(scene)
+  }
+  lines.push(EPISODE_FADE_OUT, '')
   lines.push(renderEpisodeBeatTable(input))
   return {
     path: paths.短剧集(input.集),
@@ -173,10 +375,54 @@ export interface EpisodeParseResult {
 }
 
 const EPISODE_TITLE_RE = /^#\s*集(\d+)\s*[：:]\s*(.+?)\s*$/
-const EPISODE_SCENE_RE = /^##\s*场(\d+)\s*\.\s*(.+?)\s*$/
+/** 场头：`1-1 日／内 苏家客厅`（集-场 日/夜／内/外 地点；／ 也认 `/`）。 */
+const EPISODE_SCENE_RE = /^(\d+)-(\d+)\s+(\S+)[／/](内|外)\s+(.+?)\s*$/
+/** 旧版场头 `## 场01. 地点 时间 内/外`（对齐轮次已改场头格式，解析到就报迁移提示）。 */
+const EPISODE_SCENE_LEGACY_RE = /^##\s*场(\d+)\s*\.\s*(.+?)\s*$/
+/** 镜头块头：`△【镜头01｜时间：00:00—00:42｜景别：近景｜角度：平视正面｜运镜：固定镜头】`（｜ 也认 `|`）。 */
+const EPISODE_SHOT_RE = /^△【镜头(\d+)[｜|]时间[：:](.+?)[｜|]景别[：:](.+?)[｜|]角度[：:](.+?)[｜|]运镜[：:](.+?)】$/
+const EPISODE_CHARACTER_RE = /^人物[：:]\s*(.+?)\s*$/
+const EPISODE_SETTING_RE = /^场景环境[：:]\s*(.+?)\s*$/
+const EPISODE_SOUND_RE = /^【环境声[：:](.+)】$/
+const EPISODE_SUBTITLE_RE = /^【字幕[：:](.+)】$/
 const EPISODE_DIALOGUE_RE = /^([^：:（(]{1,15}?)(?:[（(]([^）)]+)[）)])?[：:](.+)$/
 const EPISODE_BEAT_OPEN_RE = /^-\s*开场冲突：\s*第\s*(\d+)\s*秒/
 const EPISODE_BEAT_HOOK_RE = /^-\s*结尾钩子：\s*第\s*(\d+)\s*秒/
+
+function parseShotTimecode(raw: string, where: string, problems: string[]): { 开始秒: number | null; 结束秒: number | null } {
+  const value = raw.trim()
+  if (value === '—' || value === '') return { 开始秒: null, 结束秒: null }
+  const parts = value.split(/[—-]/)
+  if (parts.length !== 2) {
+    problems.push(`${where}：时间码格式不对，应为「MM:SS—MM:SS」或「—」（收到：${value}）`)
+    return { 开始秒: null, 结束秒: null }
+  }
+  const 开始秒 = parseTimecode(parts[0]!)
+  const 结束秒 = parseTimecode(parts[1]!)
+  if (开始秒 === null || 结束秒 === null) {
+    problems.push(`${where}：时间码格式不对，应为「MM:SS—MM:SS」（收到：${value}）`)
+    return { 开始秒: null, 结束秒: null }
+  }
+  return { 开始秒, 结束秒 }
+}
+
+function parseCharacterLine(raw: string, where: string, problems: string[]): EpisodeCharacter[] {
+  const people: EpisodeCharacter[] = []
+  for (const segment of raw.split('、')) {
+    const part = segment.trim()
+    if (part === '') continue
+    const m = /^([^（(]+?)(?:[（(]([^）)]+)[）)])?$/.exec(part)
+    if (m === null || (m[1] ?? '').trim() === '') {
+      problems.push(`${where}：人物行格式不对，应为「人物：名字（形象标识）、名字……」（收到：${part}）`)
+      continue
+    }
+    people.push({
+      角色: m[1]!.trim(),
+      ...(m[2] !== undefined ? { 形象标识: m[2].trim() } : {}),
+    })
+  }
+  return people
+}
 
 function episodeMetaValue(lines: readonly string[], label: string): string | undefined {
   for (const line of lines) {
@@ -187,14 +433,18 @@ function episodeMetaValue(lines: readonly string[], label: string): string | und
 }
 
 /**
- * 解析一集短剧剧本（renderEpisodeScript 的输出格式）。
+ * 解析一集短剧剧本（renderEpisodeScript 的输出格式，对齐轮次分镜形状）。
  *
- * 约定：场景标题后第一行非空行是动作行，其后 `角色：台词` / `角色(pause)：台词`
- * 为台词行；`## 节拍表` 给出开场冲突/反转/结尾钩子秒数。`SFX:` / `MUSIC:` 独占行
- * 与 `(beat)` 一律记解析问题（与电影剧本同一口径：前者是广播剧格式，后者停顿
- * 只用 `(pause)`）。横屏专用的 首场冲突 / 起承转合 不写进集文本，解析结果不含
- * 这两项（导出时不依赖它们）。解析后用 renderEpisodeScript 重渲染一次校验：
- * 结构非法（集号越界、场号不连续、时长越界等）直接报问题。
+ * 约定：场头 `集-场 日/夜／内/外 地点` → 可选人物行 → 场景环境行 →
+ * 镜头块（`△【镜头NN｜时间｜景别｜角度｜运镜】` + △站位/动作/表情行 +
+ * `角色（标注）：台词` + `【环境声：……】` / `【字幕：……】`）→ 集末
+ * `【画面淡出黑场】` → `## 节拍表`（开场冲突/反转/结尾钩子秒数）。
+ * 旧版场头 `## 场01. 地点 时间 内/外` 不再接受，报迁移提示。
+ * `SFX:` / `MUSIC:` 独占行与 `(beat)` 一律记解析问题（与电影剧本同一口径：
+ * 前者是广播剧格式，后者停顿只用 `(pause)`）。横屏专用的 首场冲突 /
+ * 起承转合 不写进集文本，解析结果不含这两项（导出时不依赖它们）。
+ * 解析后用 renderEpisodeScript 重渲染一次校验：结构非法（集号越界、场号不连续、
+ * 时长越界、镜头号不连续等）直接报问题。
  */
 export function parseEpisodeScript(text: string): EpisodeParseResult {
   const problems: string[] = []
@@ -231,16 +481,69 @@ export function parseEpisodeScript(text: string): EpisodeParseResult {
   if (结尾悬念 === '') problems.push('单集剧本缺少结尾悬念（须是问题，不是答案）')
 
   const 场景: ScriptScene[] = []
-  let current: { 场: number; 地点: string; 时间: string; 内外: '内' | '外'; 动作: string; 台词: ScriptLine[] } | null = null
+  interface MutableShot {
+    镜头号: number
+    开始秒: number | null
+    结束秒: number | null
+    景别: string
+    角度: string
+    运镜: string
+    描写: string[]
+    台词: ScriptLine[]
+    环境声: string[]
+    字幕: string[]
+  }
+  interface MutableScene {
+    集: number
+    场: number
+    地点: string
+    时间: string
+    内外: '内' | '外'
+    动作: string
+    台词: ScriptLine[]
+    人物: EpisodeCharacter[]
+    场景环境: string
+    镜头: MutableShot[]
+    seenSetting: boolean
+  }
+  let current: MutableScene | null = null
+  let currentShot: MutableShot | null = null
   let inBeats = false
   let 开场冲突秒 = NaN
   let 反转秒: number[] = []
   let 结尾钩子秒 = NaN
   const flushScene = (): void => {
     if (current !== null) {
-      场景.push({ 场: current.场, 地点: current.地点, 时间: current.时间, 内外: current.内外, 动作: current.动作, 台词: current.台词 })
+      const flatLines = current.镜头.flatMap((s) => s.台词)
+      场景.push({
+        场: current.场,
+        地点: current.地点,
+        时间: current.时间,
+        内外: current.内外,
+        动作: current.动作,
+        台词: flatLines.length > 0 ? flatLines : current.台词,
+        ...(current.人物.length > 0 ? { 人物: current.人物 } : {}),
+        ...(current.场景环境 !== '' ? { 场景环境: current.场景环境 } : {}),
+        ...(current.镜头.length > 0
+          ? {
+            镜头: current.镜头.map((s): EpisodeShot => ({
+              镜头号: s.镜头号,
+              开始秒: s.开始秒,
+              结束秒: s.结束秒,
+              景别: s.景别,
+              角度: s.角度,
+              运镜: s.运镜,
+              描写: s.描写,
+              台词: s.台词,
+              ...(s.环境声.length > 0 ? { 环境声: s.环境声 } : {}),
+              ...(s.字幕.length > 0 ? { 字幕: s.字幕 } : {}),
+            })),
+          }
+          : {}),
+      })
     }
     current = null
+    currentShot = null
   }
   for (const line of lines) {
     if (line === '') continue
@@ -253,24 +556,26 @@ export function parseEpisodeScript(text: string): EpisodeParseResult {
       inBeats = true
       continue
     }
+    if (line === EPISODE_FADE_OUT) continue
+    const legacyScene = EPISODE_SCENE_LEGACY_RE.exec(line)
+    if (legacyScene) {
+      problems.push(`场${legacyScene[1]} 还是旧版场头「## 场01. 地点 时间 内/外」：对齐轮次已改场头为「集-场 日/夜／内/外 地点」（如 1-1 日／内 苏家客厅），请用新版格式重写`)
+      continue
+    }
     const sceneMatch = EPISODE_SCENE_RE.exec(line)
     if (sceneMatch) {
       flushScene()
       inBeats = false
-      const rest = sceneMatch[2]!.trim()
-      const parts = rest.split(/\s+/)
-      const 内外raw = parts[parts.length - 1]
-      const 时间 = parts[parts.length - 2] ?? ''
-      const 地点 = parts.slice(0, -2).join(' ')
-      if (内外raw !== '内' && 内外raw !== '外') {
-        problems.push(`场${sceneMatch[1]} 场景标题缺少内/外：应为「场01. 地点 时间 内/外」`)
+      const scene集 = Number(sceneMatch[1])
+      const scene场 = Number(sceneMatch[2])
+      if (集 !== 0 && scene集 !== 集) {
+        problems.push(`场头集号与集标题不一致：集标题是集${集}，场头写成 ${sceneMatch[1]}-${sceneMatch[2]}`)
         continue
       }
-      if (地点 === '' || 时间 === '') {
-        problems.push(`场${sceneMatch[1]} 场景标题不完整：应为「场01. 地点 时间 内/外」`)
-        continue
+      current = {
+        集: scene集, 场: scene场, 地点: sceneMatch[5]!.trim(), 时间: sceneMatch[3]!.trim(),
+        内外: sceneMatch[4]! as '内' | '外', 动作: '', 台词: [], 人物: [], 场景环境: '', 镜头: [], seenSetting: false,
       }
-      current = { 场: Number(sceneMatch[1]), 地点, 时间, 内外: 内外raw, 动作: '', 台词: [] }
       continue
     }
     if (inBeats) {
@@ -294,30 +599,97 @@ export function parseEpisodeScript(text: string): EpisodeParseResult {
     }
     if (line.startsWith('#') || line.startsWith('- ')) continue
     if (current === null) {
-      problems.push(`场景标题之外出现正文「${line.slice(0, 20)}……」：单集剧本正文必须先有场景标题`)
+      problems.push(`场景标题之外出现正文「${line.slice(0, 20)}……」：单集剧本正文必须先有场头（集-场 日/夜／内/外 地点）`)
       continue
     }
-    if (current.动作 === '') {
-      current.动作 = line
+    const where = `集${current.集} 场${String(current.场).padStart(2, '0')}`
+    const characterMatch = EPISODE_CHARACTER_RE.exec(line)
+    if (characterMatch) {
+      if (current.镜头.length > 0) {
+        problems.push(`${where}：人物行须在镜头块之前（收到：${line.slice(0, 20)}……）`)
+        continue
+      }
+      current.人物.push(...parseCharacterLine(characterMatch[1]!, where, problems))
+      continue
+    }
+    const settingMatch = EPISODE_SETTING_RE.exec(line)
+    if (settingMatch) {
+      if (current.镜头.length > 0) {
+        problems.push(`${where}：场景环境行须在镜头块之前（收到：${line.slice(0, 20)}……）`)
+        continue
+      }
+      const value = settingMatch[1]!.trim()
+      current.场景环境 = value
+      current.动作 = value
+      current.seenSetting = true
+      continue
+    }
+    const shotMatch = EPISODE_SHOT_RE.exec(line)
+    if (shotMatch) {
+      if (!current.seenSetting) {
+        problems.push(`${where}：镜头块之前缺少场景环境行（应先写「场景环境：……」）`)
+        continue
+      }
+      const shotWhere = `${where} 镜头${shotMatch[1]}`
+      const { 开始秒, 结束秒 } = parseShotTimecode(shotMatch[2]!, shotWhere, problems)
+      currentShot = {
+        镜头号: Number(shotMatch[1]),
+        开始秒, 结束秒,
+        景别: shotMatch[3]!.trim(),
+        角度: shotMatch[4]!.trim(),
+        运镜: shotMatch[5]!.trim(),
+        描写: [], 台词: [], 环境声: [], 字幕: [],
+      }
+      current.镜头.push(currentShot)
+      continue
+    }
+    if (line.startsWith('△')) {
+      if (currentShot === null) {
+        problems.push(`${where}：△描写行在镜头块之外（须先写「△【镜头NN｜时间｜景别｜角度｜运镜】」）`)
+        continue
+      }
+      currentShot.描写.push(line.slice(1))
+      continue
+    }
+    const soundMatch = EPISODE_SOUND_RE.exec(line)
+    if (soundMatch) {
+      if (currentShot === null) {
+        problems.push(`${where}：【环境声】行在镜头块之外`)
+        continue
+      }
+      currentShot.环境声.push(soundMatch[1]!.trim())
+      continue
+    }
+    const subtitleMatch = EPISODE_SUBTITLE_RE.exec(line)
+    if (subtitleMatch) {
+      if (currentShot === null) {
+        problems.push(`${where}：【字幕】行在镜头块之外`)
+        continue
+      }
+      currentShot.字幕.push(subtitleMatch[1]!.trim())
       continue
     }
     const dialogue = EPISODE_DIALOGUE_RE.exec(line)
     if (dialogue === null) {
-      problems.push(`场${String(current.场).padStart(2, '0')} 有一行既不是动作也不是「角色：台词」：「${line.slice(0, 20)}……」`)
+      problems.push(`${where} 有一行既不是场景环境、镜头块也不是「角色：台词」：「${line.slice(0, 20)}……」`)
+      continue
+    }
+    if (currentShot === null) {
+      problems.push(`${where}：台词行在镜头块之外（对白须写进镜头块里）`)
       continue
     }
     const mark = dialogue[2]
     if (mark !== undefined && isBeatMark(mark)) {
-      problems.push(`场${String(current.场).padStart(2, '0')} ${dialogue[1]}：括号提示用了 (beat)，停顿只用 ${PAUSE_MARK}`)
+      problems.push(`${where} ${dialogue[1]}：括号提示用了 (beat)，停顿只用 ${PAUSE_MARK}`)
     }
-    current.台词.push({
+    currentShot.台词.push({
       角色: dialogue[1]!.trim(),
       ...(mark !== undefined ? { 括号提示: mark.trim() } : {}),
       台词: dialogue[3]!.trim(),
     })
   }
   flushScene()
-  if (场景.length === 0) problems.push('单集剧本里没有场景（## 场01. 地点 时间 内/外）')
+  if (场景.length === 0) problems.push('单集剧本里没有场景（场头：集-场 日/夜／内/外 地点，如 1-1 日／内 苏家客厅）')
   if (Number.isNaN(开场冲突秒)) problems.push('单集剧本缺少节拍表开场冲突秒数')
   if (Number.isNaN(结尾钩子秒)) problems.push('单集剧本缺少节拍表结尾钩子秒数')
   if (problems.length > 0) return fail()

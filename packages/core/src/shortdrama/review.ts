@@ -23,6 +23,7 @@ import {
   PAUSE_MARK,
   dialogueChars,
   isBeatMark,
+  sceneDialogueLines,
   totalDialogueChars,
 } from './script'
 import type { EpisodeOutline, EpisodeScriptInput } from './types'
@@ -98,7 +99,7 @@ export function reviewShortDramaEpisode(input: ShortDramaReviewInput): ShortDram
 
   // 3. 台词：单句超长、总量越界（竖屏 180–360 字）。
   for (const scene of 剧本.场景) {
-    for (const line of scene.台词) {
+    for (const line of sceneDialogueLines(scene)) {
       const n = dialogueChars(line.台词)
       if (n > MAX_DIALOGUE_CHARS) {
         push(
