@@ -91,6 +91,61 @@ describe('阶段 4：剧本导出 CLI（screenplayExportCli）', () => {
     expect(JSON.parse(verified.stdout).校验.ok).toBe(true)
   })
 
+  it('总纲：--总纲 渲染总纲文件并做人名检查；未登记人名阻断', () => {
+    const book = makeBook()
+    const bible = {
+      标题: '赘婿归来',
+      类型: '都市／身份反转',
+      形式: '12集连续短剧',
+      文字目标: '分镜拉片剧本每集约3,000—5,000字',
+      叙事线: { A线: '顾霆琛的身份揭晓', B线: '苏晚的信任动摇', C线: '岳母的算计' },
+      故事一句话: '被当成废物赘婿的顾霆琛，其实是顾氏继承人。',
+      开篇承诺: '岳母把离婚协议拍在顾霆琛面前。',
+      悬念: ['他到底是谁', '黑卡从哪来'],
+      主题: '尊严不是别人给的。',
+      反题: '靠羞辱别人抬高自己的人，迟早被真相打脸。',
+      世界硬约束: {
+        现实基底与唯一超自然规则: '现代都市，没有超自然设定。',
+        硬约束: ['顾氏继承人的身份只有老爷子能确认。'],
+        核心地理空间: ['苏家客厅。'],
+      },
+      三段核心真相: [
+        { 阶段: '第一阶段', 内容: '顾霆琛在苏家当了三年赘婿。' },
+        { 阶段: '第二阶段', 内容: '黑卡出现，身份开始松动。' },
+        { 阶段: '第三阶段', 内容: '顾霆琛公开身份，接回苏晚。' },
+      ],
+      人物: [
+        { 标准名: '顾霆琛', 身份: '顾氏继承人', 人物弧: '从忍气吞声到公开身份。', 曾误标: ['废物[第1集]'] },
+        { 标准名: '苏晚', 身份: '苏家女儿', 人物弧: '从半信半疑到坚定站队。' },
+        { 标准名: '岳母', 身份: '苏晚的母亲', 人物弧: '从百般刁难到无话可说。' },
+        { 标准名: '电话那头', 身份: '顾氏管家', 人物弧: '只在电话里出现。' },
+      ],
+      分集结构: [{ 集: 1, 时间锚点: 'D1 白天', 梗概: '岳母逼顾霆琛签离婚协议。' }],
+      对白语言: '中文',
+    }
+    const biblePath = path.join(roots[roots.length - 1]!, '总纲.json')
+    fs.writeFileSync(biblePath, JSON.stringify(bible, null, 2))
+    const { exit, stdout } = runCli(['--book', book, '--形态', '短剧', '--集', '1', '--总纲', biblePath])
+    expect(exit).toBe(0)
+    const value = JSON.parse(stdout)
+    expect(value.ok).toBe(true)
+    expect(value.总纲文件).toBe('晚星-总纲.md')
+    expect(value.人名检查).toEqual({ ok: true, problems: [] })
+    expect(value.文件).toHaveLength(3)
+    expect(value.文件[2].content).toContain('# 《赘婿归来》总纲（剧本圣经）')
+    expect(value.文件[2].content).toContain('（原剧本曾误标为：废物[第1集]，已全部统一为顾霆琛）')
+    // 未登记：去掉「电话那头」的登记，导出必须阻断
+    const missing = { ...bible, 人物: bible.人物.slice(0, 3) }
+    fs.writeFileSync(biblePath, JSON.stringify(missing, null, 2))
+    const blocked = runCli(['--book', book, '--形态', '短剧', '--集', '1', '--总纲', biblePath])
+    expect(blocked.exit).toBe(1)
+    expect(blocked.stderr).toContain('未登记')
+    // 总纲文件不存在 / JSON 非法都退出 1
+    expect(runCli(['--book', book, '--形态', '短剧', '--集', '1', '--总纲', '不存在.json']).exit).toBe(1)
+    fs.writeFileSync(biblePath, '{不是 json')
+    expect(runCli(['--book', book, '--形态', '短剧', '--集', '1', '--总纲', biblePath]).exit).toBe(1)
+  })
+
   it('书仓无改动：CLI 只算不写', () => {
     const book = makeBook()
     const before = fs.readdirSync(book, { recursive: true }).sort()

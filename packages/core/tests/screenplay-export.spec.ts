@@ -79,7 +79,7 @@ describe('阶段 4：剧本导出格式（Fountain / Markdown 双输出 + 分镜
     expect(text).toContain('# 《晚星》电影剧本')
     expect(text).toContain('## 编剧层')
     expect(text).toContain('## 导演层')
-    expect(text).toContain('| 镜号 | 场 | 景别 | 摄法 | 运镜 | 时长（秒） | 画面内容 | 台词 | 音响 | 音乐 |')
+    expect(text).toContain('| 镜号 | 场 | 景别 | 角度 | 运镜 | 时间 | 时长（秒） | 画面内容 | 台词 | 对白标注 | 音响 | 字幕 | 音乐 |')
     expect(text).toContain('场01 INT. 面馆 - 深夜')
     expect(text).toContain('(pause)')
     expect(text).not.toMatch(/^SFX:|^MUSIC:/m)
@@ -100,7 +100,7 @@ describe('阶段 4：剧本导出格式（Fountain / Markdown 双输出 + 分镜
   it('分镜头表解析失败：表头不对、镜号不连续、场号越界、时长非法都报问题', () => {
     const badHeader = '| 镜号 | 场 | 景别 |\n| --- | --- | --- |\n| 1 | 1 | 全景 |\n'
     expect(parseShotListTable(badHeader).ok).toBe(false)
-    const badDuration = '| 镜号 | 场 | 景别 | 摄法 | 运镜 | 时长（秒） | 画面内容 | 台词 | 音响 | 音乐 |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| 1 | 1 | 全景 | 固定 | 固定 | 0 | 面馆。 | — | — | — |\n'
+    const badDuration = '| 镜号 | 场 | 景别 | 角度 | 运镜 | 时间 | 时长（秒） | 画面内容 | 台词 | 对白标注 | 音响 | 字幕 | 音乐 |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| 1 | 1 | 全景 | 平视正面 | 固定镜头 | — | 0 | 面馆。 | — | — | — | — | — |\n'
     expect(parseShotListTable(badDuration).ok).toBe(false)
     const template = deriveShotListTemplate('测试', [
       { 场号: 1, 画面内容: '面馆。', 台词: '吃面吗？' },

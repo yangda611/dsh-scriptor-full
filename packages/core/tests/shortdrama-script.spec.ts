@@ -51,8 +51,11 @@ describe('阶段 3：单集剧本', () => {
     const rendered = renderEpisodeScript(baseScript())
     expect(rendered.path).toBe('剧本/短剧/集001.md')
     expect(rendered.内容).toContain('# 集001：废物赘婿')
-    expect(rendered.内容).toContain('## 场01. 苏家客厅 日 内')
-    expect(rendered.内容).toContain('## 场02. 苏家门外 日 外')
+    expect(rendered.内容).toContain('1-1 日／内 苏家客厅')
+    expect(rendered.内容).toContain('1-2 日／外 苏家门外')
+    expect(rendered.内容).toContain('场景环境：岳母把离婚协议拍在桌上。')
+    expect(rendered.内容).toContain('△【镜头01｜时间：—｜景别：—｜角度：—｜运镜：—】')
+    expect(rendered.内容).toContain('【画面淡出黑场】')
     expect(rendered.内容).toContain('岳母：签了它，滚出苏家。')
     expect(rendered.内容).toContain(`顾霆琛${PAUSE_MARK}：先别声张。`)
     expect(rendered.内容).toContain('## 节拍表')
@@ -71,8 +74,8 @@ describe('阶段 3：单集剧本', () => {
     expect(rendered.path).toBe('剧本/短剧/集012.md')
     expect(rendered.内容).toContain('# 集012：废物赘婿')
     // 场按场号排序渲染
-    expect(rendered.内容.indexOf('场01.')).toBeLessThan(rendered.内容.indexOf('场02.'))
-    expect(rendered.内容.indexOf('场02.')).toBeLessThan(rendered.内容.indexOf('场03.'))
+    expect(rendered.内容.indexOf('12-1 ')).toBeLessThan(rendered.内容.indexOf('12-2 '))
+    expect(rendered.内容.indexOf('12-2 ')).toBeLessThan(rendered.内容.indexOf('12-3 '))
   })
 
   it('停顿约定：只用 (pause)，(beat) 只警告不丢稿', () => {

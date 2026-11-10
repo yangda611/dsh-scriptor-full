@@ -619,6 +619,10 @@ export function parseEpisodeScript(text: string): EpisodeParseResult {
         continue
       }
       const value = settingMatch[1]!.trim()
+      if (/^SFX:|^MUSIC:/.test(value)) {
+        problems.push(`${where}：场景环境行用了 \`SFX:\` / \`MUSIC:\` 独占行写法：这是 BBC 广播剧格式，不是电影/短剧剧本格式（音效写进动作行，音乐提示进分镜头表）`)
+        continue
+      }
       current.场景环境 = value
       current.动作 = value
       current.seenSetting = true
@@ -648,7 +652,12 @@ export function parseEpisodeScript(text: string): EpisodeParseResult {
         problems.push(`${where}：△描写行在镜头块之外（须先写「△【镜头NN｜时间｜景别｜角度｜运镜】」）`)
         continue
       }
-      currentShot.描写.push(line.slice(1))
+      const desc = line.slice(1)
+      if (/^SFX:|^MUSIC:/.test(desc)) {
+        problems.push(`${where}：△描写行用了 \`SFX:\` / \`MUSIC:\` 独占行写法：这是 BBC 广播剧格式，不是电影/短剧剧本格式（音效写进动作行，音乐提示进分镜头表）`)
+        continue
+      }
+      currentShot.描写.push(desc)
       continue
     }
     const soundMatch = EPISODE_SOUND_RE.exec(line)
