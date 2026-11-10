@@ -11,6 +11,7 @@
 
 import { GENRE_LIBRARY, tiersForMarket, type GenreTierId } from '../design/genres'
 import { isMarketValue, type Market } from '../repo/document-fields'
+import { requiredTurns } from './beat-checker'
 import { RHYTHM_TEMPLATES } from './templates'
 import {
   hookTypeForEpisode,
@@ -28,13 +29,15 @@ export interface PlanSeasonInput {
   readonly 画幅: ShortDramaOrientation
   readonly 总集数: number
   /**
-   * 第一次真正的胜利所在的集号。不填时竖屏默认第 5 集（不晚于第 5 集是上限，
-   * 不是推荐值——越早越好）；横屏不设硬限，默认第 3 集（模板约定，见 templates.ts）。
+   * 第一次真正的胜利所在的集号。不填时竖屏默认第 5 集、横屏默认第 3 集。
+   * 平台说明（排播数据，不是节拍规则）：节拍检查器不检查首胜集号；竖屏
+   * “不晚于第 5 集”是竖屏付费模式的排播建议（见 templates.ts 的 平台说明）。
    */
   readonly 首胜集?: number
   /**
    * 首个付费集。不填时竖屏默认第 11 集（海外最常见值）；横屏无此概念，传了也忽略。
    * 竖屏只接受 10 或 11（调研：海外最常见第 11 集，国内前 10–15 集免费）。
+   * 平台说明（排播数据，不是节拍规则）：节拍检查器不检查付费集号。
    */
   readonly 付费集?: number
 }
@@ -70,12 +73,16 @@ export function planSeason(input: PlanSeasonInput): SeasonPlan {
   }
 
   const 集大纲: EpisodeOutlineSlot[] = []
+  // 最少反转次数按单集时长范围中点折算（与节拍检查器同一公式 requiredTurns）：
+  // 竖屏中点 90 秒→2 个，横屏中点 900 秒→29 个。实际集数按真实时长由节拍检查器核定。
+  const 中点时长秒 = Math.round((template.单集时长秒[0] + template.单集时长秒[1]) / 2)
+  const 最少反转次数 = requiredTurns(中点时长秒)
   for (let 集 = 1; 集 <= 总集数; 集++) {
     集大纲.push({
       集,
       画幅,
       钩子类型: hookTypeForEpisode(集),
-      最少反转次数: 2,
+      最少反转次数,
       场景数: template.每集场景数 ?? [1, 99],
       时长秒: template.单集时长秒,
       台词字数: template.台词字数,
@@ -141,8 +148,8 @@ export function renderSeasonOutline(plan: SeasonPlan, outlines: readonly Episode
     `- 市场：${plan.市场}（题材档：${plan.题材档}）`,
     `- 画幅：${plan.画幅}（${RHYTHM_TEMPLATES[plan.画幅].画幅比}）`,
     `- 总集数：${plan.总集数} 集`,
-    `- 首胜集：第 ${plan.首胜集} 集`,
-    plan.付费集 === null ? '- 付费墙：无（横屏点播，不设按集付费墙）' : `- 首个付费集：第 ${plan.付费集} 集`,
+    `- 首胜集：第 ${plan.首胜集} 集（平台说明，排播数据，不是节拍规则）`,
+    plan.付费集 === null ? '- 付费墙：无（横屏点播，不设按集付费墙；平台说明）' : `- 首个付费集：第 ${plan.付费集} 集（平台说明，排播数据，不是节拍规则）`,
     '',
     '钩子轮换：第 1 集身份钩、第 2 集情感钩、第 3 集顿悟钩，此后循环。',
     '',

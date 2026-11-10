@@ -75,7 +75,7 @@ describe('阶段 3：短剧审读（确定性检查）', () => {
     expect(findings.some((f) => f.证据位置 === '集001/场01' && f.问题说明.includes('超过单句 12 字上限'))).toBe(true)
   })
 
-  it('反转数少于大纲报发现项；(beat) 停顿报发现项', () => {
+  it('反转数少于大纲报发现项；修改建议按时长推导最少反转数；(beat) 停顿报发现项', () => {
     const findings = reviewShortDramaEpisode(input({
       反转秒: [25],
       场景: [
@@ -84,7 +84,23 @@ describe('阶段 3：短剧审读（确定性检查）', () => {
       ],
     }))
     expect(findings.some((f) => f.问题说明.includes('反转数不足'))).toBe(true)
+    // 90 秒一集最少 2 个反转：修改建议写时长与推导数，不写固定的「竖屏 90 秒」。
+    expect(findings.some((f) => f.问题说明.includes('反转数不足') && f.修改建议.includes('90 秒一集至少 2 个'))).toBe(true)
     expect(findings.some((f) => f.问题说明.includes('(beat)'))).toBe(true)
+  })
+
+  it('长集反转数建议按时长缩放（900 秒一集至少 29 个），横屏竖屏同规则', () => {
+    const findings = reviewShortDramaEpisode(input({
+      画幅: '横屏',
+      时长秒: 900,
+      反转秒: [25],
+    }, {
+      反转: Array.from({ length: 29 }, (_, i) => `反转${i + 1}`),
+    }))
+    const target = findings.find((f) => f.问题说明.includes('反转数不足'))
+    expect(target).toBeDefined()
+    expect(target?.修改建议).toContain('900 秒一集至少 29 个')
+    expect(target?.修改建议).not.toContain('竖屏')
   })
 
   it('示例短剧 6 集（竖屏 3 + 横屏 3）确定性审读零发现', () => {

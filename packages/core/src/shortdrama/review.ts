@@ -1,15 +1,16 @@
 /**
  * 短剧审读（阶段 3 第三步）：复用现有审读机制，加短剧审读检查。
  *
- * 复用方式（接线见汇报，不在本文件改注册表）：
+ * 接线（2026-11-11 阶段 2/3 后续轮次）：本模块已注册进共享审读注册表
+ * （packages/review/src/film-drama.ts 的 `短剧审读`，适用范围 集），
+ * 与 `短剧审读（语义）` 合流；审读记录按集寻址，落
+ * 草稿区/审核/审-集NNN.json（见 packages/core/src/evidence/record.ts）。
  * - 确定性检查由本文件的 reviewShortDramaEpisode 做：台词长度、台词总量、场景数、
  *   钩子/大纲一致性、节拍表与大纲的对应——不读正文猜测，只算数。
  * - 发现项沿用现有审读的词汇：模块名 `短剧审读`，字段与 packages/core/src/evidence/record.ts
  *   的 Finding 同义（审核编号/发现项编号/证据位置/严重程度/是否建议阻断/问题说明/
- *   修改建议/建议返回节点/处置状态），由协调人经现有 `novel_record_review_findings`
- *   通道回写（模块名 `短剧审读`）。注意：现有审核记录按（卷，章）寻址，短剧按
- *   （集，场）寻址——审核记录落盘位置（草稿区/审核/ 下按集建文件还是复用章键）
- *   由协调人定，本文件不自造路径。
+ *   修改建议/建议返回节点/处置状态），由 `novel_record_review_findings`
+ *   （适用范围 集）回写。
  * - 语义审读（对白是否即行动、爽点是否成立、人物是否前后一致、题材禁忌是否踩线）
  *   不由代码判定，见技能底本 packages/bundle/skills/novel-shortdrama/底本/短剧审读.md，
  *   由隔离派发按底本执行，与 novel-review 的 8 维底本同一派发方式。
@@ -17,6 +18,7 @@
  *   语义底本的回写仍须经 novel_record_review_findings 落盘后才算完成（与全量审读同理）。
  */
 
+import { requiredTurns } from './beat-checker'
 import { RHYTHM_TEMPLATES } from './templates'
 import {
   MAX_DIALOGUE_CHARS,
@@ -86,7 +88,7 @@ export function reviewShortDramaEpisode(input: ShortDramaReviewInput): ShortDram
     push(ep, '中', false, '爽点与大纲不一致：剧本的爽点不是大纲定的那个。', '以大纲为准改剧本，或回分集大纲改爽点。', '分集大纲')
   }
   if (剧本.反转秒.length < 大纲.反转.length) {
-    push(`${ep}/节拍表`, '中', false, `反转数不足：大纲定了 ${大纲.反转.length} 个反转，节拍表只有 ${剧本.反转秒.length} 个时间点。`, '补反转时间点，或回分集大纲减反转（竖屏 90 秒一集至少 2 个）。', '单集剧本')
+    push(`${ep}/节拍表`, '中', false, `反转数不足：大纲定了 ${大纲.反转.length} 个反转，节拍表只有 ${剧本.反转秒.length} 个时间点。`, `补反转时间点，或回分集大纲减反转（${剧本.时长秒} 秒一集至少 ${requiredTurns(剧本.时长秒)} 个，按时长缩放）。`, '单集剧本')
   }
 
   // 2. 场景数（竖屏 2–4 场）。

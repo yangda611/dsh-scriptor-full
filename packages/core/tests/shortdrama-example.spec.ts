@@ -39,11 +39,14 @@ describe('阶段 3：示例短剧端到端（《赘婿归来》，至少 3 集�
     }
   })
 
-  it('横屏 3 集：每集 900 秒、起承转合齐全、单句 ≤12 字、零渲染警告', () => {
+  it('横屏 3 集：每集 900 秒、29 个转折、起承转合齐全、单句 ≤12 字、零渲染警告', () => {
     for (const s of exampleHorizontalScripts) {
       const rendered = renderEpisodeScript(s)
       expect(rendered.警告).toEqual([])
       expect(s.时长秒).toBe(900)
+      expect(s.反转秒).toHaveLength(29)
+      expect(s.开场冲突秒).toBeLessThanOrEqual(5)
+      expect(s.结尾钩子秒).toBeGreaterThanOrEqual(890)
       expect(s.起承转合).toEqual({ 起: true, 承: true, 转: true, 合: true })
       expect(s.首场冲突).toBe(true)
       for (const scene of s.场景) {
@@ -54,7 +57,7 @@ describe('阶段 3：示例短剧端到端（《赘婿归来》，至少 3 集�
     }
   })
 
-  it('节拍检查：竖屏与横屏前 3 集全部通过（竖屏付费集第 11 集）', () => {
+  it('节拍检查：竖屏与横屏前 3 集全部通过（共用节拍规则；首胜/付费集是平台说明，不检查）', () => {
     const result = runExampleShortDrama()
     expect(result.竖屏节拍.全部通过).toBe(true)
     expect(result.竖屏节拍.未通过清单).toEqual([])

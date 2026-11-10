@@ -29,13 +29,15 @@ describe('阶段 3：分集钩子/爽点大纲', () => {
     expect(() => hookTypeForEpisode(0)).toThrow()
   })
 
-  it('横屏季规划：24 集、首胜默认第 3 集、无付费集、台词不限总量', () => {
+  it('横屏季规划：24 集、首胜默认第 3 集、无付费集、台词不限总量、最少反转按时长中点折算', () => {
     const plan = planSeason({ 市场: '海外', 题材档: '海外女性向', 画幅: '横屏', 总集数: 24 })
     expect(plan.付费集).toBeNull()
     expect(plan.首胜集).toBe(3)
     expect(plan.集大纲[0]?.台词字数).toBeNull()
     expect(plan.集大纲[0]?.时长秒).toEqual([600, 1200])
     expect(plan.集大纲.some((s) => s.付费墙集)).toBe(false)
+    // 横屏单集时长中点 900 秒 → requiredTurns(900) = 29（与竖屏中点 90 秒→2 同一公式）
+    expect(plan.集大纲[0]?.最少反转次数).toBe(29)
   })
 
   it('题材档必须属于契约市场：中文市场不能用海外档', () => {

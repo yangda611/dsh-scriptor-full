@@ -276,7 +276,12 @@ export const exampleVerticalScripts: readonly EpisodeScriptInput[] = [
   },
 ]
 
-/** 横屏单集剧本（每集 15 分钟/900 秒，起承转合，单句仍 ≤12 字）。 */
+/** 横屏单集剧本（每集 15 分钟/900 秒，起承转合，单句仍 ≤12 字）。节拍按共用节拍规则：开场 5 秒内进冲突、每 20–30 秒一个转折（900 秒一集 29 个）、结尾 5–10 秒留悬念。 */
+export const HORIZONTAL_TURNS: readonly number[] = [
+  25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450,
+  475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725,
+]
+
 export const exampleHorizontalScripts: readonly EpisodeScriptInput[] = [
   {
     集: 1,
@@ -286,9 +291,9 @@ export const exampleHorizontalScripts: readonly EpisodeScriptInput[] = [
     核心想法: '所有人都以为他是废物赘婿。',
     爽点: '当众羞辱他的人，不知道他就是顾氏继承人。',
     时长秒: 900,
-    开场冲突秒: 45,
-    反转秒: [300, 620],
-    结尾钩子秒: 860,
+    开场冲突秒: 3,
+    反转秒: HORIZONTAL_TURNS,
+    结尾钩子秒: 892,
     结尾悬念: '他到底是谁？',
     首场冲突: true,
     起承转合: { 起: true, 承: true, 转: true, 合: true },
@@ -331,9 +336,9 @@ export const exampleHorizontalScripts: readonly EpisodeScriptInput[] = [
     核心想法: '苏晚在所有人面前护住了他。',
     爽点: '苏晚当众说“我信他”，反派被噎住。',
     时长秒: 900,
-    开场冲突秒: 40,
-    反转秒: [280, 600],
-    结尾钩子秒: 855,
+    开场冲突秒: 4,
+    反转秒: HORIZONTAL_TURNS,
+    结尾钩子秒: 895,
     结尾悬念: '你娶我，到底是为了什么？',
     首场冲突: true,
     起承转合: { 起: true, 承: true, 转: true, 合: true },
@@ -374,9 +379,9 @@ export const exampleHorizontalScripts: readonly EpisodeScriptInput[] = [
     核心想法: '原来他一直是顾氏继承人。',
     爽点: '顾霆琛在董事会亮明身份，仇人傻眼。',
     时长秒: 900,
-    开场冲突秒: 50,
-    反转秒: [320, 640],
-    结尾钩子秒: 865,
+    开场冲突秒: 3,
+    反转秒: HORIZONTAL_TURNS,
+    结尾钩子秒: 893,
     结尾悬念: '他会原谅苏家吗？',
     首场冲突: true,
     起承转合: { 起: true, 承: true, 转: true, 合: true },
@@ -415,7 +420,7 @@ export const exampleHorizontalScripts: readonly EpisodeScriptInput[] = [
   },
 ]
 
-/** 竖屏前 3 集的节拍数据（首胜在第 3 集，付费集第 11 集由 plan 给出）。 */
+/** 竖屏前 3 集的节拍数据（首胜在第 3 集；首胜/付费集是平台说明，节拍检查不检查它们）。 */
 export const exampleVerticalBeats: readonly EpisodeBeats[] = exampleVerticalScripts.map((s) => ({
   集: s.集,
   画幅: s.画幅,
@@ -457,8 +462,8 @@ export function runExampleShortDrama(): {
 } {
   const 竖屏渲染 = exampleVerticalScripts.map((s) => renderEpisodeScript(s))
   const 横屏渲染 = exampleHorizontalScripts.map((s) => renderEpisodeScript(s))
-  const 竖屏节拍 = checkSeasonBeats(exampleVerticalBeats, { 付费集: exampleVerticalPlan.付费集 })
-  const 横屏节拍 = checkSeasonBeats(exampleHorizontalBeats, { 付费集: exampleHorizontalPlan.付费集 })
+  const 竖屏节拍 = checkSeasonBeats(exampleVerticalBeats)
+  const 横屏节拍 = checkSeasonBeats(exampleHorizontalBeats)
   const 审读发现 = [
     ...exampleVerticalScripts.map((s, i) => ({
       集: s.集,

@@ -14,7 +14,7 @@
 import type { GenreTierId } from '../design/genres'
 import type { Market } from '../repo/document-fields'
 
-/** 画幅：竖屏与横屏是两种产品（调研 §2.4），各用一套节奏模板，不混成一个。 */
+/** 画幅：竖屏与横屏是两种产品（调研 §2.4），时长/集数/台词总量/取景按画幅区分；节拍规则共用同一套（共用节拍规则，见 templates.ts，2026-11-11 用户决定），不按画幅放宽。 */
 export type ShortDramaOrientation = '竖屏' | '横屏'
 export const SHORTDRAMA_ORIENTATIONS = ['竖屏', '横屏'] as const
 
@@ -45,30 +45,33 @@ export interface EpisodeBeats {
   readonly 画幅: ShortDramaOrientation
   /** 单集时长（秒）：竖屏 60–120，横屏 600–1200。 */
   readonly 时长秒: number
-  /** 开场冲突出现的秒数（竖屏要求 ≤5）。 */
+  /** 开场冲突出现的秒数（两画幅统一要求 ≤5，见共用节拍规则）。 */
   readonly 开场冲突秒: number
-  /** 是否放了片头（竖屏要求：无）。 */
+  /** 是否放了片头（两画幅统一要求：无）。 */
   readonly 有片头: boolean
-  /** 开场是否有铺垫场景/自我介绍（竖屏要求：无）。 */
+  /** 开场是否有铺垫场景/自我介绍（两画幅统一要求：无）。 */
   readonly 有开场铺垫: boolean
   /** 反转出现的时间点（秒），升序。 */
   readonly 反转秒: readonly number[]
-  /** 结尾钩子开始的秒数（竖屏要求：在结尾 5–10 秒内开始）。 */
+  /** 结尾钩子开始的秒数（两画幅统一要求：在结尾 5–10 秒内开始）。 */
   readonly 结尾钩子秒: number
   /** 结尾钩子的类型。 */
   readonly 钩子类型: HookType
   /** 结尾是否切在问题上（true）还是答案上（false）。 */
   readonly 结尾切在问题上: boolean
-  /** 本集主角是否取得第一次真正的胜利（全季只应有一集为 true）。 */
+  /**
+   * 本集主角是否取得第一次真正的胜利（全季只应有一集为 true）。
+   * 平台说明数据（排播用）：首胜集号不是节拍规则，节拍检查器不检查它。
+   */
   readonly 首次胜利: boolean
   /**
-   * 横屏专用：开场冲突是否在首场内（横屏不设 5 秒硬限，见 templates.ts）。
-   * 竖屏集可省略（竖屏用 开场冲突秒 判定）。
+   * 旧字段：横屏曾用「首场即冲突」判定开场；2026-11-11 起两画幅共用
+   * 3–5 秒进冲突规则，检查器不再读本字段。保留输入兼容，填了也不参与判定。
    */
   readonly 首场冲突?: boolean
   /**
-   * 横屏专用：起承转合四段是否齐全（横屏是偏精品叙事的完整结构，见 templates.ts）。
-   * 竖屏集可省略。
+   * 长集专用：起承转合四段是否齐全。检查器按时长判定（单集 ≥600 秒才检查），
+   * 不按画幅；短集（<600 秒）不适用，可省略。
    */
   readonly 起承转合?: Readonly<{ 起: boolean; 承: boolean; 转: boolean; 合: boolean }>
 }
@@ -79,7 +82,7 @@ export interface EpisodeOutlineSlot {
   readonly 画幅: ShortDramaOrientation
   /** 本集结尾钩子类型（按 HOOK_ROTATION 排布，前三集 身份→情感→顿悟）。 */
   readonly 钩子类型: HookType
-  /** 本集要求的最少反转次数（竖屏：90 秒至少 2 次；横屏：模板约定下限 2 次）。 */
+  /** 本集要求的最少反转次数（按单集时长范围中点折算：requiredTurns(中点时长），见 beat-checker.ts；竖屏中点 90 秒→2 个，横屏中点 900 秒→29 个）。 */
   readonly 最少反转次数: number
   /** 本集场景数范围。 */
   readonly 场景数: readonly [number, number]
@@ -87,9 +90,9 @@ export interface EpisodeOutlineSlot {
   readonly 时长秒: readonly [number, number]
   /** 预计台词字数范围（竖屏 180–360 字；横屏不设总量硬限，见 templates.ts）。 */
   readonly 台词字数: readonly [number, number] | null
-  /** 是否为付费墙集（竖屏第 10–11 集；横屏无此概念，见 templates.ts）。 */
+  /** 是否为付费墙集（平台说明，排播数据，不是节拍规则；横屏无此概念，见 templates.ts）。 */
   readonly 付费墙集: boolean
-  /** 是否为本季第一次真正的胜利所在的集（竖屏不晚于第 5 集）。 */
+  /** 是否为本季第一次真正的胜利所在的集（平台说明，排播数据，不是节拍规则）。 */
   readonly 首胜集: boolean
 }
 
@@ -99,9 +102,9 @@ export interface SeasonPlan {
   readonly 题材档: GenreTierId
   readonly 画幅: ShortDramaOrientation
   readonly 总集数: number
-  /** 竖屏：首个付费集（10 或 11）；横屏：null（无按集付费墙概念）。 */
+  /** 首个付费集（平台说明，排播数据，不是节拍规则）：竖屏 10 或 11；横屏 null（无按集付费墙概念）。 */
   readonly 付费集: number | null
-  /** 第一次真正的胜利所在的集号（竖屏不晚于第 5 集）。 */
+  /** 第一次真正的胜利所在的集号（平台说明，排播数据，不是节拍规则）。 */
   readonly 首胜集: number
   readonly 集大纲: readonly EpisodeOutlineSlot[]
 }
@@ -226,7 +229,7 @@ export interface EpisodeScriptInput {
   readonly 开场冲突秒: number
   readonly 反转秒: readonly number[]
   readonly 结尾钩子秒: number
-  /** 横屏专用：见 EpisodeBeats.首场冲突 / 起承转合。 */
+  /** 横屏旧字段：见 EpisodeBeats.首场冲突 / 起承转合（首场冲突已是旧字段，检查器不再读；起承转合按时长判定）。 */
   readonly 首场冲突?: boolean
   readonly 起承转合?: Readonly<{ 起: boolean; 承: boolean; 转: boolean; 合: boolean }>
 }

@@ -235,6 +235,7 @@ function validate(input: EpisodeScriptInput): string[] {
       if (shot.镜头号 !== expectedShot) fail(`集${input.集}：镜头号须从 1 起集内连续（第 ${expectedShot} 镜应为镜头${String(expectedShot).padStart(2, '0')}，收到镜头${String(shot.镜头号).padStart(2, '0')}）`)
       expectedShot += 1
       if (shot.描写.length === 0) fail(`${where}：至少要有一行 △站位/动作/表情行（无面部时用「${NO_FACE_SHOT_NOTE}」）`)
+      if (shot.描写.every((d) => d.trim() === '')) fail(`${where}：描写行全为空（至少要有一行非空的 △站位/动作/表情行；空行渲染不出内容，见 renderShotBlock）`)
       if (shot.开始秒 !== null && shot.结束秒 !== null) {
         if (!Number.isSafeInteger(shot.开始秒) || !Number.isSafeInteger(shot.结束秒) || shot.开始秒 < 0 || shot.结束秒 <= shot.开始秒) {
           fail(`${where}：时间码须为 00:00—MM:SS 且开始早于结束（收到：${formatTimecode(shot.开始秒)}—${formatTimecode(shot.结束秒)}）`)
@@ -266,14 +267,24 @@ function renderLine(line: ScriptLine): string {
   return `${line.角色}${mark}：${line.台词}`
 }
 
-function renderShotBlock(shot: EpisodeShot): string {
+/**
+ * 渲染一镜的 △ 块（对齐轮次，分镜剧本形状）。
+ * 空的 △描写行（空字符串/空白）一律跳过，渲染器永不输出裸 `△` 行
+ * （2026-11-11 修：《夜市摊主》集001 镜头03 的空描写曾渲染出裸 `△` 行）。
+ * 描写全空的输入由 validate 阻断（见下），这里是第二道防线（renderEpisodeMarkdown
+ * 不经过 validate 的路径也一样不出裸行）。
+ */
+export function renderShotBlock(shot: EpisodeShot): string {
   const 时间 = shot.开始秒 === null || shot.结束秒 === null
     ? '—'
     : `${formatTimecode(shot.开始秒)}—${formatTimecode(shot.结束秒)}`
   const lines: string[] = [
     `△【镜头${String(shot.镜头号).padStart(2, '0')}｜时间：${时间}｜景别：${shot.景别}｜角度：${shot.角度}｜运镜：${shot.运镜}】`,
   ]
-  for (const desc of shot.描写) lines.push(`△${desc}`)
+  for (const desc of shot.描写) {
+    if (desc.trim() === '') continue
+    lines.push(`△${desc}`)
+  }
   for (const line of shot.台词) lines.push(renderLine(line))
   for (const env of shot.环境声 ?? []) lines.push(`【环境声：${env}】`)
   for (const sub of shot.字幕 ?? []) lines.push(`【字幕：${sub}】`)
