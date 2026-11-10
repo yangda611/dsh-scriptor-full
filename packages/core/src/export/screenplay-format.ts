@@ -676,15 +676,16 @@ bible.故事一句话,
 '',
 '四、三段核心真相（作者事实，不等于所有角色已知）',
 '',
-...bible.三段核心真相.map((t) => `${t.内容}`),
+...bible.三段核心真相.map((t) => `【${t.阶段}】${t.内容}`),
 '',
 '五、主要人物与人物弧（全剧统一规范）',
 '',
 ...bible.人物.map((p, i) => {
 const head = `${i + 1}. ${p.标准名}${p.原名!== undefined? `（${p.原名}`: ''}${p.年龄!== undefined? `${p.原名!== undefined? '，': '（'}${p.年龄}`: ''}${p.原名!== undefined || p.年龄!== undefined? '）': ''}：${p.身份}。${p.人物弧}`
-const former = (p.曾误标?? []).length === 0
+const formerNames = p.曾误标 ?? []
+const former = formerNames.length === 0
 ? ''
-: `（原剧本曾误标为：${p.曾误标.join('、')}，已全部统一为${p.标准名}）`
+: `（原剧本曾误标为：${formerNames.join('、')}，已全部统一为${p.标准名}）`
 return `${head}${former}`
 }),
 '',
