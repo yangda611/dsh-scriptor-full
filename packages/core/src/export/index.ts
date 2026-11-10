@@ -18,9 +18,13 @@ import { parseScreenplay, validateScreenplay } from '../screenplay/format'
 import type { ScreenplayFinding } from '../screenplay/types'
 import { parseEpisodeScript, renderEpisodeScript, totalDialogueChars } from '../shortdrama/script'
 import {
+  buildCharacterRegistry,
+  checkCharacterNames,
+  collectEpisodeNames,
+  collectScreenplayNames,
   deriveShotListTemplate, renderEpisodeFountain, renderEpisodeMarkdown, renderFountainScreenplay,
-  renderScreenplayMarkdown, validateShotList,
-  type ShotList,
+  renderScreenplayMarkdown, renderStoryBible, validateShotList, validateStoryBible,
+  type CharacterNameCheck, type ShotList, type StoryBibleInput,
 } from './screenplay-format'
 
 export * from './screenplay-format'
@@ -310,6 +314,12 @@ export interface ScreenplayExportOptions {
   readonly 格式?: ScreenplayExportFormat
   /** 导演已填的分镜头表；不传则按场生成待填模板行（不编造景别与运镜）。 */
   readonly 分镜头表?: ShotList
+  /**
+   * 总纲（剧本圣经，对齐轮次）：传了就渲染总纲文件（`<书名>-总纲.md`），并以
+   * 总纲第五节为人名注册表做导出前一致性检查——全剧人名必须在册且只用标准名，
+   * 未登记/误标直接阻断（gaps），不准静默输出。不传则不渲染总纲、不做人名检查。
+   */
+  readonly 总纲?: StoryBibleInput
 }
 
 export interface ComputedScreenplayExport {
@@ -328,6 +338,11 @@ export interface ComputedScreenplayExport {
   readonly markdown文件: string
   readonly fountain: string
   readonly markdown: string
+  /** 总纲文件（传了 总纲 才有，否则为空）；总纲正文（同上）。 */
+  readonly 总纲文件: string
+  readonly 总纲: string
+  /** 人名一致性检查（传了 总纲 才做，否则 ok:true、problems 为空）。 */
+  readonly 人名检查: CharacterNameCheck
   readonly 分镜头表: ShotList
   readonly 分镜头数: number
   /** 电影剧本的格式审读发现项（validateScreenplay）；短剧为空（短剧审读另走 reviewShortDramaEpisode，需分集大纲，不在导出里做）。 */
@@ -350,6 +365,7 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
     ok: false, gaps: [...gaps, ...(extra ?? [])], 警告, 书名: '', 形态: options.形态, 标题: '',
     ...(options.集 !== undefined ? { 集: options.集 } : {}),
     场景数: 0, 台词字数: 0, fountain文件: '', markdown文件: '', fountain: '', markdown: '',
+    总纲文件: '', 总纲: '', 人名检查: { ok: true, problems: [] },
     分镜头表: { 标题: '', 镜: [] }, 分镜头数: 0, 审读发现项: [],
   })
   if (options.形态 !== '电影剧本' && options.形态 !== '短剧') return fail(['导出形态必须是 电影剧本 或 短剧'])
@@ -359,6 +375,18 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
     return fail(['短剧导出必须传 --集 1–100 的集号'])
   }
   if (options.形态 === '电影剧本' && options.集 !== undefined) return fail(['电影剧本导出不传集号（集号只用于短剧）'])
+  // 总纲先行校验：七节不全直接阻断，不渲染、不继续导出。
+  let 总纲文件 = ''
+  let 总纲 = ''
+  if (options.总纲 !== undefined) {
+    const bibleCheck = validateStoryBible(options.总纲)
+    if (!bibleCheck.ok) return fail(bibleCheck.problems.map((p) => `总纲校验失败：${p}`))
+    try {
+      总纲 = renderStoryBible(options.总纲)
+    } catch (err) {
+      return fail([`总纲渲染失败：${err instanceof Error ? err.message : String(err)}`])
+    }
+  }
   const root = canonicalizePath(bookRoot)
   if (root === '') return fail(['书仓路径无效'])
   const 书名 = path.basename(root)
@@ -371,8 +399,14 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
   }
 
   const stem = safeFileStem(书名)
+  if (options.总纲 !== undefined) 总纲文件 = `${stem}-总纲.md`
   const wantFountain = 格式 === 'fountain' || 格式 === 'both'
   const wantMarkdown = 格式 === 'markdown' || 格式 === 'both'
+  // 人名一致性检查（传了总纲才做）：注册表 = 总纲第五节；失败直接阻断。
+  const checkNames = (names: readonly string[]): CharacterNameCheck => {
+    if (options.总纲 === undefined) return { ok: true, problems: [] }
+    return checkCharacterNames(buildCharacterRegistry(options.总纲), names)
+  }
 
   if (options.形态 === '电影剧本') {
     const parsed = parseScreenplay(source)
@@ -391,6 +425,8 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
     const shotCheck = validateShotList(shotList, draft.场.length)
     if (!shotCheck.ok) return fail(shotCheck.problems)
     警告.push(...shotCheck.warnings)
+    const 人名检查 = checkNames(collectScreenplayNames(draft))
+    if (!人名检查.ok) return fail(人名检查.problems)
     let fountain = ''
     let markdown = ''
     try {
@@ -406,6 +442,7 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
       fountain文件: wantFountain ? `${stem}-电影剧本.fountain` : '',
       markdown文件: wantMarkdown ? `${stem}-电影剧本.md` : '',
       fountain, markdown,
+      总纲文件, 总纲, 人名检查,
       分镜头表: shotList, 分镜头数: shotList.镜.length, 审读发现项: findings,
     }
   }
@@ -428,6 +465,8 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
   const shotCheck = validateShotList(shotList, episode.场景.length)
   if (!shotCheck.ok) return fail(shotCheck.problems)
   警告.push(...shotCheck.warnings)
+  const 人名检查 = checkNames(collectEpisodeNames(episode))
+  if (!人名检查.ok) return fail(人名检查.problems)
   let fountain = ''
   let markdown = ''
   try {
@@ -444,6 +483,7 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
     fountain文件: wantFountain ? `${stem}-短剧集${epNo}.fountain` : '',
     markdown文件: wantMarkdown ? `${stem}-短剧集${epNo}.md` : '',
     fountain, markdown,
+    总纲文件, 总纲, 人名检查,
     分镜头表: shotList, 分镜头数: shotList.镜.length, 审读发现项: [],
   }
 }
@@ -479,6 +519,7 @@ export function verifyScreenplayExportTarget(bookRoot: string, targetDir: string
   const expected: { 名称: string; content: string }[] = []
   if (computed.fountain文件 !== '') expected.push({ 名称: computed.fountain文件, content: computed.fountain })
   if (computed.markdown文件 !== '') expected.push({ 名称: computed.markdown文件, content: computed.markdown })
+  if (computed.总纲文件 !== '') expected.push({ 名称: computed.总纲文件, content: computed.总纲 })
   const target = inspectScreenplayExportTarget(bookRoot, targetDir, computed.ok ? expected.map((f) => f.名称) : [])
   const problems = [...target.problems, ...computed.gaps]
   const 文件: Array<{ 名称: string; 预期哈希: string; 实际哈希: string | null; 一致: boolean }> = []
