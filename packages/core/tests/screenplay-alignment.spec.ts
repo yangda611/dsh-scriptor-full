@@ -7,6 +7,9 @@ import {
   checkCharacterNames,
   collectEpisodeNames,
   computeScreenplayExport,
+  deriveEpisodeWordTarget,
+  deriveEpisodeWordTargetText,
+  deriveFilmWordTarget,
   parseEpisodeScript,
   parseShotListTable,
   renderEpisodeMarkdown,
@@ -32,7 +35,7 @@ describe('阶段 4 对齐轮次：按《痴迷》参考案例对齐', () => {
     const text = renderStoryBible(NIGHT_MARKET_BIBLE)
     expect(text).toContain('# 《夜市摊主》总纲（剧本圣经）')
     expect(text).toContain('类型：都市美食／身份反转／温情治愈')
-    expect(text).toContain('文字目标：分镜拉片剧本每集约3,000—5,000字')
+    expect(text).toContain('文字目标：分镜拉片剧本每集约1,530—1,710字')
     expect(text).toContain('叙事：陈默摆摊求生与身份揭晓为主线（A线）')
     expect(text).toContain('一、故事一句话')
     expect(text).toContain('二、开篇承诺与中心问题')
@@ -56,6 +59,50 @@ describe('阶段 4 对齐轮次：按《痴迷》参考案例对齐', () => {
     expect(text).toContain('> 语言规则：说明/场景/动作文字一律中文；对白按目标市场语言（本剧对白语言：中文）。')
     // 确定性：重复渲染字节相同
     expect(renderStoryBible(NIGHT_MARKET_BIBLE)).toBe(text)
+  })
+
+  it('文字目标按时长推导：90 秒一集约 1,530—1,710 字；600 秒一集随之放大；电影按页数推导', () => {
+    const t90 = deriveEpisodeWordTarget(90)
+    expect(t90.镜数).toBe(9)
+    expect(t90.下限).toBe(1530)
+    expect(t90.上限).toBe(1710)
+    expect(deriveEpisodeWordTargetText(90)).toContain('分镜拉片剧本每集约1,530—1,710字')
+    const t600 = deriveEpisodeWordTarget(600)
+    expect(t600.镜数).toBe(60)
+    expect(t600.下限).toBe(2 * 600 + 60 * 150)
+    expect(t600.上限).toBe(4 * 600 + 60 * 150)
+    expect(t600.下限).toBeGreaterThan(t90.上限)
+    expect(() => deriveEpisodeWordTarget(0)).toThrow()
+    // 电影：2 页约 2 分钟；长片 100 页约 92 分钟
+    expect(deriveFilmWordTarget(2)).toContain('约2页，约2分钟')
+    expect(deriveFilmWordTarget(100)).toContain('约100页，约92分钟')
+    expect(() => deriveFilmWordTarget(0)).toThrow()
+  })
+
+  it('总纲第六节电影版：传 三幕结构 渲染「三幕结构与时间锚点」，不渲染分集结构', () => {
+    const filmBible = {
+      ...NIGHT_MARKET_BIBLE,
+      标题: '夜市摊主·电影版',
+      形式: '长片／三幕结构',
+      文字目标: deriveFilmWordTarget(95),
+      分集结构: undefined,
+      三幕结构: [
+        { 幕: '第一幕：身份藏匿', 时间锚点: 'D1 夜晚', 梗概: '陈默拒绝了林晓十万买配方的出价。' },
+        { 幕: '第二幕：配方风波', 时间锚点: 'D4 白天—夜晚', 梗概: '配方爆红，出价的人越来越多。' },
+        { 幕: '第三幕：真相与归来', 时间锚点: 'D8 清晨', 梗概: '陈默接回小满，铁锅有了新的主人。' },
+      ],
+    }
+    expect(validateStoryBible(filmBible).ok).toBe(true)
+    const text = renderStoryBible(filmBible)
+    expect(text).toContain('六、三幕结构与时间锚点')
+    expect(text).toContain('• 第一幕：身份藏匿（D1 夜晚）：陈默拒绝了林晓十万买配方的出价。')
+    expect(text).not.toContain('六、分集结构与时间锚点')
+    expect(text).not.toContain('- 第1集（')
+    expect(text).toContain('文字目标：分镜拉片剧本约95页，约87分钟')
+    // 分集与三幕同时传 / 两个都不传都校验失败
+    expect(validateStoryBible({ ...NIGHT_MARKET_BIBLE, 三幕结构: filmBible.三幕结构 }).ok).toBe(false)
+    const { 分集结构: _episodes, ...noStructure } = NIGHT_MARKET_BIBLE
+    expect(validateStoryBible(noStructure as typeof NIGHT_MARKET_BIBLE).ok).toBe(false)
   })
 
   it('总纲校验：缺节/三段不对/人物重名/集号不连续都报问题', () => {

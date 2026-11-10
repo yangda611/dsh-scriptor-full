@@ -22,7 +22,7 @@ import {
   checkCharacterNames,
   collectEpisodeNames,
   collectScreenplayNames,
-  deriveShotListTemplate, renderEpisodeFountain, renderEpisodeMarkdown, renderFountainScreenplay,
+  deriveShotListTemplate, renderEpisodeFountain, renderEpisodeMarkdown, renderFilmStoryboardMarkdown, renderFountainScreenplay,
   renderScreenplayMarkdown, renderStoryBible, validateShotList, validateStoryBible,
   type CharacterNameCheck, type ShotList, type StoryBibleInput,
 } from './screenplay-format'
@@ -291,26 +291,35 @@ export function verifyExportTarget(bookRoot: string, targetDir: string, computed
 }
 
 // ---------------------------------------------------------------------------
-// 专业剧本导出（阶段 4，muse-dev）：Fountain / Markdown 双输出。
+// 专业剧本导出（阶段 4，muse-dev）：Fountain / 分镜剧本 / master-scene 三种输出。
 //
 // 只算不写：computeScreenplayExport 读剧本定稿真源（剧本/电影/剧本.md 或
 // 剧本/短剧/集NNN.md），在内存中生成 Fountain 与 Markdown 两份完整载荷；
 // 实际写盘由主 Agent 经原生文件工具完成（与小说导出同一纪律：目标在书仓
 // 围栏外时属提权情形，清单最后落盘、写盘后逐份比对哈希才算完成）。
 // 导出确定性（无时间戳），同一书仓状态重复计算结果字节相同。
-// 小说导出（computeExport / verifyExportTarget）一字不动，只加不改。
+// 默认格式 storyboard（2026-11-11 用户决定）：电影与短剧默认出《痴迷》式分镜剧本
+// （总纲 + △分镜块 + 导演层分镜头表）；master-scene（FADE IN / INT. 场景标题）
+// 是电影的次要导出，Fountain 是编剧层纯文本。小说导出（computeExport /
+// verifyExportTarget）一字不动，只加不改。
 // ---------------------------------------------------------------------------
 
 /** 剧本导出形态：电影剧本全文一份；短剧按集导出（集号三位）。 */
 export type ScreenplayExportKind = '电影剧本' | '短剧'
-/** 导出格式：fountain（编剧层纯文本）/ markdown（编剧层 + 导演层分镜头表）/ both。 */
-export type ScreenplayExportFormat = 'fountain' | 'markdown' | 'both'
+/**
+ * 导出格式（2026-11-11 用户决定：电影剧本默认出《痴迷》式分镜剧本）：
+ * storyboard（默认：总纲 + △分镜块 + 导演层分镜头表；电影与短剧通用）/
+ * master-scene（电影次要导出：FADE IN + INT./EXT. 场景标题的编剧层 + 导演层；
+ * 短剧不支持）/ fountain（编剧层纯文本）/ both（fountain + storyboard）。
+ * 旧值 markdown 已废弃：电影用 storyboard（默认）或 master-scene 替代。
+ */
+export type ScreenplayExportFormat = 'storyboard' | 'master-scene' | 'fountain' | 'both'
 
 export interface ScreenplayExportOptions {
   readonly 形态: ScreenplayExportKind
   /** 短剧必填（1–100）；电影剧本不传。 */
   readonly 集?: number
-  /** 默认 both。 */
+  /** 默认 storyboard（《痴迷》式分镜剧本）。 */
   readonly 格式?: ScreenplayExportFormat
   /** 导演已填的分镜头表；不传则按场生成待填模板行（不编造景别与运镜）。 */
   readonly 分镜头表?: ShotList
@@ -336,6 +345,8 @@ export interface ComputedScreenplayExport {
   readonly 台词字数: number
   readonly fountain文件: string
   readonly markdown文件: string
+  /** markdown 的实际形态：storyboard（默认）/ master-scene；不出 markdown 时为空。 */
+  readonly markdown格式: 'storyboard' | 'master-scene' | ''
   readonly fountain: string
   readonly markdown: string
   /** 总纲文件（传了 总纲 才有，否则为空）；总纲正文（同上）。 */
@@ -364,13 +375,18 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
   const fail = (extra?: readonly string[]): ComputedScreenplayExport => ({
     ok: false, gaps: [...gaps, ...(extra ?? [])], 警告, 书名: '', 形态: options.形态, 标题: '',
     ...(options.集 !== undefined ? { 集: options.集 } : {}),
-    场景数: 0, 台词字数: 0, fountain文件: '', markdown文件: '', fountain: '', markdown: '',
+    场景数: 0, 台词字数: 0, fountain文件: '', markdown文件: '', markdown格式: '', fountain: '', markdown: '',
     总纲文件: '', 总纲: '', 人名检查: { ok: true, problems: [] },
     分镜头表: { 标题: '', 镜: [] }, 分镜头数: 0, 审读发现项: [],
   })
   if (options.形态 !== '电影剧本' && options.形态 !== '短剧') return fail(['导出形态必须是 电影剧本 或 短剧'])
-  const 格式 = options.格式 ?? 'both'
-  if (格式 !== 'fountain' && 格式 !== 'markdown' && 格式 !== 'both') return fail(['导出格式必须是 fountain、markdown 或 both'])
+  const 格式 = options.格式 ?? 'storyboard'
+  if (格式 !== 'storyboard' && 格式 !== 'master-scene' && 格式 !== 'fountain' && 格式 !== 'both') {
+    return fail(['导出格式必须是 storyboard、master-scene、fountain 或 both（旧值 markdown 已废弃：电影默认 storyboard，次要导出用 master-scene）'])
+  }
+  if (options.形态 === '短剧' && 格式 === 'master-scene') {
+    return fail(['短剧没有 master-scene 形态（短剧剧本本身就是分镜剧本）：用 storyboard（默认）、fountain 或 both'])
+  }
   if (options.形态 === '短剧' && (options.集 === undefined || !Number.isSafeInteger(options.集) || options.集 < 1 || options.集 > 100)) {
     return fail(['短剧导出必须传 --集 1–100 的集号'])
   }
@@ -401,7 +417,10 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
   const stem = safeFileStem(书名)
   if (options.总纲 !== undefined) 总纲文件 = `${stem}-总纲.md`
   const wantFountain = 格式 === 'fountain' || 格式 === 'both'
-  const wantMarkdown = 格式 === 'markdown' || 格式 === 'both'
+  const wantStoryboard = 格式 === 'storyboard' || 格式 === 'both'
+  const wantMasterScene = 格式 === 'master-scene'
+  const wantMarkdown = wantStoryboard || wantMasterScene
+  const markdown格式: 'storyboard' | 'master-scene' | '' = wantStoryboard ? 'storyboard' : wantMasterScene ? 'master-scene' : ''
   // 人名一致性检查（传了总纲才做）：注册表 = 总纲第五节；失败直接阻断。
   const checkNames = (names: readonly string[]): CharacterNameCheck => {
     if (options.总纲 === undefined) return { ok: true, problems: [] }
@@ -431,7 +450,8 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
     let markdown = ''
     try {
       if (wantFountain) fountain = renderFountainScreenplay(draft)
-      if (wantMarkdown) markdown = renderScreenplayMarkdown(draft, shotList)
+      if (wantStoryboard) markdown = renderFilmStoryboardMarkdown(draft, shotList, options.总纲)
+      else if (wantMasterScene) markdown = renderScreenplayMarkdown(draft, shotList)
     } catch (err) {
       return fail([`剧本导出渲染失败：${err instanceof Error ? err.message : String(err)}`])
     }
@@ -441,6 +461,7 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
       台词字数: draft.场.flatMap((s) => s.台词段).flatMap((b) => b.台词).reduce((sum, line) => sum + dialogueCharsOf(line), 0),
       fountain文件: wantFountain ? `${stem}-电影剧本.fountain` : '',
       markdown文件: wantMarkdown ? `${stem}-电影剧本.md` : '',
+      markdown格式,
       fountain, markdown,
       总纲文件, 总纲, 人名检查,
       分镜头表: shotList, 分镜头数: shotList.镜.length, 审读发现项: findings,
@@ -482,6 +503,7 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
     台词字数: totalDialogueChars(episode.场景),
     fountain文件: wantFountain ? `${stem}-短剧集${epNo}.fountain` : '',
     markdown文件: wantMarkdown ? `${stem}-短剧集${epNo}.md` : '',
+    markdown格式,
     fountain, markdown,
     总纲文件, 总纲, 人名检查,
     分镜头表: shotList, 分镜头数: shotList.镜.length, 审读发现项: [],

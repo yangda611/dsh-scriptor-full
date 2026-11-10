@@ -9,8 +9,9 @@
  * 形态（argv 进、退出码出），模块顶层不得有副作用。
  *
  * 参数：--book <书仓路径>（必填）；--形态 电影剧本|短剧（可选，默认 电影剧本）；
- * --集 N（短剧必填，1–100；电影剧本不传）；--格式 fountain|markdown|both
- * （可选，默认 both）；--分镜头 <路径>（可选，相对书仓或绝对路径，导演已填的
+ * --集 N（短剧必填，1–100；电影剧本不传）；--格式 storyboard|master-scene|fountain|both
+ * （可选，默认 storyboard：《痴迷》式分镜剧本；master-scene 是电影的次要导出，
+ * 短剧不支持；旧值 markdown 已废弃）；--分镜头 <路径>（可选，相对书仓或绝对路径，导演已填的
  * 分镜头表 Markdown 表格；不传则按场生成待填模板行）；--总纲 <JSON 路径>
  * （可选，相对书仓或绝对路径，总纲 StoryBibleInput JSON；传了就渲染总纲文件
  * `<书名>-总纲.md`，并以总纲第五节为人名注册表做导出前一致性检查——全剧人名
@@ -81,9 +82,9 @@ export function screenplayExportCli(argv: readonly string[]): number {
     console.error('前置参数错误：电影剧本导出不传 --集（集号只用于短剧）')
     return 1
   }
-  const 格式raw = argValue(argv, '格式')?.trim() ?? 'both'
-  if (格式raw !== 'fountain' && 格式raw !== 'markdown' && 格式raw !== 'both') {
-    console.error('前置参数错误：--格式 必须是 fountain、markdown 或 both')
+  const 格式raw = argValue(argv, '格式')?.trim() ?? 'storyboard'
+  if (格式raw !== 'storyboard' && 格式raw !== 'master-scene' && 格式raw !== 'fountain' && 格式raw !== 'both') {
+    console.error('前置参数错误：--格式 必须是 storyboard、master-scene、fountain 或 both（旧值 markdown 已废弃：默认 storyboard，次要导出用 master-scene）')
     return 1
   }
   const 格式 = 格式raw as ScreenplayExportFormat
@@ -152,6 +153,7 @@ export function screenplayExportCli(argv: readonly string[]): number {
       台词字数: c.台词字数,
       fountain文件: c.fountain文件,
       markdown文件: c.markdown文件,
+      markdown格式: c.markdown格式,
       总纲文件: c.总纲文件,
       人名检查: c.人名检查,
       分镜头数: c.分镜头数,

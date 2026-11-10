@@ -5,12 +5,14 @@ import * as path from 'node:path'
 import {
   computeExport,
   computeScreenplayExport,
+  deriveFilmStoryboard,
   deriveShotListTemplate,
   inspectScreenplayExportTarget,
   parseEpisodeScript,
   parseShotListTable,
   renderEpisodeFountain,
   renderEpisodeMarkdown,
+  renderFilmStoryboardMarkdown,
   renderFountainScreenplay,
   renderScreenplayMarkdown,
   renderShotListTable,
@@ -19,9 +21,10 @@ import {
   type ShotList,
 } from '../src/index'
 import { renderEpisodeScript } from '../src/shortdrama/script'
+import { parseScreenplay } from '../src/screenplay/format'
 import { removeSync } from '../src/repo/remove'
 import { makeFixtureBook } from './helpers/fixture-book'
-import { VALID_DRAFT } from './screenplay-fixtures'
+import { VALID_DRAFT, WANXING_BIBLE } from './screenplay-fixtures'
 
 const repoRoot = path.resolve(__dirname, '..', '..', '..')
 const filmExample = fs.readFileSync(path.join(repoRoot, 'docs/examples/电影剧本示例/剧本.md'), 'utf-8')
@@ -155,7 +158,7 @@ describe('阶段 4：剧本导出格式（Fountain / Markdown 双输出 + 分镜
   it('computeScreenplayExport 电影：双格式 + 导演已填分镜头表 + 审读零发现 + 确定性', () => {
     const root = filmBook('晚星')
     const shotList = readShotList('分镜头表-晚星.md')
-    const result = computeScreenplayExport(root, { 形态: '电影剧本', 分镜头表: shotList })
+    const result = computeScreenplayExport(root, { 形态: '电影剧本', 格式: 'both', 分镜头表: shotList })
     expect(result.ok, result.gaps.join('；')).toBe(true)
     expect(result.书名).toBe('晚星')
     expect(result.标题).toBe('晚星')
@@ -167,9 +170,86 @@ describe('阶段 4：剧本导出格式（Fountain / Markdown 双输出 + 分镜
     expect(result.fountain).toContain('Title: 晚星')
     expect(result.markdown).toContain('低沉弦乐起')
     expect(result.markdown).toContain('温暖主题音乐起')
-    const again = computeScreenplayExport(root, { 形态: '电影剧本', 分镜头表: shotList })
+    expect(result.markdown格式).toBe('storyboard')
+    const again = computeScreenplayExport(root, { 形态: '电影剧本', 格式: 'both', 分镜头表: shotList })
     expect(again.fountain).toBe(result.fountain)
     expect(again.markdown).toBe(result.markdown)
+  })
+
+  it('电影默认出分镜剧本（storyboard）：总纲七节 + △分镜块五字段 + 对白标注，不是 master-scene 形状', () => {
+    const root = filmBook('晚星')
+    const shotList = readShotList('分镜头表-晚星.md')
+    const result = computeScreenplayExport(root, { 形态: '电影剧本', 分镜头表: shotList, 总纲: WANXING_BIBLE })
+    expect(result.ok, result.gaps.join('；')).toBe(true)
+    expect(result.markdown格式).toBe('storyboard')
+    expect(result.fountain文件).toBe('')
+    expect(result.fountain).toBe('')
+    // 总纲七节（电影版第六节是三幕结构）
+    expect(result.markdown).toContain('# 《晚星》总纲（剧本圣经）')
+    expect(result.markdown).toContain('一、故事一句话')
+    expect(result.markdown).toContain('六、三幕结构与时间锚点')
+    expect(result.markdown).toContain('• 第一幕：起疑（D1 深夜—清晨）')
+    // 分镜剧本：场头 + △镜头块（五字段齐全）+ 对白带 (pause) 标注
+    expect(result.markdown).toContain('# 《晚星》电影剧本（分镜剧本）')
+    expect(result.markdown).toContain('场01 夜／内 面馆')
+    expect(result.markdown).toContain('人物：林晚星、阿辉')
+    expect(result.markdown).toMatch(/△【镜头01｜时间：00:00—00:0\d｜景别：—｜角度：—｜运镜：—】/)
+    expect(result.markdown).toContain('△面馆打烊了，林晚星擦着桌子，门外传来脚步声。')
+    expect(result.markdown).toContain('林晚星(pause)：你想说什么？')
+    // 不是 master-scene 形状：没有 FADE IN / INT. 场景标题作主结构
+    expect(result.markdown).not.toContain('FADE IN:')
+    expect(result.markdown).not.toContain('场01 INT. 面馆 - 深夜')
+    // 导演层分镜头表仍在
+    expect(result.markdown).toContain('## 导演层')
+    expect(result.markdown).toContain('低沉弦乐起')
+    // 总纲仍单独出一份文件
+    expect(result.总纲文件).toBe('晚星-总纲.md')
+    expect(result.总纲).toContain('# 《晚星》总纲（剧本圣经）')
+  })
+
+  it('电影 master-scene 显式指定时仍可用（次要导出）：FADE IN + INT. 场景标题 + 导演层', () => {
+    const root = filmBook('晚星')
+    const shotList = readShotList('分镜头表-晚星.md')
+    const result = computeScreenplayExport(root, { 形态: '电影剧本', 格式: 'master-scene', 分镜头表: shotList })
+    expect(result.ok, result.gaps.join('；')).toBe(true)
+    expect(result.markdown格式).toBe('master-scene')
+    expect(result.markdown).toContain('FADE IN:')
+    expect(result.markdown).toContain('场01 INT. 面馆 - 深夜')
+    expect(result.markdown).toContain('## 导演层')
+    expect(result.markdown).not.toContain('△【镜头01')
+  })
+
+  it('电影分镜推导：8 场 38 镜，时间码全片累计、总和等于页数 × 55 秒，景别/角度/运镜填 —', () => {
+    const parsed = parseScreenplay(filmExample)
+    expect(parsed.ok, parsed.problems.join('；')).toBe(true)
+    const draft = parsed.draft!
+    const scenes = deriveFilmStoryboard(draft)
+    expect(scenes).toHaveLength(8)
+    const shots = scenes.flatMap((s) => s.镜头)
+    expect(shots).toHaveLength(38)
+    expect(shots[0]!.镜头号).toBe(1)
+    expect(shots[37]!.镜头号).toBe(38)
+    expect(shots[0]!.开始秒).toBe(0)
+    // 总时长 = 预估页数 × 55 秒（8 场剧本约 2 页 → 约 110 秒）
+    const total = (shots[37]!.结束秒 as number) - (shots[0]!.开始秒 as number)
+    expect(total).toBe(110)
+    for (const shot of shots) {
+      expect(shot.景别).toBe('—')
+      expect(shot.角度).toBe('—')
+      expect(shot.运镜).toBe('—')
+      expect(shot.描写.length).toBeGreaterThan(0)
+      expect(shot.描写.every((d) => d.trim() !== '')).toBe(true)
+      expect((shot.结束秒 as number)).toBeGreaterThan(shot.开始秒 as number)
+    }
+    // 时间码连续：上一镜结束 = 下一镜开始
+    for (let i = 1; i < shots.length; i++) {
+      expect(shots[i]!.开始秒).toBe(shots[i - 1]!.结束秒)
+    }
+    // 渲染出的分镜含 5 字段头与对白标注，且没有裸 △ 行
+    const text = renderFilmStoryboardMarkdown(draft, readShotList('分镜头表-晚星.md'))
+    expect(text).toContain('△【镜头01｜时间：00:00—')
+    expect(text).toContain('林晚星(pause)：你想说什么？')
+    expect(text).not.toMatch(/^△$/m)
   })
 
   it('computeScreenplayExport 电影：不传分镜头表时按场生成待填模板行（警告、不阻断）', () => {
@@ -193,7 +273,7 @@ describe('阶段 4：剧本导出格式（Fountain / Markdown 双输出 + 分镜
   it('computeScreenplayExport 短剧：集001 双格式 + 分镜头表 6 镜', () => {
     const root = episodeBook('赘婿归来')
     const shotList = readShotList('分镜头表-赘婿归来集001.md')
-    const result = computeScreenplayExport(root, { 形态: '短剧', 集: 1, 分镜头表: shotList })
+    const result = computeScreenplayExport(root, { 形态: '短剧', 集: 1, 格式: 'both', 分镜头表: shotList })
     expect(result.ok, result.gaps.join('；')).toBe(true)
     expect(result.书名).toBe('赘婿归来')
     expect(result.标题).toBe('废物赘婿')
@@ -227,7 +307,7 @@ describe('阶段 4：剧本导出格式（Fountain / Markdown 双输出 + 分镜
 
   it('verifyScreenplayExportTarget：落盘后逐份比对哈希；改动一字节即失败；目标进 剧本/ 拒绝', () => {
     const root = filmBook('晚星')
-    const computed = computeScreenplayExport(root, { 形态: '电影剧本' })
+    const computed = computeScreenplayExport(root, { 形态: '电影剧本', 格式: 'both' })
     expect(computed.ok).toBe(true)
     const target = path.join(roots[roots.length - 1]!, '导出目标')
     fs.mkdirSync(target, { recursive: true })
@@ -259,13 +339,13 @@ describe('阶段 4：剧本导出格式（Fountain / Markdown 双输出 + 分镜
   it('示例导出文件与代码输出逐字节一致（示例不是手写稿）', () => {
     const filmRoot = filmBook('晚星')
     const filmShotList = readShotList('分镜头表-晚星.md')
-    const film = computeScreenplayExport(filmRoot, { 形态: '电影剧本', 分镜头表: filmShotList })
+    const film = computeScreenplayExport(filmRoot, { 形态: '电影剧本', 格式: 'both', 分镜头表: filmShotList, 总纲: WANXING_BIBLE })
     expect(film.ok, film.gaps.join('；')).toBe(true)
     expect(fs.readFileSync(path.join(exportExamplesDir, '晚星-电影剧本.fountain'), 'utf-8')).toBe(film.fountain)
     expect(fs.readFileSync(path.join(exportExamplesDir, '晚星-电影剧本.md'), 'utf-8')).toBe(film.markdown)
     const episodeRoot = episodeBook('赘婿归来')
     const episodeShotList = readShotList('分镜头表-赘婿归来集001.md')
-    const episode = computeScreenplayExport(episodeRoot, { 形态: '短剧', 集: 1, 分镜头表: episodeShotList })
+    const episode = computeScreenplayExport(episodeRoot, { 形态: '短剧', 集: 1, 格式: 'both', 分镜头表: episodeShotList })
     expect(episode.ok, episode.gaps.join('；')).toBe(true)
     expect(fs.readFileSync(path.join(exportExamplesDir, '赘婿归来-短剧集001.fountain'), 'utf-8')).toBe(episode.fountain)
     expect(fs.readFileSync(path.join(exportExamplesDir, '赘婿归来-短剧集001.md'), 'utf-8')).toBe(episode.markdown)

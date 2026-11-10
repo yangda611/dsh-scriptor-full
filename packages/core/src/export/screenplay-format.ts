@@ -59,14 +59,17 @@ import {
   SHOT_MOVEMENT_VOCAB,
   SHOT_SIZE_VOCAB,
   countEpisodeShots,
+  dayNightLabel,
+  formatTimecode,
   parseTimecode,
   renderEpisodeBeatTable,
   renderEpisodeSceneBlock,
+  renderShotBlock,
   sceneDialogueLines,
   totalDialogueChars,
   EPISODE_FADE_OUT,
 } from '../shortdrama/script'
-import type { EpisodeScriptInput } from '../shortdrama/types'
+import type { EpisodeScriptInput, EpisodeShot, ScriptLine } from '../shortdrama/types'
 
 /** 景别词汇（调研 §1.2；中文常用写法 + 英文缩写都认）。 */
 export const SHOT_SIZE_TOKENS = [
@@ -502,6 +505,63 @@ export function renderEpisodeMarkdown(episode: EpisodeScriptInput, shotList: Sho
 }
 
 // ---------------------------------------------------------------------------
+// 文字目标推导（2026-11-11）：总纲的 文字目标 不再写死数字，改由时长推导。
+//
+// 短剧（deriveEpisodeWordTarget）：分镜拉片剧本每集字数 = 对白 + 镜头开销。
+// - 对白按 2–4 字/秒：竖屏模板 90 秒一集对白 180–360 字折算；横屏无总量硬限，同一口径（工具约定）。
+// - 镜数 = round(时长秒 / 10)：约 1 镜/10 秒（《夜市摊主》集001：90 秒 9 镜）。
+// - 每镜开销约 150 字：镜头参数行（约 45 字）+ △站位/动作/表情描写（约 45 字）
+//   + 分摊的场头/人物/场景环境（约 60 字/镜）；《夜市摊主》集001 实测：全文 1621 字，
+//   对白 104 字，非对白 1517 字 / 9 镜 ≈ 169 字/镜，取 150 字为保守口径。
+// - 90 秒一集 → 对白 180–360 字 + 9 镜 × 150 字 = 约 1,530—1,710 字。
+//
+// 电影（deriveFilmWordTarget）：总纲的 文字目标 改为页数/片长目标——长片
+// 90–110 页 ≈ 90–110 分钟之类，按片长推导（1 页 ≈ 55 秒，见调研 §1.1）。
+// ---------------------------------------------------------------------------
+
+/** 分镜拉片剧本每镜开销（字，工具约定，见上）。 */
+export const STORYBOARD_WORDS_PER_SHOT = 150
+
+/** 对白 pace（字/秒，工具约定，见上）：竖屏模板 90 秒 180–360 字折算。 */
+export const DIALOGUE_WORDS_PER_SECOND: readonly [number, number] = [2, 4]
+
+/** 一镜约 10 秒（工具约定，见上）：《夜市摊主》集001：90 秒 9 镜。 */
+export const STORYBOARD_SECONDS_PER_SHOT = 10
+
+export interface EpisodeWordTarget {
+  /** 单集时长（秒）。 */
+  readonly 时长秒: number
+  /** 推导出的镜数（round(时长秒 / 10)）。 */
+  readonly 镜数: number
+  /** 文字目标下限（字）。 */
+  readonly 下限: number
+  /** 文字目标上限（字）。 */
+  readonly 上限: number
+}
+
+/** 推导短剧分镜拉片剧本每集文字目标（字数范围）：对白（2–4 字/秒）+ 镜数 × 每镜开销。两画幅同一口径（对白 pace 与每镜开销不按画幅区分，只按时长缩放）。 */
+export function deriveEpisodeWordTarget(时长秒: number): EpisodeWordTarget {
+  if (!Number.isFinite(时长秒) || 时长秒 <= 0) throw new Error(`推导文字目标失败：单集时长须为正数（收到：${String(时长秒)}）`)
+  const 镜数 = Math.max(1, Math.round(时长秒 / STORYBOARD_SECONDS_PER_SHOT))
+  const 下限 = DIALOGUE_WORDS_PER_SECOND[0] * 时长秒 + 镜数 * STORYBOARD_WORDS_PER_SHOT
+  const 上限 = DIALOGUE_WORDS_PER_SECOND[1] * 时长秒 + 镜数 * STORYBOARD_WORDS_PER_SHOT
+  return { 时长秒, 镜数, 下限, 上限 }
+}
+
+/** 推导出的短剧文字目标写进总纲 文字目标 字段的完整句子（90 秒一集：约 1,530—1,710 字）。 */
+export function deriveEpisodeWordTargetText(时长秒: number): string {
+  const t = deriveEpisodeWordTarget(时长秒)
+  return `分镜拉片剧本每集约${t.下限.toLocaleString('en-US')}—${t.上限.toLocaleString('en-US')}字（含标点、场景环境、镜头参数、△站位/动作/表情描写、对白、环境音效与画面字幕），服从成片节奏，不为凑字数扩写`
+}
+
+/** 推导电影分镜拉片剧本文字目标（页数/片长目标）：约 N 页，约 M 分钟（1 页 ≈ 55 秒）。 */
+export function deriveFilmWordTarget(页数: number): string {
+  if (!Number.isFinite(页数) || 页数 < 1) throw new Error(`推导电影文字目标失败：页数须 ≥1（收到：${String(页数)}）`)
+  const 分钟 = Math.max(1, Math.round((页数 * 55) / 60))
+  return `分镜拉片剧本约${页数}页，约${分钟}分钟（1页≈55秒，见调研 §1.1；服从成片节奏，不为凑字数扩写）`
+}
+
+// ---------------------------------------------------------------------------
 // 总纲（剧本圣经）+ 人名注册表（阶段 4 对齐轮次）。
 //
 // 结构取自《痴迷》参考案例第一部分（docs/examples/痴迷-12集分镜剧本-参考案例.docx）：
@@ -510,6 +570,10 @@ export function renderEpisodeMarkdown(episode: EpisodeScriptInput, shotList: Sho
 // 语言规则与分镜剧本同一条：说明/场景/动作文字一律中文，对白按目标市场语言
 // （`对白语言` 字段写明，如海外题材为英文）；渲染出的总纲正文不含对白，只有
 // 在「对白语言」一行写明该剧的对白语言。
+//
+// 电影改编（2026-11-11）：电影总纲同样七节，但第六节是「三幕结构与时间锚点」
+// 而不是「分集结构与时间锚点」——传 三幕结构（与 分集结构 二选一）时渲染三幕版；
+// 文字目标字段填页数/片长目标（deriveFilmWordTarget），而不是每集字数。
 // ---------------------------------------------------------------------------
 
 /** 总纲第五节里的一位主要人物（含全剧统一规范与曾误标统一记录）。 */
@@ -539,6 +603,19 @@ readonly 幕?: string
 /** 时间锚点（如 `D1 周三白天至傍晚`）。 */
 readonly 时间锚点: string
 /** 本集一句话梗概。 */
+readonly 梗概: string
+}
+
+/**
+ * 总纲第六节里的一幕（电影用三幕结构与时间锚点，与 分集结构 二选一）。
+ * 电影总纲传本字段，第六节渲染「三幕结构与时间锚点」；短剧总纲传 分集结构。
+ */
+export interface StoryBibleActEntry {
+/** 幕名（如 `第一幕：起疑`）。 */
+readonly 幕: string
+/** 时间锚点（如 `D1 深夜—清晨`）。 */
+readonly 时间锚点: string
+/** 本幕一句话梗概。 */
 readonly 梗概: string
 }
 
@@ -577,8 +654,16 @@ readonly 核心地理空间: readonly string[]
 readonly 三段核心真相: readonly { readonly 阶段: string; readonly 内容: string}[]
 /** 主要人物与人物弧（全剧统一规范；同时是人名注册表的数据源）。 */
 readonly 人物: readonly StoryBibleCharacter[]
-/** 分集结构与时间锚点（集号从 1 起连续）。 */
-readonly 分集结构: readonly StoryBibleEpisodeEntry[]
+/**
+ * 分集结构与时间锚点（集号从 1 起连续，短剧用）。与 三幕结构 二选一：
+ * 传了 三幕结构 就不传本字段（电影用三幕结构）；两个都传或两个都不传都校验失败。
+ */
+readonly 分集结构?: readonly StoryBibleEpisodeEntry[]
+/**
+ * 三幕结构与时间锚点（电影用，与 分集结构 二选一；通常三幕）。
+ * 传了本字段，第六节渲染「三幕结构与时间锚点」。
+ */
+readonly 三幕结构?: readonly StoryBibleActEntry[]
 /** 对白语言（如 `英文` / `中文`）：说明文字一律中文，对白按目标市场语言。 */
 readonly 对白语言: string
 }
@@ -590,9 +675,9 @@ readonly problems: readonly string[]
 
 /**
 * 校验总纲：七节齐全（类型/形式/文字目标/叙事线 A线/故事一句话/开篇承诺/
-* 主题/反题/世界硬约束三项/三段核心真相正好三段/人物至少一位/分集至少一集且
-* 集号从 1 起连续）；人物标准名不重复；曾误标名不得与任何一位标准名相同
-* （否则「统一」无所指）；对白语言必填。
+* 主题/反题/世界硬约束三项/三段核心真相正好三段/人物至少一位/第六节二选一：
+* 分集结构至少一集且集号从 1 起连续，或三幕结构至少一幕）；人物标准名不重复；
+* 曾误标名不得与任何一位标准名相同（否则「统一」无所指）；对白语言必填。
 */
 export function validateStoryBible(bible: StoryBibleInput): StoryBibleValidation {
 const problems: string[] = []
@@ -635,11 +720,22 @@ for (const old of person.曾误标?? []) {
 if (标准名.has(old.trim())) problems.push(`总纲人物 ${person.标准名} 的曾误标名「${old}」与另一位人物标准名相同，统一记录无所指`)
 }
 }
+if (bible.分集结构 !== undefined && bible.三幕结构 !== undefined) {
+problems.push('总纲第六节只能二选一：分集结构（短剧）与三幕结构（电影）不能同时传')
+} else if (bible.三幕结构 !== undefined) {
+if (bible.三幕结构.length === 0) problems.push('总纲缺少三幕结构（第六节）')
+bible.三幕结构.forEach((act, i) => {
+if (act.幕.trim() === '' || act.时间锚点.trim() === '' || act.梗概.trim() === '') problems.push(`总纲三幕结构第 ${i + 1} 幕缺少幕名、时间锚点或梗概`)
+})
+} else if (bible.分集结构 !== undefined) {
 if (bible.分集结构.length === 0) problems.push('总纲缺少分集结构（第六节）')
 bible.分集结构.forEach((entry, i) => {
 if (entry.集!== i + 1) problems.push(`总纲分集结构集号须从 1 起连续（第 ${i + 1} 项应为第${i + 1}集，收到第${entry.集}集）`)
 if (entry.时间锚点.trim() === '' || entry.梗概.trim() === '') problems.push(`总纲分集结构第${entry.集}集缺少时间锚点或梗概`)
 })
+} else {
+problems.push('总纲缺少第六节：分集结构（短剧）与三幕结构（电影）须传一个')
+}
 return { ok: problems.length === 0, problems}
 }
 
@@ -689,17 +785,27 @@ const former = formerNames.length === 0
 return `${head}${former}`
 }),
 '',
-'六、分集结构与时间锚点',
-'',
+...(bible.三幕结构 !== undefined
+? [
+  '六、三幕结构与时间锚点',
+  '',
+  ...bible.三幕结构.map((act) => `• ${act.幕}（${act.时间锚点}）：${act.梗概}`),
 ]
-// 同幕的集归一组（幕名只出现一次）；没写幕的集平铺。
+: [
+  '六、分集结构与时间锚点',
+  '',
+]),
+]
+// 同幕的集归一组（幕名只出现一次）；没写幕的集平铺。三幕结构不走这段。
 let currentAct = ''
+if (bible.分集结构 !== undefined) {
 for (const entry of bible.分集结构) {
 if (entry.幕!== undefined && entry.幕!== currentAct) {
 currentAct = entry.幕
 lines.push(`• ${entry.幕}`)
 }
 lines.push(` - 第${entry.集}集（${entry.时间锚点}）：${entry.梗概}`)
+}
 }
 lines.push('')
 return `${lines.join('\n').replace(/\n+$/, '')}\n`
@@ -771,4 +877,202 @@ if (!names.includes(line.角色)) names.push(line.角色)
 }
 }
 return names
+}
+
+// ---------------------------------------------------------------------------
+// 电影分镜剧本（2026-11-11 用户决定）：电影剧本默认出《痴迷》式分镜剧本
+// （总纲 + 按场分的分镜），不再默认出 master-scene（FADE IN / INT. 场景标题）。
+// master-scene 渲染器（renderScreenplayMarkdown / renderFountainScreenplay）
+// 保留，只作次要导出（--格式 master-scene / fountain）。
+//
+// 分镜推导规则（只从剧本草稿取材，不编造）：
+// - 每场按场号顺序出一场；一场内的镜按「动作行在先、台词段在后」——剧本草稿
+//   模型分开存动作与台词段，不保留交错顺序，与 renderScreenplay 同一口径；
+// - 一镜对应一行动作或一段台词：动作镜的 描写 = 动作行原文，无台词；台词镜的
+//   描写 = 台词内容原文（`角色：台词`），台词 = 同一段台词（括号提示原样作对白
+//   标注，没有括号提示就不写标注，不编造语速/音量/语调）；
+// - 景别/角度/运镜一律填 `—`（模板镜，导演补——工具不编造导演的景别与运镜决定）；
+// - 时间码按预估片长分配：总时长 = 预估页数 × 55 秒（estimatePages，1 页 ≈ 55 秒），
+//   每镜时长按镜内容字数占比分配（最大余数法凑整，累计时间码全片连续）；
+// - 环境声/字幕只在原文写明时才写，原文没写就留空——永不编造；
+// - 空镜（描写全空）永不输出：推导出的镜描写恒非空，且 renderShotBlock 会跳过
+//   空描写行（见 script.ts）。
+// ---------------------------------------------------------------------------
+
+const FILM_STORYBOARD_NOTE = [
+  '> 导出说明：本文件是《痴迷》式分镜剧本——总纲（传了总纲时附在前）+ 按场分的分镜（△镜头块，五字段齐全）；',
+  '> 不是编剧层 master-scene（FADE IN / INT. 场景标题），后者是次要导出（.fountain 或 --格式 master-scene）。',
+  '> 景别/角度/运镜填 — 的是待填模板镜（工具不编造导演的决定，导演补）；时间码按预估片长分配（1页≈55秒），导演核定。',
+  '> 说明/场景/动作文字一律中文，对白按目标市场语言。音效写进动作行，不用 `SFX:` / `MUSIC:` 独占行（那是 BBC 广播剧格式）；',
+  '> 停顿只用 `(pause)`，不用 `(beat)`；音乐提示只进分镜头表音乐栏。',
+].join('\n')
+
+/** 电影分镜剧本里的一场（场号 + 镜头，镜头号全片连续）。 */
+export interface FilmStoryboardScene {
+  readonly 场号: number
+  readonly 地点: string
+  readonly 时间: string
+  /** 内景 / 外景 / 内外未定。 */
+  readonly 内外: '内' | '外' | '内/外'
+  /** 本场出场人物（按台词段首次出现顺序去重；没有台词的场为空）。 */
+  readonly 人物: readonly string[]
+  /** 本场镜头（EpisodeShot 形状；镜头号全片连续，时间码全片累计）。 */
+  readonly 镜头: readonly EpisodeShot[]
+}
+
+function stripParens(mark: string): string {
+  return mark.trim().replace(/^[（(]/, '').replace(/[）)]$/, '').trim()
+}
+
+function nonWhitespaceChars(text: string): number {
+  return [...text].filter((ch) => !/\s/.test(ch)).length
+}
+
+/**
+ * 按权重分配总秒数（最大余数法）：每份 = floor(总秒 × 权重 / 总权重），余数按
+ * 小数部分从大到小每份补 1 秒；每份至少 1 秒（权重为 0 的份也至少 1 秒）。
+ * 返回值之和恒等于总秒数（总秒数 < 份数时除外——此时每份 1 秒，总和超出，属退化情形）。
+ */
+export function allocateShotSeconds(totalSeconds: number, weights: readonly number[]): readonly number[] {
+  if (weights.length === 0) return []
+  const total = Math.max(0, Math.floor(totalSeconds))
+  if (total === 0) return weights.map(() => 1)
+  const safeWeights = weights.map((w) => Math.max(0, w))
+  const totalWeight = safeWeights.reduce((s, w) => s + w, 0)
+  const raw = totalWeight === 0
+    ? safeWeights.map(() => total / safeWeights.length)
+    : safeWeights.map((w) => (total * w) / totalWeight)
+  const floors = raw.map((r) => Math.floor(r))
+  const fracs = raw.map((r, i) => ({ i, frac: r - (floors[i] as number) }))
+  // 每份至少 1 秒：先把 0 份补到 1，从最大的份里扣（扣到不低于 1 为止）。
+  let assigned = floors.reduce((s, n) => s + n, 0)
+  for (let i = 0; i < floors.length; i++) {
+    if ((floors[i] as number) < 1) {
+      const need = 1 - (floors[i] as number)
+      floors[i] = 1
+      assigned += need
+      let donor = 0
+      for (let j = 0; j < floors.length; j++) {
+        if (j !== i && (floors[j] as number) > (floors[donor] as number)) donor = j
+      }
+      const take = Math.min(need, (floors[donor] as number) - 1)
+      floors[donor] = (floors[donor] as number) - take
+      assigned -= take
+    }
+  }
+  // 余数按小数部分从大到小补 1 秒；多出则从最大的份里减（不低于 1）。
+  let diff = total - assigned
+  const byFracDesc = [...fracs].sort((a, b) => b.frac - a.frac)
+  const byFloorDesc = floors.map((n, i) => ({ i, n })).sort((a, b) => b.n - a.n)
+  let cursor = 0
+  while (diff > 0) {
+    const target = byFracDesc[cursor % byFracDesc.length]!.i
+    floors[target] = (floors[target] as number) + 1
+    diff -= 1
+    cursor += 1
+  }
+  while (diff < 0) {
+    const target = byFloorDesc.find((f) => (floors[f.i] as number) > 1)
+    if (target === undefined) break
+    floors[target.i] = (floors[target.i] as number) - 1
+    diff += 1
+  }
+  return floors
+}
+
+/**
+ * 电影剧本草稿 → 分镜剧本（场 + 镜）：一场一镜组，镜头号全片连续，时间码按
+ * 预估片长（页数 × 55 秒）依内容字数占比分配。只从草稿取材，不编造。
+ */
+export function deriveFilmStoryboard(draft: ScreenplayDraft): readonly FilmStoryboardScene[] {
+  interface RawShot {
+    readonly 描写: readonly string[]
+    readonly 台词: readonly ScriptLine[]
+  }
+  const rawScenes: { 场号: number; 地点: string; 时间: string; 内外: '内' | '外' | '内/外'; 人物: string[]; 镜: RawShot[] }[] = []
+  for (const scene of draft.场) {
+    const shots: RawShot[] = []
+    for (const action of scene.动作) {
+      shots.push({ 描写: [action], 台词: [] })
+    }
+    for (const block of scene.台词段) {
+      const annotation = block.括号提示 === undefined ? undefined : stripParens(block.括号提示)
+      shots.push({
+        描写: block.台词.map((line) => `${block.角色}：${line}`),
+        台词: block.台词.map((line): ScriptLine => ({
+          角色: block.角色,
+          ...(annotation !== undefined && annotation !== '' ? { 括号提示: annotation } : {}),
+          台词: line,
+        })),
+      })
+    }
+    const 人物: string[] = []
+    for (const block of scene.台词段) {
+      if (!人物.includes(block.角色)) 人物.push(block.角色)
+    }
+    rawScenes.push({
+      场号: scene.场号,
+      地点: scene.标题.地点,
+      时间: scene.标题.时间,
+      内外: scene.标题.内外 === 'INT' ? '内' : scene.标题.内外 === 'EXT' ? '外' : '内/外',
+      人物,
+      镜: shots,
+    })
+  }
+  const allShots = rawScenes.flatMap((s) => s.镜)
+  const weights = allShots.map((s) => nonWhitespaceChars([...s.描写, ...s.台词.map((l) => l.台词)].join('')))
+  const durations = allocateShotSeconds(estimatePages(draft) * 55, weights)
+  let 镜头号 = 1
+  let cursor = 0
+  let elapsed = 0
+  return rawScenes.map((scene) => {
+    const 镜头: EpisodeShot[] = scene.镜.map((shot) => {
+      const seconds = durations[cursor] as number
+      cursor += 1
+      const 开始秒 = elapsed
+      elapsed += seconds
+      return {
+        镜头号: 镜头号++,
+        开始秒,
+        结束秒: elapsed,
+        景别: '—',
+        角度: '—',
+        运镜: '—',
+        描写: shot.描写,
+        台词: shot.台词,
+      }
+    })
+    return { 场号: scene.场号, 地点: scene.地点, 时间: scene.时间, 内外: scene.内外, 人物: scene.人物, 镜头 }
+  })
+}
+
+/** 渲染电影剧本分镜剧本 Markdown：总纲（传了才附）+ 按场分的分镜（△镜头块）+ 导演层（分镜头表）。 */
+export function renderFilmStoryboardMarkdown(draft: ScreenplayDraft, shotList: ShotList, bible?: StoryBibleInput): string {
+  const problems: string[] = []
+  const scenes = deriveFilmStoryboard(draft)
+  const pages = estimatePages(draft)
+  const runtimeMinutes = Math.max(1, Math.round((pages * 55) / 60))
+  const lines: string[] = [
+    `# 《${draft.标题}》电影剧本（分镜剧本）`,
+    '',
+    `- 场数：${draft.场.length} 场`,
+    `- 预估页数：约 ${pages} 页（一页约一分钟是经验法则，实测约 55 秒/页，见调研 §1.1）`,
+    `- 预估片长：约 ${runtimeMinutes} 分钟（页数 × 55 秒折算；分镜时间码按此片长分配，导演核定）`,
+    '',
+    FILM_STORYBOARD_NOTE,
+    '',
+    '## 分镜剧本',
+    '',
+  ]
+  for (const scene of scenes) {
+    lines.push(`场${String(scene.场号).padStart(2, '0')} ${dayNightLabel(scene.时间)}／${scene.内外} ${scene.地点}`, '')
+    if (scene.人物.length > 0) lines.push(`人物：${scene.人物.join('、')}`, '')
+    for (const shot of scene.镜头) lines.push(renderShotBlock(shot), '')
+  }
+  lines.push('## 导演层', '', '### 分镜头表', '', renderShotListTable(shotList), '')
+  const body = `${lines.join('\n').replace(/\n+$/, '')}\n`
+  const text = bible === undefined ? body : `${renderStoryBible(bible).replace(/\n+$/, '')}\n\n${body}`
+  checkNoBroadcastRows(text, problems)
+  if (problems.length > 0) throw new Error(`剧本导出渲染失败：${problems.join('；')}`)
+  return text
 }

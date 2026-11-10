@@ -7,14 +7,16 @@
  * 内容为原创示例（中文市场，对白中文）；总纲为节选结构（七节齐全，分集结构列出
  * 12 集梗概），格式对标《痴迷》参考案例。
  */
-import type { StoryBibleInput} from '../src/export/screenplay-format'
-import type { EpisodeScriptInput} from '../src/shortdrama/types'
+import { deriveEpisodeWordTargetText } from '../src/export/screenplay-format'
+import type { StoryBibleInput } from '../src/export/screenplay-format'
+import type { EpisodeScriptInput } from '../src/shortdrama/types'
 
 export const NIGHT_MARKET_BIBLE: StoryBibleInput = {
   标题: '夜市摊主',
   类型: '都市美食／身份反转／温情治愈',
   形式: '12集连续短剧／约90分钟长片规格；三幕、十二集',
-  文字目标: '分镜拉片剧本每集约3,000—5,000字（含标点、场景环境、镜头参数、△站位/动作/表情描写、对白、环境音效与画面字幕），服从成片节奏，不为凑字数扩写',
+  // 文字目标按单集时长推导（90 秒一集：对白 180–360 字 + 9 镜 × 约 150 字），不写死数字。
+  文字目标: deriveEpisodeWordTargetText(90),
   叙事线: {
     A线: '陈默摆摊求生与身份揭晓',
     B线: '小满的身世与妈妈留下的铁锅',
@@ -178,7 +180,7 @@ export const NIGHT_MARKET_EPISODE_001: EpisodeScriptInput = {
           景别: '特写',
           角度: '平视正面',
           运镜: '固定镜头',
-          描写: [''],
+          描写: ['铁锅特写：锅面油光发亮，热气袅袅升起。'],
           台词: [
             { 角色: '陈默', 括号提示: '语速缓慢，音量偏低，语调平稳，尾音轻落', 台词: '小满炒饭，不外卖。'},
           ],

@@ -215,6 +215,7 @@ fs.mkdirSync(path.join(bookRoot, '剧本/短剧'), { recursive: true})
 fs.writeFileSync(path.join(bookRoot, '剧本/短剧/集001.md'), renderEpisodeScript(EPISODE_001).内容)
 const biblePath = path.join(workspace, '总纲.json')
 fs.writeFileSync(biblePath, JSON.stringify(BIBLE, null, 2))
+// 默认导出（storyboard）：Markdown 分镜剧本 + 总纲，共 2 份；Fountain 是次要导出。
 const { exit, stdout, stderr} = runCli([
 '--book', bookRoot, '--形态', '短剧', '--集', '1', '--总纲', biblePath,
 ])
@@ -224,9 +225,19 @@ const value = JSON.parse(stdout)
 expect(value.ok).toBe(true)
 expect(value.总纲文件).toBe('巷口面馆-总纲.md')
 expect(value.人名检查).toEqual({ ok: true, problems: []})
-expect(value.文件).toHaveLength(3)
-expect(value.文件[2].content).toContain('# 《巷口面馆》总纲（剧本圣经）')
-expect(value.文件[2].content).toContain('（原剧本曾误标为：老板娘[第1集]，已全部统一为林晚）')
+expect(value.markdown格式).toBe('storyboard')
+expect(value.文件).toHaveLength(2)
+expect(value.文件[0].content).toContain('△【镜头01')
+expect(value.文件[1].content).toContain('# 《巷口面馆》总纲（剧本圣经）')
+expect(value.文件[1].content).toContain('（原剧本曾误标为：老板娘[第1集]，已全部统一为林晚）')
+// --格式 both：同时出 Fountain，共 3 份。
+const both = runCli([
+'--book', bookRoot, '--形态', '短剧', '--集', '1', '--总纲', biblePath, '--格式', 'both',
+])
+expect(both.exit).toBe(0)
+const bothValue = JSON.parse(both.stdout)
+expect(bothValue.文件).toHaveLength(3)
+expect(bothValue.fountain文件).toBe('巷口面馆-短剧集001.fountain')
 // 写盘 + 校验：按新手文档第 7 节的纪律，校验通过才算完成。
 const target = path.join(workspace, '导出目标')
 fs.mkdirSync(target, { recursive: true})

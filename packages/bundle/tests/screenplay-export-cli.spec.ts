@@ -53,10 +53,33 @@ describe('阶段 4：剧本导出 CLI（screenplayExportCli）', () => {
     expect(value.审读发现项).toEqual([])
   })
 
+  it('电影导出默认出分镜剧本（storyboard）：△分镜块，无 FADE IN；--格式 master-scene 仍出编剧层', () => {
+    const book = makeBook()
+    const { exit, stdout } = runCli(['--book', book, '--形态', '电影剧本'])
+    expect(exit).toBe(0)
+    const value = JSON.parse(stdout)
+    expect(value.ok).toBe(true)
+    expect(value.markdown格式).toBe('storyboard')
+    expect(value.fountain文件).toBe('')
+    expect(value.文件).toHaveLength(1)
+    expect(value.文件[0].content).toContain('△【镜头01')
+    expect(value.文件[0].content).toContain('## 导演层')
+    expect(value.文件[0].content).not.toContain('FADE IN:')
+    const master = runCli(['--book', book, '--形态', '电影剧本', '--格式', 'master-scene'])
+    expect(master.exit).toBe(0)
+    const masterValue = JSON.parse(master.stdout)
+    expect(masterValue.markdown格式).toBe('master-scene')
+    expect(masterValue.文件).toHaveLength(1)
+    expect(masterValue.文件[0].content).toContain('FADE IN:')
+    expect(masterValue.文件[0].content).toContain('场01 INT. 面馆 - 深夜')
+    // 旧值 markdown 已废弃
+    expect(runCli(['--book', book, '--格式', 'markdown']).exit).toBe(1)
+  })
+
   it('短剧导出：--集 1 出集001；--分镜头 读导演表进分镜头数', () => {
     const book = makeBook()
     const table = path.join(repoRoot, 'docs/examples/剧本导出示例/分镜头表-赘婿归来集001.md')
-    const { exit, stdout } = runCli(['--book', book, '--形态', '短剧', '--集', '1', '--分镜头', table])
+    const { exit, stdout } = runCli(['--book', book, '--形态', '短剧', '--集', '1', '--格式', 'both', '--分镜头', table])
     expect(exit).toBe(0)
     const value = JSON.parse(stdout)
     expect(value.ok).toBe(true)
@@ -125,7 +148,7 @@ describe('阶段 4：剧本导出 CLI（screenplayExportCli）', () => {
     }
     const biblePath = path.join(roots[roots.length - 1]!, '总纲.json')
     fs.writeFileSync(biblePath, JSON.stringify(bible, null, 2))
-    const { exit, stdout } = runCli(['--book', book, '--形态', '短剧', '--集', '1', '--总纲', biblePath])
+    const { exit, stdout } = runCli(['--book', book, '--形态', '短剧', '--集', '1', '--格式', 'both', '--总纲', biblePath])
     expect(exit).toBe(0)
     const value = JSON.parse(stdout)
     expect(value.ok).toBe(true)
