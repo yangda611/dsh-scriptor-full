@@ -116,6 +116,30 @@ function renderLine(line: ScriptLine): string {
   return `${line.角色}${mark}：${line.台词}`
 }
 
+/**
+ * 渲染一场（`## 场01. 地点 时间 内外` + 动作 + 台词），供 renderEpisodeScript
+ * 与阶段 4 剧本导出复用同一口径；改动渲染格式时只改这里。
+ */
+export function renderEpisodeSceneBlock(scene: ScriptScene): string {
+  const sceneNo = String(scene.场).padStart(2, '0')
+  const lines: string[] = [`## 场${sceneNo}. ${scene.地点} ${scene.时间} ${scene.内外}`, '', scene.动作, '']
+  for (const line of scene.台词) lines.push(renderLine(line))
+  lines.push('')
+  return lines.join('\n')
+}
+
+/** 渲染「节拍表」小节（开场冲突/反转/结尾钩子），与 renderEpisodeScript 同一口径。 */
+export function renderEpisodeBeatTable(input: EpisodeScriptInput): string {
+  return [
+    '## 节拍表',
+    '',
+    `- 开场冲突：第 ${input.开场冲突秒} 秒`,
+    `- 反转：${input.反转秒.map((s) => `第 ${s} 秒`).join('、') || '无'}`,
+    `- 结尾钩子：第 ${input.结尾钩子秒} 秒（切在问题上）`,
+    '',
+  ].join('\n')
+}
+
 /** 渲染一集剧本（编剧层分场景格式）。定稿路径用 paths.短剧集(集号)。 */
 export function renderEpisodeScript(input: EpisodeScriptInput): RenderedEpisodeScript {
   const warnings = validate(input)
@@ -133,24 +157,179 @@ export function renderEpisodeScript(input: EpisodeScriptInput): RenderedEpisodeS
     `- 结尾悬念：${input.结尾悬念}`,
     '',
   ]
-  for (const scene of [...input.场景].sort((a, b) => a.场 - b.场)) {
-    const sceneNo = String(scene.场).padStart(2, '0')
-    lines.push(`## 场${sceneNo}. ${scene.地点} ${scene.时间} ${scene.内外}`)
-    lines.push('')
-    lines.push(scene.动作)
-    lines.push('')
-    for (const line of scene.台词) lines.push(renderLine(line))
-    lines.push('')
-  }
-  lines.push('## 节拍表')
-  lines.push('')
-  lines.push(`- 开场冲突：第 ${input.开场冲突秒} 秒`)
-  lines.push(`- 反转：${input.反转秒.map((s) => `第 ${s} 秒`).join('、') || '无'}`)
-  lines.push(`- 结尾钩子：第 ${input.结尾钩子秒} 秒（切在问题上）`)
-  lines.push('')
+  for (const scene of [...input.场景].sort((a, b) => a.场 - b.场)) lines.push(renderEpisodeSceneBlock(scene))
+  lines.push(renderEpisodeBeatTable(input))
   return {
     path: paths.短剧集(input.集),
     内容: `${lines.join('\n').replace(/\n+$/, '')}\n`,
     警告: warnings,
   }
+}
+
+export interface EpisodeParseResult {
+  readonly ok: boolean
+  readonly episode?: EpisodeScriptInput
+  readonly problems: readonly string[]
+}
+
+const EPISODE_TITLE_RE = /^#\s*集(\d+)\s*[：:]\s*(.+?)\s*$/
+const EPISODE_SCENE_RE = /^##\s*场(\d+)\s*\.\s*(.+?)\s*$/
+const EPISODE_DIALOGUE_RE = /^([^：:（(]{1,15}?)(?:[（(]([^）)]+)[）)])?[：:](.+)$/
+const EPISODE_BEAT_OPEN_RE = /^-\s*开场冲突：\s*第\s*(\d+)\s*秒/
+const EPISODE_BEAT_HOOK_RE = /^-\s*结尾钩子：\s*第\s*(\d+)\s*秒/
+
+function episodeMetaValue(lines: readonly string[], label: string): string | undefined {
+  for (const line of lines) {
+    const m = new RegExp(`^-\\s*${label}[：:]\\s*(.+?)\\s*$`).exec(line)
+    if (m) return m[1]!.trim()
+  }
+  return undefined
+}
+
+/**
+ * 解析一集短剧剧本（renderEpisodeScript 的输出格式）。
+ *
+ * 约定：场景标题后第一行非空行是动作行，其后 `角色：台词` / `角色(pause)：台词`
+ * 为台词行；`## 节拍表` 给出开场冲突/反转/结尾钩子秒数。`SFX:` / `MUSIC:` 独占行
+ * 与 `(beat)` 一律记解析问题（与电影剧本同一口径：前者是广播剧格式，后者停顿
+ * 只用 `(pause)`）。横屏专用的 首场冲突 / 起承转合 不写进集文本，解析结果不含
+ * 这两项（导出时不依赖它们）。解析后用 renderEpisodeScript 重渲染一次校验：
+ * 结构非法（集号越界、场号不连续、时长越界等）直接报问题。
+ */
+export function parseEpisodeScript(text: string): EpisodeParseResult {
+  const problems: string[] = []
+  const fail = (): EpisodeParseResult => ({ ok: false, problems })
+  const rawLines = text.replace(/\r\n/g, '\n').split('\n')
+  const lines = rawLines.map((l) => l.trim())
+  let 集 = 0
+  let 标题 = ''
+  for (const line of lines) {
+    if (line === '') continue
+    const m = EPISODE_TITLE_RE.exec(line)
+    if (m) {
+      集 = Number(m[1])
+      标题 = m[2]!.trim()
+    } else if (line.startsWith('#')) {
+      problems.push(`集标题格式不对：应为「# 集001：标题」，收到「${line.slice(0, 20)}」`)
+    }
+    break
+  }
+  if (集 === 0) problems.push('单集剧本缺少集标题（# 集001：标题）')
+  if (标题 === '') problems.push('单集剧本缺少集标题（# 集001：标题）')
+  const 画幅raw = episodeMetaValue(lines, '画幅')
+  const 画幅 = 画幅raw === undefined ? undefined : (画幅raw.split('（')[0] ?? '').trim()
+  if (画幅 !== '竖屏' && 画幅 !== '横屏') problems.push(`单集剧本缺少或写错画幅（应为 竖屏 或 横屏）：${画幅raw ?? '无'}`)
+  const 时长raw = episodeMetaValue(lines, '时长')
+  const 时长秒 = 时长raw === undefined ? NaN : Number(/(\d+)/.exec(时长raw)?.[1])
+  const 钩子类型 = episodeMetaValue(lines, '钩子类型')
+  if (钩子类型 !== '身份' && 钩子类型 !== '情感' && 钩子类型 !== '顿悟') problems.push(`单集剧本缺少或写错钩子类型（身份/情感/顿悟）：${钩子类型 ?? '无'}`)
+  const 核心想法 = episodeMetaValue(lines, '核心想法') ?? ''
+  const 爽点 = episodeMetaValue(lines, '爽点') ?? ''
+  const 结尾悬念 = episodeMetaValue(lines, '结尾悬念') ?? ''
+  if (核心想法 === '') problems.push('单集剧本缺少核心想法（一集一个想法）')
+  if (爽点 === '') problems.push('单集剧本缺少爽点')
+  if (结尾悬念 === '') problems.push('单集剧本缺少结尾悬念（须是问题，不是答案）')
+
+  const 场景: ScriptScene[] = []
+  let current: { 场: number; 地点: string; 时间: string; 内外: '内' | '外'; 动作: string; 台词: ScriptLine[] } | null = null
+  let inBeats = false
+  let 开场冲突秒 = NaN
+  let 反转秒: number[] = []
+  let 结尾钩子秒 = NaN
+  const flushScene = (): void => {
+    if (current !== null) {
+      场景.push({ 场: current.场, 地点: current.地点, 时间: current.时间, 内外: current.内外, 动作: current.动作, 台词: current.台词 })
+    }
+    current = null
+  }
+  for (const line of lines) {
+    if (line === '') continue
+    if (/^SFX:|^MUSIC:/.test(line)) {
+      problems.push(`用了 \`SFX:\` / \`MUSIC:\` 独占一行：这是 BBC 广播剧格式，不是电影/短剧剧本格式（音效写进动作行，音乐提示进分镜头表）`)
+      continue
+    }
+    if (line === '## 节拍表') {
+      flushScene()
+      inBeats = true
+      continue
+    }
+    const sceneMatch = EPISODE_SCENE_RE.exec(line)
+    if (sceneMatch) {
+      flushScene()
+      inBeats = false
+      const rest = sceneMatch[2]!.trim()
+      const parts = rest.split(/\s+/)
+      const 内外raw = parts[parts.length - 1]
+      const 时间 = parts[parts.length - 2] ?? ''
+      const 地点 = parts.slice(0, -2).join(' ')
+      if (内外raw !== '内' && 内外raw !== '外') {
+        problems.push(`场${sceneMatch[1]} 场景标题缺少内/外：应为「场01. 地点 时间 内/外」`)
+        continue
+      }
+      if (地点 === '' || 时间 === '') {
+        problems.push(`场${sceneMatch[1]} 场景标题不完整：应为「场01. 地点 时间 内/外」`)
+        continue
+      }
+      current = { 场: Number(sceneMatch[1]), 地点, 时间, 内外: 内外raw, 动作: '', 台词: [] }
+      continue
+    }
+    if (inBeats) {
+      const open = EPISODE_BEAT_OPEN_RE.exec(line)
+      if (open) {
+        开场冲突秒 = Number(open[1])
+        continue
+      }
+      const hook = EPISODE_BEAT_HOOK_RE.exec(line)
+      if (hook) {
+        结尾钩子秒 = Number(hook[1])
+        continue
+      }
+      const twist = /^-\s*反转[：:]\s*(.+?)\s*$/.exec(line)
+      if (twist) {
+        const value = twist[1]!.trim()
+        反转秒 = value === '无' ? [] : [...value.matchAll(/第\s*(\d+)\s*秒/g)].map((m) => Number(m[1]))
+        continue
+      }
+      continue
+    }
+    if (line.startsWith('#') || line.startsWith('- ')) continue
+    if (current === null) {
+      problems.push(`场景标题之外出现正文「${line.slice(0, 20)}……」：单集剧本正文必须先有场景标题`)
+      continue
+    }
+    if (current.动作 === '') {
+      current.动作 = line
+      continue
+    }
+    const dialogue = EPISODE_DIALOGUE_RE.exec(line)
+    if (dialogue === null) {
+      problems.push(`场${String(current.场).padStart(2, '0')} 有一行既不是动作也不是「角色：台词」：「${line.slice(0, 20)}……」`)
+      continue
+    }
+    const mark = dialogue[2]
+    if (mark !== undefined && isBeatMark(mark)) {
+      problems.push(`场${String(current.场).padStart(2, '0')} ${dialogue[1]}：括号提示用了 (beat)，停顿只用 ${PAUSE_MARK}`)
+    }
+    current.台词.push({
+      角色: dialogue[1]!.trim(),
+      ...(mark !== undefined ? { 括号提示: mark.trim() } : {}),
+      台词: dialogue[3]!.trim(),
+    })
+  }
+  flushScene()
+  if (场景.length === 0) problems.push('单集剧本里没有场景（## 场01. 地点 时间 内/外）')
+  if (Number.isNaN(开场冲突秒)) problems.push('单集剧本缺少节拍表开场冲突秒数')
+  if (Number.isNaN(结尾钩子秒)) problems.push('单集剧本缺少节拍表结尾钩子秒数')
+  if (problems.length > 0) return fail()
+  const episode: EpisodeScriptInput = {
+    集, 标题, 画幅: 画幅 as '竖屏' | '横屏', 钩子类型: 钩子类型 as '身份' | '情感' | '顿悟',
+    核心想法, 爽点, 时长秒, 场景, 结尾悬念, 开场冲突秒, 反转秒, 结尾钩子秒,
+  }
+  try {
+    renderEpisodeScript(episode)
+  } catch (err) {
+    problems.push(`单集剧本结构校验失败：${err instanceof Error ? err.message : String(err)}`)
+    return fail()
+  }
+  return { ok: true, problems, episode }
 }

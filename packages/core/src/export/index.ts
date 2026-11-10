@@ -11,9 +11,19 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { canonicalizePath, isInsidePath } from '../gate/canonical'
 import { parseDocument } from '../repo/frontmatter'
-import { chapterNo, pad, validateSegment } from '../repo/paths'
+import { chapterNo, episodeNo, pad, paths, validateSegment } from '../repo/paths'
 import { extractVersionFields } from '../provenance'
 import { materialHash, readMaterialFile } from '../assembly/source'
+import { parseScreenplay, validateScreenplay } from '../screenplay/format'
+import type { ScreenplayFinding } from '../screenplay/types'
+import { parseEpisodeScript, renderEpisodeScript, totalDialogueChars } from '../shortdrama/script'
+import {
+  deriveShotListTemplate, renderEpisodeFountain, renderEpisodeMarkdown, renderFountainScreenplay,
+  renderScreenplayMarkdown, validateShotList,
+  type ShotList,
+} from './screenplay-format'
+
+export * from './screenplay-format'
 
 /** 导出范围：默认全书；卷限定单卷；起/止章按全书连续章号（含端点），可与卷叠加。 */
 export interface ExportScope {
@@ -274,4 +284,217 @@ export function verifyExportTarget(bookRoot: string, targetDir: string, computed
     }
   }
   return { ok: computed.ok && problems.length === 0 && 文件.length === 2 && 文件.every(f => f.一致), 目标目录: target.目标目录, problems, 文件 }
+}
+
+// ---------------------------------------------------------------------------
+// 专业剧本导出（阶段 4，muse-dev）：Fountain / Markdown 双输出。
+//
+// 只算不写：computeScreenplayExport 读剧本定稿真源（剧本/电影/剧本.md 或
+// 剧本/短剧/集NNN.md），在内存中生成 Fountain 与 Markdown 两份完整载荷；
+// 实际写盘由主 Agent 经原生文件工具完成（与小说导出同一纪律：目标在书仓
+// 围栏外时属提权情形，清单最后落盘、写盘后逐份比对哈希才算完成）。
+// 导出确定性（无时间戳），同一书仓状态重复计算结果字节相同。
+// 小说导出（computeExport / verifyExportTarget）一字不动，只加不改。
+// ---------------------------------------------------------------------------
+
+/** 剧本导出形态：电影剧本全文一份；短剧按集导出（集号三位）。 */
+export type ScreenplayExportKind = '电影剧本' | '短剧'
+/** 导出格式：fountain（编剧层纯文本）/ markdown（编剧层 + 导演层分镜头表）/ both。 */
+export type ScreenplayExportFormat = 'fountain' | 'markdown' | 'both'
+
+export interface ScreenplayExportOptions {
+  readonly 形态: ScreenplayExportKind
+  /** 短剧必填（1–100）；电影剧本不传。 */
+  readonly 集?: number
+  /** 默认 both。 */
+  readonly 格式?: ScreenplayExportFormat
+  /** 导演已填的分镜头表；不传则按场生成待填模板行（不编造景别与运镜）。 */
+  readonly 分镜头表?: ShotList
+}
+
+export interface ComputedScreenplayExport {
+  readonly ok: boolean
+  readonly gaps: readonly string[]
+  /** 非阻断提醒：分镜头表待填项、台词超长等（见 renderEpisodeScript 警告）。 */
+  readonly 警告: readonly string[]
+  readonly 书名: string
+  readonly 形态: ScreenplayExportKind
+  readonly 标题: string
+  readonly 集?: number
+  readonly 场景数: number
+  /** 台词总字数（非空白字符数；电影按台词行计，短剧按 totalDialogueChars 计）。 */
+  readonly 台词字数: number
+  readonly fountain文件: string
+  readonly markdown文件: string
+  readonly fountain: string
+  readonly markdown: string
+  readonly 分镜头表: ShotList
+  readonly 分镜头数: number
+  /** 电影剧本的格式审读发现项（validateScreenplay）；短剧为空（短剧审读另走 reviewShortDramaEpisode，需分集大纲，不在导出里做）。 */
+  readonly 审读发现项: readonly ScreenplayFinding[]
+}
+
+function dialogueCharsOf(text: string): number {
+  return [...text].filter((ch) => !/\s/.test(ch)).length
+}
+
+/**
+ * 只读计算剧本导出计划与两份完整载荷；不落盘、不改书仓。
+ * 阻断条件：定稿文件缺失/解析失败、电影剧本有高级别格式发现项
+ * （(beat)、SFX:/MUSIC: 独占行、空场等）、分镜头表校验失败。
+ */
+export function computeScreenplayExport(bookRoot: string, options: ScreenplayExportOptions): ComputedScreenplayExport {
+  const gaps: string[] = []
+  const 警告: string[] = []
+  const fail = (extra?: readonly string[]): ComputedScreenplayExport => ({
+    ok: false, gaps: [...gaps, ...(extra ?? [])], 警告, 书名: '', 形态: options.形态, 标题: '',
+    ...(options.集 !== undefined ? { 集: options.集 } : {}),
+    场景数: 0, 台词字数: 0, fountain文件: '', markdown文件: '', fountain: '', markdown: '',
+    分镜头表: { 标题: '', 镜: [] }, 分镜头数: 0, 审读发现项: [],
+  })
+  if (options.形态 !== '电影剧本' && options.形态 !== '短剧') return fail(['导出形态必须是 电影剧本 或 短剧'])
+  const 格式 = options.格式 ?? 'both'
+  if (格式 !== 'fountain' && 格式 !== 'markdown' && 格式 !== 'both') return fail(['导出格式必须是 fountain、markdown 或 both'])
+  if (options.形态 === '短剧' && (options.集 === undefined || !Number.isSafeInteger(options.集) || options.集 < 1 || options.集 > 100)) {
+    return fail(['短剧导出必须传 --集 1–100 的集号'])
+  }
+  if (options.形态 === '电影剧本' && options.集 !== undefined) return fail(['电影剧本导出不传集号（集号只用于短剧）'])
+  const root = canonicalizePath(bookRoot)
+  if (root === '') return fail(['书仓路径无效'])
+  const 书名 = path.basename(root)
+  const 定稿相对路径 = options.形态 === '电影剧本' ? paths.电影剧本() : paths.短剧集(options.集!)
+  let source: string
+  try {
+    source = fs.readFileSync(path.join(root, 定稿相对路径), 'utf-8')
+  } catch {
+    return fail([`剧本定稿不存在：${定稿相对路径}（先把剧本定稿到 剧本/ 目录，见 docs/book-format.md「剧本定稿目录」）`])
+  }
+
+  const stem = safeFileStem(书名)
+  const wantFountain = 格式 === 'fountain' || 格式 === 'both'
+  const wantMarkdown = 格式 === 'markdown' || 格式 === 'both'
+
+  if (options.形态 === '电影剧本') {
+    const parsed = parseScreenplay(source)
+    if (!parsed.ok || parsed.draft === undefined) return fail(parsed.problems)
+    const draft = parsed.draft
+    const findings = validateScreenplay(draft)
+    const blocking = findings.filter((f) => f.严重程度 === '高')
+    if (blocking.length > 0) {
+      return fail(blocking.map((f) => `审读阻断 ${f.证据位置}：${f.问题说明}`))
+    }
+    const shotList = options.分镜头表 ?? deriveShotListTemplate(draft.标题, draft.场.map((s) => ({
+      场号: s.场号,
+      画面内容: s.动作[0] ?? '',
+      台词: s.台词段[0]?.台词[0] ?? '',
+    })))
+    const shotCheck = validateShotList(shotList, draft.场.length)
+    if (!shotCheck.ok) return fail(shotCheck.problems)
+    警告.push(...shotCheck.warnings)
+    let fountain = ''
+    let markdown = ''
+    try {
+      if (wantFountain) fountain = renderFountainScreenplay(draft)
+      if (wantMarkdown) markdown = renderScreenplayMarkdown(draft, shotList)
+    } catch (err) {
+      return fail([`剧本导出渲染失败：${err instanceof Error ? err.message : String(err)}`])
+    }
+    return {
+      ok: true, gaps: [], 警告, 书名, 形态: '电影剧本', 标题: draft.标题,
+      场景数: draft.场.length,
+      台词字数: draft.场.flatMap((s) => s.台词段).flatMap((b) => b.台词).reduce((sum, line) => sum + dialogueCharsOf(line), 0),
+      fountain文件: wantFountain ? `${stem}-电影剧本.fountain` : '',
+      markdown文件: wantMarkdown ? `${stem}-电影剧本.md` : '',
+      fountain, markdown,
+      分镜头表: shotList, 分镜头数: shotList.镜.length, 审读发现项: findings,
+    }
+  }
+
+  const parsed = parseEpisodeScript(source)
+  if (!parsed.ok || parsed.episode === undefined) return fail(parsed.problems)
+  const episode = parsed.episode
+  let rendered: ReturnType<typeof renderEpisodeScript>
+  try {
+    rendered = renderEpisodeScript(episode)
+  } catch (err) {
+    return fail([`单集剧本结构校验失败：${err instanceof Error ? err.message : String(err)}`])
+  }
+  警告.push(...rendered.警告)
+  const shotList = options.分镜头表 ?? deriveShotListTemplate(`集${episodeNo(episode.集)}：${episode.标题}`, episode.场景.map((s) => ({
+    场号: s.场,
+    画面内容: s.动作,
+    台词: s.台词[0]?.台词 ?? '',
+  })))
+  const shotCheck = validateShotList(shotList, episode.场景.length)
+  if (!shotCheck.ok) return fail(shotCheck.problems)
+  警告.push(...shotCheck.warnings)
+  let fountain = ''
+  let markdown = ''
+  try {
+    if (wantFountain) fountain = renderEpisodeFountain(episode)
+    if (wantMarkdown) markdown = renderEpisodeMarkdown(episode, shotList)
+  } catch (err) {
+    return fail([`剧本导出渲染失败：${err instanceof Error ? err.message : String(err)}`])
+  }
+  const epNo = episodeNo(episode.集)
+  return {
+    ok: true, gaps: [], 警告, 书名, 形态: '短剧', 标题: episode.标题, 集: episode.集,
+    场景数: episode.场景.length,
+    台词字数: totalDialogueChars(episode.场景),
+    fountain文件: wantFountain ? `${stem}-短剧集${epNo}.fountain` : '',
+    markdown文件: wantMarkdown ? `${stem}-短剧集${epNo}.md` : '',
+    fountain, markdown,
+    分镜头表: shotList, 分镜头数: shotList.镜.length, 审读发现项: [],
+  }
+}
+
+/**
+ * 剧本导出的目标目录只读检查：复用小说导出的 inspectExportTarget（目标
+ * 落在定稿目录内拒绝、同名文件列入冲突），再加一条——目标落在剧本定稿
+ * 目录（剧本/）内同样拒绝，导出不能污染剧本真源。
+ */
+export function inspectScreenplayExportTarget(bookRoot: string, targetDir: string, fileNames: readonly string[]): ExportTargetReport {
+  const base = inspectExportTarget(bookRoot, targetDir, fileNames)
+  const problems = [...base.problems]
+  const root = canonicalizePath(bookRoot)
+  const target = canonicalizePath(targetDir)
+  if (root !== '' && target !== '') {
+    const scriptRoot = path.join(root, '剧本')
+    if (target === scriptRoot || isInsidePath(scriptRoot, target)) {
+      problems.push('目标位于剧本定稿目录内，导出会污染真源：请另选目录')
+    }
+  }
+  return { ...base, problems, ok: problems.length === 0 && base.冲突.length === 0 }
+}
+
+export interface ScreenplayExportVerification {
+  readonly ok: boolean
+  readonly 目标目录: string
+  readonly problems: readonly string[]
+  readonly 文件: readonly { 名称: string; 预期哈希: string; 实际哈希: string | null; 一致: boolean }[]
+}
+
+/** 只读验收实际落盘的剧本导出文件（Fountain 和/或 Markdown，按本次导出格式逐份比对哈希）。 */
+export function verifyScreenplayExportTarget(bookRoot: string, targetDir: string, computed: ComputedScreenplayExport): ScreenplayExportVerification {
+  const expected: { 名称: string; content: string }[] = []
+  if (computed.fountain文件 !== '') expected.push({ 名称: computed.fountain文件, content: computed.fountain })
+  if (computed.markdown文件 !== '') expected.push({ 名称: computed.markdown文件, content: computed.markdown })
+  const target = inspectScreenplayExportTarget(bookRoot, targetDir, computed.ok ? expected.map((f) => f.名称) : [])
+  const problems = [...target.problems, ...computed.gaps]
+  const 文件: Array<{ 名称: string; 预期哈希: string; 实际哈希: string | null; 一致: boolean }> = []
+  if (computed.ok && problems.length === 0) {
+    for (const file of expected) {
+      const 预期哈希 = materialHash(file.content)
+      let 实际哈希: string | null = null
+      try { 实际哈希 = readMaterialFile(target.目标目录, file.名称).hash }
+      catch (err) { problems.push(`导出文件不可读取：${file.名称}（${err instanceof Error ? err.message : String(err)}）`) }
+      const 一致 = 实际哈希 === 预期哈希
+      if (实际哈希 !== null && !一致) problems.push(`导出文件内容不一致：${file.名称}`)
+      文件.push({ 名称: file.名称, 预期哈希, 实际哈希, 一致 })
+    }
+  }
+  return {
+    ok: computed.ok && problems.length === 0 && 文件.length === expected.length && 文件.every((f) => f.一致),
+    目标目录: target.目标目录, problems, 文件,
+  }
 }
