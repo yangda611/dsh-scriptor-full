@@ -20,6 +20,8 @@ const EXPECTED_SKILLS: ReadonlyArray<{ readonly name: string; readonly 中文名
   { name: 'novel-export', 中文名: '最小导出' },
   { name: 'novel-analyze', 中文名: '参考小说拆解' },
   { name: 'novel-maintenance', 中文名: '书仓维护' },
+  { name: 'novel-screenplay', 中文名: '电影剧本改编' },
+  { name: 'novel-shortdrama', 中文名: '短剧管线' },
 ]
 
 const BLACKLIST = ['家位', '门控', '闭环', '抓手', '世代']

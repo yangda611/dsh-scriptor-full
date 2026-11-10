@@ -1,5 +1,7 @@
 import { validateJsonSchemaValue, type JsonSchemaNode, type ToolExecutionToken } from '@deepseek-ai/dsh-tools'
 import { createReferenceTools } from './reference/tools'
+import { createScreenplayTools } from './screenplay-tools'
+import { SHORTDRAMA_TOOL_DEFINITIONS } from './shortdrama-tools'
 import type { ReferenceHost } from './reference/host'
 /**
  * 主 Agent 专用 Tools（方案 A：core 能力结构化包装为 Tool）。
@@ -120,6 +122,7 @@ import {
   type 处置状态,
   askAuthor,
   type AskFn,
+  readExistingContract,
 } from '@webnovel/core'
 import { writeSettlementDecision } from '@webnovel/core'
 import { ingestAuthorRevision, planSettlement, registerProposal, resolveProposal, retconEventOps } from '@webnovel/core'
@@ -2104,6 +2107,16 @@ ${摘要现文}`,
       execute: (args, sessionContext) => acceptEditorSuggestion(deps.editorRequests, sessionContext?.agent, args),
     },
   ]
+
+  // 影视剧扩展（muse-dev 阶段 2/3）：电影剧本与短剧工具，纯计算不写文件，
+  // 不进 locked（不做 read-modify-write），随 tools 一起走 guarded 包装。
+  tools.push(
+    ...createScreenplayTools({
+      bookRootOfBookId: deps.bookRootOfBookId,
+      readContractFields: (bookRoot) => readExistingContract(bookRoot).fields,
+    }),
+    ...SHORTDRAMA_TOOL_DEFINITIONS,
+  )
 
   // Tool calls are the product write boundary. Keep the read-modify-write
   // portion of synchronous mutations under the same book lock that protects

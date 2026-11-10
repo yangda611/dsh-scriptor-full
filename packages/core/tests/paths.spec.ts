@@ -51,4 +51,9 @@ describe('剧本路径（影视剧扩展 muse-dev，格式规格 §影视剧扩�
     expect(paths.短剧集(1)).toBe('剧本/短剧/集001.md')
     expect(paths.短剧集(88)).toBe('剧本/短剧/集088.md')
   })
+  it('电影剧本中间稿在草稿区/剧本/，可丢弃可重建', () => {
+    expect(paths.剧本故事稿()).toBe('草稿区/剧本/故事稿.md')
+    expect(paths.剧本分场大纲()).toBe('草稿区/剧本/分场大纲.md')
+    expect(paths.剧本草稿()).toBe('草稿区/剧本/剧本草稿.md')
+  })
 })

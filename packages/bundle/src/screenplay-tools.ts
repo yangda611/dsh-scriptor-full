@@ -18,28 +18,14 @@
  */
 
 import type { NovelToolDefinition } from './novel-tools'
-import { MARKET_VALUES, OUTPUT_FORM_VALUES } from '../../core/src/repo/document-fields'
-import { GENRE_TIER_IDS, type GenreTierId } from '../../core/src/design/genres'
 import {
-  checkScreenplayGate,
-  draftFromOutline,
-  emptySceneOutline,
-  emptyStoryDraft,
-  outlineFromStory,
-  parseSceneOutline,
-  parseScreenplay,
-  parseStoryDraft,
-  renderSceneOutline,
-  renderScreenplay,
-  renderStoryDraft,
-  runScreenplayPipeline,
-  runScreenplayReview,
-  screenplayFinalPath,
-  validateSceneOutline,
-  validateScreenplay,
-  validateStoryDraft,
-  estimatePages,
-} from '../../core/src/screenplay/index'
+  checkScreenplayGate, draftFromOutline, emptySceneOutline, emptyStoryDraft,
+  outlineFromStory, parseSceneOutline, parseScreenplay, parseStoryDraft,
+  renderSceneOutline, renderScreenplay, renderStoryDraft, runScreenplayPipeline,
+  runScreenplayReview, screenplayFinalPath, validateSceneOutline, validateScreenplay,
+  validateStoryDraft, estimatePages,
+  MARKET_VALUES, OUTPUT_FORM_VALUES, GENRE_TIER_IDS, type GenreTierId,
+} from '@webnovel/core'
 
 export const SCREENPLAY_TOOL_NAMES: readonly string[] = [
   'novel_screenplay_check_contract',

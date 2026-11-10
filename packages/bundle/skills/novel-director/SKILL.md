@@ -26,6 +26,8 @@ user-invocable: false
 | 最小导出 | `novel-export` |
 | 参考小说拆解 | `novel-analyze` |
 | 书仓维护 | `novel-maintenance` |
+| 电影剧本改编 | `novel-screenplay` |
+| 短剧管线 | `novel-shortdrama` |
 
 ## 标准流程
 

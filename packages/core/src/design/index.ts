@@ -1,6 +1,7 @@
 export {
   checkContractComplete,
   contractTemplate,
+  readExistingContract,
   writeContract,
   prepareContract,
   type ContractPart,

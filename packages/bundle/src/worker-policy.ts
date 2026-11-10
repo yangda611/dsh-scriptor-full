@@ -46,6 +46,14 @@ const rolePolicies: Record<WritingRole, string> = {
 审读只读不写，返回所需模块、证据和原审读指纹；不自行生成审核记录，不把缺材料写成通过。`,
   settle: `【当前角色：沉淀对账】
 沉淀对账只读不写，按任务底本返回候选；计划、推测和人物证言不冒充已发生事实，不直接修改账本。`,
+  screenplay: `【当前角色：电影剧本改编】
+只在契约输出形态=电影剧本时走本管线。按故事稿→分场大纲→剧本草稿→审读四步走，中间稿落在草稿区/剧本/（故事稿.md、分场大纲.md、剧本草稿.md），定稿只认剧本/电影/剧本.md。
+编剧层格式：场景标题（场号 INT./EXT. 地点 - 时间）、动作行现在时只写可见/可听、角色名全大写、台词、括号提示；停顿只用 (pause)，不用 (beat)；音效写进动作行，不用 SFX:/MUSIC: 独占行；音乐与镜头提示不进编剧层。
+审读三模块跑完再定稿，任一高级别发现项即阻断，不把待写占位当成稿。`,
+  shortdrama: `【当前角色：短剧管线】
+只在契约输出形态=短剧时走本管线。按分集钩子/爽点大纲→单集剧本→审读走，每集一个核心想法；定稿只认剧本/短剧/集001.md 起。
+竖屏与横屏是两套节奏模板，不要混用：竖屏 60–120 秒/集、冲突 5 秒内、每 20–30 秒一个反转、结尾 5–10 秒留悬念；横屏 10–20 分钟/集、起承转合齐全。
+每集跑节拍检查器，不通过的集不进定稿。台词要短（一行约 <12 字），台词即行动。`,
 }
 
 export function workerPolicyFor(role: WritingRole): string {
@@ -56,7 +64,7 @@ export function workerPolicyFor(role: WritingRole): string {
 export function attachWorkerPolicyToAgent(agent: AgentLike, role: WritingRole): (() => Promise<void>) | undefined {
   const context = agent.ctx as Context | undefined
   if (typeof context?.inject !== 'function') return undefined
-  const allowedTools = new Set<string>(role === 'drafting' || role === 'polish' ? WORKER_FILE_TOOLS : ['read', 'glob', 'grep'])
+  const allowedTools = new Set<string>(role === 'drafting' || role === 'polish' || role === 'screenplay' || role === 'shortdrama' ? WORKER_FILE_TOOLS : ['read', 'glob', 'grep'])
   const fiber = context.inject(['systemPrompt', 'tools'], scope => {
     scope.effect(function* () {
       yield scope.systemPrompt.section({

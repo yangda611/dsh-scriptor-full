@@ -12,7 +12,8 @@
  *   本工具只返回路径与正文）。
  * - novel_shortdrama_check_beats：节拍检查（逐集逐规则报通过/未通过/不适用）。
  * - novel_shortdrama_review_episode：短剧审读确定性检查（发现项模块名 `短剧审读`，
- *   回写走现有 novel_record_review_findings 通道）。
+ *   直接返回发现项；不走小说章节的 novel_record_review_findings 回写通道，
+ *   该通道按卷/章寻址，短剧按集/场寻址）。
  *
  * 核心实现在 @webnovel/core 的 shortdrama 模块；本文件只做参数校验与包装。
  * 注意：core 的包入口（packages/core/src/index.ts）暂未导出 shortdrama（阶段 3
@@ -32,7 +33,7 @@ import {
   type EpisodeBeats,
   type EpisodeOutline,
   type EpisodeScriptInput,
-} from '../../core/src/shortdrama/index'
+} from '@webnovel/core'
 
 export const SHORTDRAMA_TOOL_NAMES = [
   'novel_shortdrama_plan_episodes',
@@ -260,7 +261,7 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
   },
   {
     name: 'novel_shortdrama_review_episode',
-    description: '短剧审读确定性检查：台词单句长度、台词总量、场景数、钩子/核心想法/爽点/结尾悬念与大纲的一致性、反转数、节拍表时间点。返回发现项（模块名：短剧审读），回写走现有 novel_record_review_findings 通道；零发现不等于审读通过，语义审读仍按底本派发。',
+    description: '短剧审读确定性检查：台词单句长度、台词总量、场景数、钩子/核心想法/爽点/结尾悬念与大纲的一致性、反转数、节拍表时间点。直接返回发现项（模块名：短剧审读）；零发现不等于审读通过，语义审读仍按底本派发。注意：本工具不走小说章节的 novel_record_review_findings 回写通道（该通道按卷/章寻址，短剧按集/场寻址）。',
     parameters: {
       type: 'object',
       properties: {

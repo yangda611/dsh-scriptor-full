@@ -6,7 +6,7 @@ import type { AgentLike } from './novel-tools'
 
 import { WRITING_DELEGATE_TOOL } from './tool-catalog'
 export { WRITING_DELEGATE_TOOL } from './tool-catalog'
-export const WRITING_ROLES = ['drafting', 'polish', 'revision', 'review', 'settle'] as const
+export const WRITING_ROLES = ['drafting', 'polish', 'revision', 'review', 'settle', 'screenplay', 'shortdrama'] as const
 export type WritingRole = typeof WRITING_ROLES[number]
 export interface WritingAssignment { role: WritingRole; bookId?: string; chapter?: number }
 const creationRole = new AsyncLocalStorage<WritingAssignment & { parent: AgentLike }>()
@@ -66,7 +66,7 @@ export function attachWritingDelegationToAgent(agent: AgentLike): (() => Promise
           off = scope.tools.register({
             ...current,
             name: WRITING_DELEGATE_TOOL,
-            description: '委派小说生产任务，按 role 绑定该实例的规约和权限。drafting 为起草，polish 为润色，revision 为改稿。review 为审读，settle 为沉淀对账。明确目标书和章节时填写 bookId、chapter，供进度归属；未明确时不要猜填。普通研究和工具任务使用 subagent。\n' + current.description,
+            description: '委派小说生产任务，按 role 绑定该实例的规约和权限。drafting 为起草，polish 为润色，revision 为改稿。review 为审读，settle 为沉淀对账。screenplay 为电影剧本改编，shortdrama 为短剧管线。明确目标书和章节时填写 bookId、chapter，供进度归属；未明确时不要猜填。普通研究和工具任务使用 subagent。\n' + current.description,
             parameters: {
               ...current.parameters,
               properties: { ...parameters.properties, role: { type: 'string', enum: [...WRITING_ROLES] },

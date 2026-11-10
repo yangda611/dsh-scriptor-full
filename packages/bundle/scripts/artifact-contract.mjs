@@ -1,4 +1,4 @@
-export const skills = ['novel-director', 'novel-inspiration', 'novel-design', 'novel-outline', 'novel-drafting', 'novel-review', 'novel-polish', 'novel-revision', 'novel-settle', 'novel-export', 'novel-analyze', 'novel-maintenance']
+export const skills = ['novel-director', 'novel-inspiration', 'novel-design', 'novel-outline', 'novel-drafting', 'novel-review', 'novel-polish', 'novel-revision', 'novel-settle', 'novel-export', 'novel-analyze', 'novel-maintenance', 'novel-screenplay', 'novel-shortdrama']
 /** Dispatch references must travel with the skills that consume them. */
 export const referenceDocs = [
   ...['导入与覆盖', '事实提取', '机制与灵感'].map(name => `skills/novel-analyze/工序/${name}.md`),
@@ -8,6 +8,9 @@ export const referenceDocs = [
   'skills/novel-revision/底本/改稿章程.md',
   'skills/novel-settle/底本/沉淀对账.md',
   'skills/novel-maintenance/参考/书仓格式速查.md',
+  ...['剧本对白审读', '剧本节奏审读', '剧本场次完整性审读', '全量审读'].map(name => `skills/novel-screenplay/底本/${name}.md`),
+  'skills/novel-shortdrama/底本/短剧审读.md',
+  ...['分集大纲', '单集剧本'].map(name => `skills/novel-shortdrama/工序/${name}.md`),
 ]
 export const thinScripts = [
   ['skills/novel-drafting/scripts/核验字数.mjs', 'draftLengthCli'],
@@ -18,4 +21,5 @@ export const thinScripts = [
   ['skills/novel-settle/scripts/定稿备包.mjs', 'packCli'],
   ['skills/novel-settle/scripts/卷摘要候选.mjs', 'volumeSummaryCli'],
   ['skills/novel-export/scripts/最小导出.mjs', 'exportCli'],
+  ['skills/novel-screenplay/scripts/剧本格式检查.mjs', 'runScreenplayChecksCli'],
 ]
