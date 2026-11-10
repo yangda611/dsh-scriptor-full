@@ -28,6 +28,10 @@ export const LAYOUT = {
   卷规划: (卷: number) => `大纲/卷规划/卷${pad(卷)}`,
   世界书: '世界书',
   定稿: (卷: number) => `定稿/卷${pad(卷)}`,
+  /** 影视剧扩展（muse-dev）：剧本定稿顶级目录，与 定稿/ 平行，只放已定稿剧本。 */
+  剧本: '剧本',
+  电影剧本目录: '剧本/电影',
+  短剧目录: '剧本/短剧',
   账本: '账本',
   本书记忆: '本书记忆',
   草稿区: '草稿区',
@@ -45,6 +49,16 @@ export function pad(n: number): string {
 /** 章号四位(格式规格 §2.2)。 */
 export function chapterNo(n: number): string {
   return String(n).padStart(4, '0')
+}
+
+/** 影视剧扩展（muse-dev）：集号三位（短剧 60–100 集，如 集001）。 */
+export function episodeNo(n: number): string {
+  return String(n).padStart(3, '0')
+}
+
+/** 影视剧扩展（muse-dev）：场号两位（集内场 / 幕内场，如 场01）。 */
+export function sceneNo(n: number): string {
+  return String(n).padStart(2, '0')
 }
 
 /** Windows 保留名(不带扩展名视角)。 */
@@ -91,6 +105,10 @@ export const paths = {
   卷摘要: (卷: number) => `${LAYOUT.卷规划(卷)}/卷摘要.md`,
   定稿章: (卷: number, 章: number, 章名: string) =>
     `${LAYOUT.定稿(卷)}/${chapterNo(章)}-${章名}.md`,
+  /** 影视剧扩展（muse-dev）：一部电影的已定稿剧本（全文一份）。 */
+  电影剧本: () => `${LAYOUT.电影剧本目录}/剧本.md`,
+  /** 影视剧扩展（muse-dev）：一部短剧每集的已定稿剧本（每集一份，集号三位）。 */
+  短剧集: (集: number) => `${LAYOUT.短剧目录}/集${episodeNo(集)}.md`,
   账本: (名: LedgerName) => `账本/${名}.md`,
   /** @deprecated 旧格式(一类一文件)读侧兼容;新写入走 本书记忆条目/本书记忆索引。 */
   记忆: (类: MemoryKind) => `本书记忆/${类}.md`,

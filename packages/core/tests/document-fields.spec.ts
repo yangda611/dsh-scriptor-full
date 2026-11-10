@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DOCUMENT_FIELDS, isDocumentFieldValue, TIMELINE_FIELD_KEYS, WORLDBOOK_INPUT_FIELDS, WORLDBOOK_NATURES, WORLDBOOK_STATES } from '../src/repo/document-fields'
+import { DOCUMENT_FIELDS, isDocumentFieldValue, TIMELINE_FIELD_KEYS, WORLDBOOK_INPUT_FIELDS, WORLDBOOK_NATURES, WORLDBOOK_STATES, MARKET_VALUES, OUTPUT_FORM_VALUES, isMarketValue, isOutputFormValue } from '../src/repo/document-fields'
 
 describe('shared document field definitions', () => {
   it('scopes worldbook patch fields to plans, including explicit empty and conditional required semantics', () => {
@@ -34,5 +34,23 @@ describe('shared document field definitions', () => {
 
   it.each(['', '  ', '清晨\n章号：1', '清晨\r次日', null, 1])('rejects empty or non-field text %j', value => {
     expect(isDocumentFieldValue(DOCUMENT_FIELDS.timelineEvent, value)).toBe(false)
+  })
+
+  it('registers market and output-form fields with fixed value tables（影视剧扩展 muse-dev）', () => {
+    expect(DOCUMENT_FIELDS.market.name).toBe('市场')
+    expect(DOCUMENT_FIELDS.outputForm.name).toBe('输出形态')
+    expect(MARKET_VALUES).toEqual(['海外', '中文'])
+    expect(OUTPUT_FORM_VALUES).toEqual(['短剧', '电影剧本', '小说'])
+    expect(isMarketValue('海外')).toBe(true)
+    expect(isMarketValue('中文')).toBe(true)
+    expect(isMarketValue('欧美')).toBe(false)
+    expect(isMarketValue('')).toBe(false)
+    expect(isOutputFormValue('短剧')).toBe(true)
+    expect(isOutputFormValue('电影剧本')).toBe(true)
+    expect(isOutputFormValue('小说')).toBe(true)
+    expect(isOutputFormValue('电视剧')).toBe(false)
+    expect(isDocumentFieldValue(DOCUMENT_FIELDS.market, '海外')).toBe(true)
+    expect(isDocumentFieldValue(DOCUMENT_FIELDS.outputForm, '短剧')).toBe(true)
+    expect(isDocumentFieldValue(DOCUMENT_FIELDS.market, '')).toBe(false)
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateSegment, assertSegment, paths, pad, chapterNo } from '../src/repo/paths'
+import { validateSegment, assertSegment, paths, pad, chapterNo, episodeNo, sceneNo, LAYOUT } from '../src/repo/paths'
 
 describe('路径白名单(机制 B2)', () => {
   it('合法中文名通过', () => {
@@ -33,5 +33,22 @@ describe('路径构造(格式规格 §2)', () => {
     expect(paths.账本('时间线')).toBe('账本/时间线.md')
     expect(paths.记忆('文风')).toBe('本书记忆/文风.md')
     expect(paths.审核记录(1, '初见')).toBe('草稿区/审核/卷01-初见.json')
+  })
+})
+
+describe('剧本路径（影视剧扩展 muse-dev，格式规格 §影视剧扩展）', () => {
+  it('集号三位、场号两位', () => {
+    expect(episodeNo(1)).toBe('001')
+    expect(episodeNo(100)).toBe('100')
+    expect(sceneNo(1)).toBe('01')
+    expect(sceneNo(12)).toBe('12')
+  })
+  it('剧本定稿目录与定稿平行，不复用定稿目录', () => {
+    expect(LAYOUT.剧本).toBe('剧本')
+    expect(LAYOUT.电影剧本目录).toBe('剧本/电影')
+    expect(LAYOUT.短剧目录).toBe('剧本/短剧')
+    expect(paths.电影剧本()).toBe('剧本/电影/剧本.md')
+    expect(paths.短剧集(1)).toBe('剧本/短剧/集001.md')
+    expect(paths.短剧集(88)).toBe('剧本/短剧/集088.md')
   })
 })
