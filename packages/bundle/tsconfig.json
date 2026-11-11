@@ -1,7 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "src",
+    // rootDir 覆盖整个 packages 目录：检索客户端源码与主包共享
+    // （2026-11-11 检索并入主包后，主包客户端直接引用 embedding-provider 的源码），
+    // noEmit 下它只决定类型检查的包含边界，不影响构建产物。
+    "rootDir": "..",
     "jsx": "react"
   },
   "include": [

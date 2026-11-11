@@ -1,4 +1,4 @@
-// Packaged locally: Scriptor and retrieval can each be installed without the other client.
+// 检索已并入主包：主包客户端直接挂载检索设置卡片；独立检索包只留给老用户升级过渡。
 /** Minimal view of the Plugins page inventory the navigation needs. */
 interface InventoryPackage { readonly name: string; readonly installed?: boolean; readonly rows?: readonly { readonly rowId: string }[] }
 interface InventorySnapshot { readonly status?: string; readonly packages?: readonly InventoryPackage[] }

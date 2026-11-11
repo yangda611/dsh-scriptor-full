@@ -4,7 +4,7 @@ import { openPluginTarget } from './plugin-target'
 export type SettingsTarget = { kind: 'bundle'; group?: 'visibility' | 'views' | 'retrieval' }
   | { kind: 'row'; rowId: 'webnovel-embeddings' | 'webnovel-scenes' | 'webnovel-reranking' | 'webnovel-graph' }
 const BUNDLES = ['@yangda611/dsh-scriptor-full', '@yangda611/dsh-scriptor']
-const RETRIEVAL = ['@yangda611/dsh-scriptor-full', '@yangda611/dsh-scriptor-retrieval']
+const RETRIEVAL = ['@yangda611/dsh-scriptor', '@yangda611/dsh-scriptor-full', '@yangda611/dsh-scriptor-retrieval']
 
 export function openPluginSettings(host: ClientHost, target: SettingsTarget): void {
   openPluginTarget(host, target.kind === 'bundle' ? BUNDLES : RETRIEVAL, target.kind === 'row' ? target.rowId : undefined)

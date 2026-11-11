@@ -7,7 +7,11 @@
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
     "./package.json": "./package.json",
-    "./preset": "./lib/preset.js"
+    "./preset": "./lib/preset.js",
+    "./retrieval": "./lib/retrieval.js",
+    "./scenes": "./lib/scenes.js",
+    "./reranking": "./lib/reranking.js",
+    "./graph": "./lib/graph.js"
   },
   "dsh": {
     "client": {
@@ -21,7 +25,9 @@
         "@deepseek-ai/dsh-client-ui-tool",
         "@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
         "@deepseek-ai/dsh-client-ui-plugin-manager",
-        "@deepseek-ai/dsh-client-ui-settings"
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-settings-models",
+        "@deepseek-ai/dsh-api-remotes"
       ]
     },
     "bundle": {
@@ -66,6 +72,10 @@
     "@deepseek-ai/dsh-client-ui-conversation": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-ui-primitives": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-ui-settings": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings-models": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-api-remotes": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-api-session-controller": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-ui-sidebar-documentpreview": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-ui-sidebar-right": "0.2.2-rc.1",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.2-rc.1",
@@ -137,6 +147,10 @@
     "lib/cli.js",
     "lib/preset.js",
     "lib/client.js",
+    "lib/retrieval.js",
+    "lib/scenes.js",
+    "lib/reranking.js",
+    "lib/graph.js",
     "skills/**/*",
     "cordis.patch.yml",
     "README.md",
@@ -145,7 +159,7 @@
     "licenses/*.txt",
     "presets/*.yml"
   ],
-  "description": "Webnovel Writer：DSH 长篇网文写作工作台",
+  "description": "Webnovel Writer：DSH 长篇网文写作工作台（含检索增强：嵌入、场景识别与重排，默认停用）",
   "license": "GPL-3.0-only",
   "engines": {
     "node": ">=24.9.0",

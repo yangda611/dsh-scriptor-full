@@ -98,6 +98,18 @@ checkDependencies(clientBuild)
 console.log('[bundle] lib/client.js ok (DSH native client module)')
 
 /**
+ * 检索增强已并入主包（2026-11-11 用户决定：影视剧本十几万字，向量检索是刚需，不再单独装包）。
+ * 四个检索入口沿用 embedding-provider 的源码与构建口径（node ESM、external 宿主服务），
+ * 产物落进主包 lib/，由主包 cordis.patch.yml 以 webnovel-embeddings 等稳定 id 注册。
+ * 独立检索包仍保留自己的构建与发布（老用户升级用），但不要再与主包同装。
+ */
+const retrievalRoot = path.join(packageRoot, '..', 'embedding-provider')
+const retrievalBuilds = []
+for (const [src, out] of [['index', 'retrieval'], ['scenes', 'scenes'], ['reranking', 'reranking'], ['graph', 'graph']]) {
+  retrievalBuilds.push(await buildEntry(path.join(retrievalRoot, 'src', `${src}.ts`), path.join(packageRoot, 'lib', `${out}.js`)))
+}
+
+/**
  * 薄入口接缝仅做早期诊断；实包独立进程执行由 pack-check 验证。
  */
 const libText = fs.readFileSync(path.join(packageRoot, 'lib', 'cli.js'), 'utf8')
@@ -110,7 +122,7 @@ for (const [rel, fn] of THIN_SCRIPTS) {
 }
 console.log(`[bundle] 脚本薄入口接缝校验 ok (${THIN_SCRIPTS.length} 个薄入口 -> lib/cli.js)`)
 
-writeNotices(packageRoot, [hostBuild, presetBuild, clientBuild, cliBuild])
+writeNotices(packageRoot, [hostBuild, presetBuild, clientBuild, cliBuild, ...retrievalBuilds])
 fs.appendFileSync(path.join(packageRoot, 'THIRD_PARTY_NOTICES.md'), `\n## DSH writing preset basis\n\nThe writing preset is adapted from the DSH ${baseline.source.version} standard preset (MIT).\nCopyright (c) 2026 DeepSeek. [Original notice](licenses/dsh-preset.txt).\nSource: https://github.com/deepseek-ai/deepseek-harness/tree/${baseline.source.commit}/packages/bundle/web-app/presets\n`)
 // Vendored diagram artwork is source input rather than an npm dependency.
 fs.appendFileSync(path.join(packageRoot, 'THIRD_PARTY_NOTICES.md'), '\n## Archify artwork\n\nWriting workflow geometry and semantic styling derive from Archify 3.0.1 (MIT).\nCopyright (c) 2026 tt-a1i (Archify); Copyright (c) 2025 Cocoon AI.\n[Original notice](licenses/archify.txt). Source: https://github.com/tt-a1i/archify\n')

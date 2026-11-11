@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react'
+import type { Context } from '@deepseek-ai/cordis'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ClientHost, NativeOpenService } from './host'
 import { IconBook } from './icons'
@@ -29,11 +30,22 @@ import resultStyles from './tool-result.css'
 import preferenceStyles from './preferences.css'
 import { followPreference, installPreferences } from './preferences'
 import { installBundleConfig } from './bundle-config'
+import { apply as applyRetrievalClient } from '../../../embedding-provider/src/client'
 
-export const inject = ['slots', 'sidebarRight', 'sidebarRightTabs', 'conversation', 'sessions', 'uiWorkspace', 'remote', 'remote.workspaceFiles']
+export const inject = ['slots', 'sidebarRight', 'sidebarRightTabs', 'conversation', 'sessions', 'uiWorkspace', 'remote', 'remote.workspaceFiles', 'configForms', 'remote.credentials']
+
+/**
+ * 检索客户端已并入主包（2026-11-11）：嵌入、场景识别、重排的设置卡片随主包客户端一起挂载，
+ * 不再需要单独安装检索包。DSH 传给客户端的 host 实际是完整 Context，ClientHost 只收窄了
+ * 主包自己用的那部分；检索 apply 只用 configForms/effect/slots/get，inject 里已声明所需服务。
+ */
+export function applyRetrieval(host: ClientHost) {
+  applyRetrievalClient(host as unknown as Context)
+}
 
 export function apply(host: ClientHost) {
   const preferences = installPreferences(host)
+  applyRetrieval(host)
   installBundleConfig(host)
   installNovelToolCards(host)
   installSaveNotices(host)

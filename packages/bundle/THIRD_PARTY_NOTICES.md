@@ -34,6 +34,7 @@ Shared DSH/React peers are provided by the host and are not included in this bun
 | @codemirror/view | 6.43.8 | MIT | [Original notices](licenses/codemirror__view--6.43.8.txt) |
 | @deepseek-ai/cosmokit | 1.9.0 | MIT | [Original notices](licenses/deepseek-ai__cosmokit--1.9.0.txt) |
 | @deepseek-ai/dsh-brand | 0.2.2-rc.1 | MIT | [Original notices](licenses/deepseek-ai__dsh-brand--0.2.2-rc.1.txt) |
+| @deepseek-ai/dsh-credentials | 0.2.2-rc.1 | MIT | [Original notices](licenses/deepseek-ai__dsh-credentials--0.2.2-rc.1.txt) |
 | @deepseek-ai/dsh-scope | 0.2.2-rc.1 | MIT | [Original notices](licenses/deepseek-ai__dsh-scope--0.2.2-rc.1.txt) |
 | @deepseek-ai/dsh-system-prompt | 0.2.2-rc.1 | MIT | [Original notices](licenses/deepseek-ai__dsh-system-prompt--0.2.2-rc.1.txt) |
 | @deepseek-ai/dsh-util-workspace-path | 0.2.2-rc.1 | MIT | [Original notices](licenses/deepseek-ai__dsh-util-workspace-path--0.2.2-rc.1.txt) |
