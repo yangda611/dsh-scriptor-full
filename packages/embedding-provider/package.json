@@ -118,7 +118,7 @@
     "lib/graph.js"
   ],
   "license": "GPL-3.0-only",
-  "description": "Scriptor 检索增强：嵌入、场景识别与重排",
+  "description": "Scriptor 检索增强：嵌入、场景识别与重排（已并入主包 @yangda611/dsh-scriptor；新用户直接装主包，不要与主包同装本包）",
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
