@@ -155,21 +155,26 @@ describe('检索增强插件管理页配置与模型设置页轻提示', () => {
       expect(text(renderer.root)).toContain('输出长度沿用宿主模型设置')
     }
   })
-  it('双包键注册四项 plugins.row.config，支持 summary 与 page 视图，并在 settings.models.footer 提供轻提示与跳转按钮', async () => {
+  it('三包键注册四项 plugins.row.config，支持 summary 与 page 视图，并在 settings.models.footer 提供轻提示与跳转按钮', async () => {
     const { rowConfigs, footers, openBundle } = setupHost({
       packages: [{ name: '@yangda611/dsh-scriptor-retrieval', rows: [{ rowId: 'webnovel-embeddings' }, { rowId: 'webnovel-scenes' }, { rowId: 'webnovel-reranking' }] }],
     })
     const expectedKeys = [
+      '@yangda611/dsh-scriptor#webnovel-embeddings',
       '@yangda611/dsh-scriptor-full#webnovel-embeddings',
       '@yangda611/dsh-scriptor-retrieval#webnovel-embeddings',
+      '@yangda611/dsh-scriptor#webnovel-scenes',
       '@yangda611/dsh-scriptor-full#webnovel-scenes',
       '@yangda611/dsh-scriptor-retrieval#webnovel-scenes',
+      '@yangda611/dsh-scriptor#webnovel-reranking',
       '@yangda611/dsh-scriptor-full#webnovel-reranking',
       '@yangda611/dsh-scriptor-retrieval#webnovel-reranking',
+      '@yangda611/dsh-scriptor#webnovel-graph',
       '@yangda611/dsh-scriptor-full#webnovel-graph',
       '@yangda611/dsh-scriptor-retrieval#webnovel-graph',
     ]
     expect([...rowConfigs.keys()].sort()).toEqual([...expectedKeys].sort())
+    expect(rowConfigs.get('@yangda611/dsh-scriptor#webnovel-embeddings')!({ view: 'summary' })).toBe('配置混合检索使用的接口、向量模型和维度。')
     expect(rowConfigs.get('@yangda611/dsh-scriptor-full#webnovel-embeddings')!({ view: 'summary' })).toBe('配置混合检索使用的接口、向量模型和维度。')
     expect(rowConfigs.get('@yangda611/dsh-scriptor-full#webnovel-scenes')!({ view: 'summary' })).toBe('复用已配置的聊天模型，每章识别一次并缓存场景边界。')
     expect(rowConfigs.get('@yangda611/dsh-scriptor-full#webnovel-reranking')!({ view: 'summary' })).toBe('对少量正文候选重新排序，提高相关片段的可见性。')

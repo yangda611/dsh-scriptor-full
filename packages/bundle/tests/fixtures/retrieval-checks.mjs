@@ -128,7 +128,7 @@ export async function checkSearch({ root, workspace, main, child, ctx, service, 
       } finally { await other.dispose() }
     })
 
-    await check('独立嵌入提供方真实 HTTP 混合检索与配置刷新', async step => {
+    await check('主包内置嵌入提供方真实 HTTP 混合检索与配置刷新', async step => {
       step('credential')
       await service('credentials').set(credentialRef('WEBNOVEL_SEARCH_TEST_KEY'), 'fixture-search-key')
       step('enable-settings')
