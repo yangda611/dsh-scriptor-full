@@ -82,7 +82,7 @@ export function checkEmbeddingPackage(filename, expectedVersion) {
   return { ok: true, files: files.size, version: manifest.version }
 }
 
-export function checkMetaPackage(filename, expectedVersion, embeddingVersion) {
+export function checkMetaPackage(filename, expectedVersion) {
   const files = packageFiles(filename)
   const read = name => { assert.ok(files.has(name), `Missing ${name}`); return files.get(name).toString('utf8') }
   const manifest = JSON.parse(read('package.json'))
@@ -90,13 +90,13 @@ export function checkMetaPackage(filename, expectedVersion, embeddingVersion) {
   assert.equal(manifest.version, expectedVersion)
   assert.equal(manifest.license, 'GPL-3.0-only')
   checkPublishableManifest(manifest)
+  // 完整版是主包的薄别名：检索增强已包含在主包内，完整版只依赖主包，不再拉独立检索包。
   assert.deepEqual(manifest.dependencies, {
     '@yangda611/dsh-scriptor': expectedVersion,
-    '@yangda611/dsh-scriptor-retrieval': embeddingVersion,
   })
   assert.deepEqual(manifest.dsh?.bundle?.patch, ['./cordis.patch.yml', './presets/writing.patch.yml'])
   assert.equal(read('cordis.patch.yml').replaceAll('\r\n', '\n').trim(),
-    "- insert:\n    - id: webnovel\n      name: '@yangda611/dsh-scriptor'\n    - id: webnovel-embeddings\n      name: '@yangda611/dsh-scriptor-retrieval'\n    - id: webnovel-scenes\n      name: '@yangda611/dsh-scriptor-retrieval/scenes'\n    - id: webnovel-reranking\n      name: '@yangda611/dsh-scriptor-retrieval/reranking'\n    - id: webnovel-graph\n      name: '@yangda611/dsh-scriptor-retrieval/graph'")
+    "- insert:\n    - id: webnovel\n      name: '@yangda611/dsh-scriptor'\n    - id: webnovel-embeddings\n      name: '@yangda611/dsh-scriptor/retrieval'\n    - id: webnovel-scenes\n      name: '@yangda611/dsh-scriptor/scenes'\n    - id: webnovel-reranking\n      name: '@yangda611/dsh-scriptor/reranking'\n    - id: webnovel-graph\n      name: '@yangda611/dsh-scriptor/graph'")
   assert.match(read('presets/writing.patch.yml'), /id: preset-scriptor[\s\S]*name: 写作模式/)
   assert.ok(read('LICENSE').includes('GNU GENERAL PUBLIC LICENSE'))
   read('README.md')

@@ -47,7 +47,7 @@ checkEmbeddingPackage(path.join(output, embeddingTarball), embedding.version)
 const meta = JSON.parse(fs.readFileSync(path.join(root, 'packages/meta/package.json'), 'utf8'))
 const metaTarball = `yangda611-dsh-scriptor-full-${meta.version}.tgz`
 pack('packages/meta', metaTarball)
-checkMetaPackage(path.join(output, metaTarball), info.version, embedding.version)
+checkMetaPackage(path.join(output, metaTarball), info.version)
 const companion = JSON.parse(fs.readFileSync(path.join(root, 'packages/companion/package.json'), 'utf8'))
 const companionTarball = `yangda611-dsh-scriptor-companion-${companion.version}.tgz`
 pack('packages/companion', companionTarball)

@@ -1,7 +1,7 @@
 {
   "name": "@yangda611/dsh-scriptor-full",
   "version": "8.4.1",
-  "description": "网文写作工作台完整版（含可选嵌入提供方）",
+  "description": "网文写作工作台完整版入口：与主包相同，检索增强已包含在主包内",
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
@@ -37,8 +37,7 @@
     "presets/*.yml"
   ],
   "dependencies": {
-    "@yangda611/dsh-scriptor": "workspace:*",
-    "@yangda611/dsh-scriptor-retrieval": "workspace:*"
+    "@yangda611/dsh-scriptor": "workspace:*"
   },
   "publishConfig": {
     "access": "public",

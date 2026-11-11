@@ -2,10 +2,10 @@
     - id: webnovel
       name: '@yangda611/dsh-scriptor'
     - id: webnovel-embeddings
-      name: '@yangda611/dsh-scriptor-retrieval'
+      name: '@yangda611/dsh-scriptor/retrieval'
     - id: webnovel-scenes
-      name: '@yangda611/dsh-scriptor-retrieval/scenes'
+      name: '@yangda611/dsh-scriptor/scenes'
     - id: webnovel-reranking
-      name: '@yangda611/dsh-scriptor-retrieval/reranking'
+      name: '@yangda611/dsh-scriptor/reranking'
     - id: webnovel-graph
-      name: '@yangda611/dsh-scriptor-retrieval/graph'
+      name: '@yangda611/dsh-scriptor/graph'
