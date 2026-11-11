@@ -107,10 +107,20 @@ try {
     report.checks.companionStandaloneLifecycle = true
   }
   if (embedding) {
-    const copiedEmbedding = path.join(root, 'embedding.tgz')
-    fs.copyFileSync(embedding, copiedEmbedding)
-    log('add-embedding', run(cli, ['plugin', '--profile', 'scriptor-test', 'add', fromRegistry ? packageSpec(embedding) : copiedEmbedding]))
-    assert.ok(run(cli, ['--profile', 'scriptor-test', '--dump-config']).includes('@yangda611/dsh-scriptor-retrieval'))
+    // 检索已并入主包（2026-11-11）：不再单独安装检索包。主包单装就必须在配置里恰好出现
+    // 一次检索模块，且隔离加载器能从主包解析出嵌入与图谱服务；否则视为打包回归。
+    // 独立检索包 tarball 只保留参数兼容（其完整性由 release:build 的 checkEmbeddingPackage 覆盖），
+    // 不再装进任何 profile，避免与主包重复注册同一模块 id。
+    const mainDump = run(cli, ['--profile', 'scriptor-test', '--dump-config'])
+    for (const id of ['webnovel-embeddings', 'webnovel-scenes', 'webnovel-reranking', 'webnovel-graph']) {
+      assert.equal((mainDump.match(new RegExp(`id: ${id}(?:\r?\n|$)`, 'g')) ?? []).length, 1, `Main package must register ${id} exactly once`)
+    }
+    assert.ok(!mainDump.includes('@yangda611/dsh-scriptor-retrieval'), 'Main profile must not contain the standalone retrieval package')
+    const mainEmbeddingReport = path.join(root, 'main-embedding.json')
+    log('main-embedding-loader', execFileSync(process.execPath, ['--permission', '--allow-addons', ...permissionGrants('read'), ...permissionGrants('write'), `--allow-fs-read=${path.dirname(process.execPath)}`, script, profile, hostAnchor, blocked, mainEmbeddingReport, '--embedding'], { cwd: workspace, env, encoding: 'utf8', windowsHide: true, timeout: 45000 }))
+    const mainEmbedding = JSON.parse(fs.readFileSync(mainEmbeddingReport, 'utf8'))
+    assert.equal(mainEmbedding.embeddingLoaded, true)
+    assert.equal(mainEmbedding.graphLoaded, true)
     report.checks.embeddingInstalled = true
   }
   fs.writeFileSync(path.join(workspace, 'author-sentinel.txt'), 'synthetic author asset')
@@ -122,7 +132,6 @@ try {
   assert.equal(fs.readFileSync(path.join(workspace, 'author-sentinel.txt'), 'utf8'), 'synthetic author asset')
   report.checks.uninstallReinstall = true
   if (meta) {
-    assert.ok(embedding, 'Full package validation requires the embedding tarball')
     const fullName = 'scriptor-full-test'
     log('full-web-profile', run(cli, ['--profile', fullName, '--from-default-profile', 'web', '--dump-config']))
     const fullProfile = path.join(home, 'profiles', fullName)
@@ -130,9 +139,8 @@ try {
     const copiedMeta = path.join(root, 'meta.tgz')
     fs.copyFileSync(meta, copiedMeta)
     if (!fromRegistry) {
-      // Serve the two exact tarballs without changing their manifests or adding
-      // workspace configuration to a user profile. Other packages use npmjs.
-      fixtureRegistry = spawn(process.execPath, [path.join(sourceRoot, 'scripts/release/fixture-registry.mjs'), copiedMain, path.join(root, 'embedding.tgz')], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'inherit'] })
+      // 完整版是主包的薄别名，只依赖主包；fixture registry 只需提供主包 tarball。
+      fixtureRegistry = spawn(process.execPath, [path.join(sourceRoot, 'scripts/release/fixture-registry.mjs'), copiedMain], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'inherit'] })
       fixtureRegistryUrl = await new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('Fixture registry startup timed out')), 10000)
         let output = ''

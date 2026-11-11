@@ -9,8 +9,9 @@ assert.equal(process.permission.has('fs.read', blockedSource), false)
 assert.throws(() => fs.readFileSync(blockedSource), { code: 'ERR_ACCESS_DENIED' })
 const require = createRequire(hostAnchor)
 const checkEmbedding = process.argv.includes('--embedding')
+// 检索已并入主包：检索模块一律从主包解析（主包单装与完整版 profile 里主包都已安装）。
 const packageRequire = checkEmbedding
-  ? createRequire(require.resolve('@yangda611/dsh-scriptor-full/package.json', { paths: [profile] }))
+  ? createRequire(require.resolve('@yangda611/dsh-scriptor/package.json', { paths: [profile] }))
   : createRequire(path.join(profile, 'package.json'))
 const packageEntry = packageRequire.resolve('@yangda611/dsh-scriptor')
 const { boot, PluginPackages } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-app-boot')).href)
@@ -35,8 +36,8 @@ const config = [
 if (checkEmbedding) {
   config.push({ id: 'credentials', name: pathToFileURL(require.resolve('@deepseek-ai/dsh-credentials-local')).href,
     config: { path: path.join(path.dirname(reportPath), 'full-credentials.yaml'), watch: false } })
-  for (const [id, subpath] of [['webnovel-embeddings', ''], ['webnovel-scenes', '/scenes'], ['webnovel-reranking', '/reranking'], ['webnovel-graph', '/graph']]) {
-    config.push({ id, name: pathToFileURL(packageRequire.resolve(`@yangda611/dsh-scriptor-retrieval${subpath}`)).href })
+  for (const [id, subpath] of [['webnovel-embeddings', '/retrieval'], ['webnovel-scenes', '/scenes'], ['webnovel-reranking', '/reranking'], ['webnovel-graph', '/graph']]) {
+    config.push({ id, name: pathToFileURL(packageRequire.resolve(`@yangda611/dsh-scriptor${subpath}`)).href })
   }
 }
 fs.writeFileSync(configPath, JSON.stringify(config))
