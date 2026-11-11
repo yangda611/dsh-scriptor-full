@@ -42,7 +42,13 @@ assert.equal(manifest.license, 'GPL-3.0-only')
 assert.deepEqual(manifest.dsh.bundle.patch, ['./cordis.patch.yml', './presets/writing.patch.yml'])
 assert.equal(manifest.exports['./client'], './lib/client.js')
 assert.equal(manifest.exports['./preset'], './lib/preset.js')
-assert.deepEqual(parse(read('cordis.patch.yml')), [{ insert: [{ id: 'webnovel', name: manifest.name }] }])
+assert.deepEqual(parse(read('cordis.patch.yml')), [{ insert: [
+  { id: 'webnovel', name: manifest.name },
+  { id: 'webnovel-embeddings', name: `${manifest.name}/retrieval` },
+  { id: 'webnovel-scenes', name: `${manifest.name}/scenes` },
+  { id: 'webnovel-reranking', name: `${manifest.name}/reranking` },
+  { id: 'webnovel-graph', name: `${manifest.name}/graph` },
+] }])
 const writing = parse(read('presets/writing.patch.yml'))
 assert.equal(writing[0].insert[0].id, 'preset-scriptor')
 assert.equal(writing[0].insert[0].config.name, '写作模式')
@@ -67,7 +73,7 @@ for (const reference of referenceDocs) assert.ok(read(reference).trim(), `Empty 
 for (const script of scripts) assert.match(read(script), /new URL\(['"]\.\.\/\.\.\/\.\.\/lib\/cli\.js['"], import\.meta\.url\)/)
 for (const entry of entries) {
   const rel = entry.slice('package/'.length)
-  assert.ok(/^(package\.json|README\.md|THIRD_PARTY_NOTICES\.md|licenses\/[^/]+\.txt|LICENSE|cordis\.patch\.yml|presets\/writing\.patch\.yml|lib\/(index|client|preset|cli)\.js|skills\/[\w-]+\/.+\.(md|mjs))$/.test(rel), `Unexpected release file: ${rel}`)
+  assert.ok(/^(package\.json|README\.md|THIRD_PARTY_NOTICES\.md|licenses\/[^/]+\.txt|LICENSE|cordis\.patch\.yml|presets\/writing\.patch\.yml|lib\/(index|client|preset|cli|retrieval|scenes|reranking|graph)\.js|skills\/[\w-]+\/.+\.(md|mjs))$/.test(rel), `Unexpected release file: ${rel}`)
   const text = read(rel)
   assert.ok(!text.includes(path.resolve(packageRoot, '../..')), `Workspace path embedded in ${rel}`)
   assert.ok(!/-----BEGIN .*PRIVATE KEY-----|sk-[A-Za-z0-9]{24,}/.test(text), `Credential in ${rel}`)
@@ -85,6 +91,17 @@ for (const name of imports) {
   assert.ok(isBuiltin(name) || manifest.peerDependencies?.[packageName] || manifest.dependencies?.[packageName], `Undeclared packed import: ${name}`)
 }
 assert.equal(Object.keys(compiled.metafile.inputs).length, 1, 'Packed Host must be self-contained apart from declared peers')
+// 检索入口随主包发布：每个入口同样只允许已声明的 peer 依赖与 Node 内置模块，
+// 且不得把源码相对导入漏进产物（与 lib/index.js 同一条自包含规则）。
+for (const entry of ['retrieval', 'scenes', 'reranking', 'graph']) {
+  assert.equal(manifest.exports[`./${entry}`], `./lib/${entry}.js`, `Missing retrieval export: ${entry}`)
+  const retrievalCompiled = await build({ entryPoints: [path.join(extracted, `lib/${entry}.js`)], bundle: true, packages: 'external', write: false, metafile: true, platform: 'node', format: 'esm', logLevel: 'silent' })
+  for (const name of [...new Set(Object.values(retrievalCompiled.metafile.outputs).flatMap(output => output.imports).map(item => item.path))]) {
+    const packageName = name.startsWith('@') ? name.split('/').slice(0, 2).join('/') : name.split('/')[0]
+    assert.ok(isBuiltin(name) || manifest.peerDependencies?.[packageName] || manifest.dependencies?.[packageName], `Undeclared retrieval import in ${entry}: ${name}`)
+  }
+  assert.equal(Object.keys(retrievalCompiled.metafile.inputs).length, 1, `Packed retrieval entry ${entry} must be self-contained apart from declared peers`)
+}
 const cli = await build({ entryPoints: [path.join(extracted, 'lib/cli.js')], bundle: true, packages: 'external', write: false, metafile: true, platform: 'node', format: 'esm', logLevel: 'silent' })
 checkCliDependencies(cli)
 assert.equal(Object.keys(cli.metafile.inputs).length, 1, 'Packed CLI must be self-contained apart from Node builtins')
