@@ -2,24 +2,24 @@
 
 **[🌐 产品主页](https://yangda611.github.io/dsh-scriptor-full/) · [📖 新手教程](https://yangda611.github.io/dsh-scriptor-full/docs/beginner.html) · [下载正式版](https://github.com/yangda611/dsh-scriptor-full/releases/latest)**
 
-> Scriptor 8.4.1 配套 **DSH 0.2.2-rc.1**。旧格式先备份并使用书仓维护预览，按明确批准执行升级。
+> Scriptor 8.4.2 配套 **DSH 0.2.2-rc.1**。旧格式先备份并使用书仓维护预览，按明确批准执行升级。
 
 安装范围为 `>=0.2.2-rc.1 <0.3.0-0`，最低Node为24.9。可下载的版本和原件以 GitHub Release 为准。
 
 基于 [DeepSeek Harness](https://www.deepseek.com/harness/) 的长篇小说写作工作台。把构想、设定、大纲、写章、审读、修改、定稿、记忆与导出放进一个能够暂停和继续的工作流程，作品以本地文件保存。
 
-**本文对应版本：8.4.1。** Windows 首发；重要作品使用前请备份。模型服务由你配置，调用可能产生费用。
+**本文对应版本：8.4.2。** Windows 首发；重要作品使用前请备份。模型服务由你配置，调用可能产生费用。
 
 [![DSH Scriptor 项目介绍视频](docs/user/images/video-poster.png)](docs/user/media/intro.mp4)
 
 > 📹 **2 分钟视频快速了解 DSH Scriptor**：[点击播放或下载视频 (1080P/MP4)](docs/user/media/intro.mp4) · [字幕文件](docs/user/media/intro.srt)  
 > 视频演示了核心设计理念、全流程写作闭环、断更无损恢复以及书稿编辑器的交互操作。
 
-DSH Scriptor is a local-first fiction writing workspace for DeepSeek Harness. Version 8.4.1 targets DeepSeek Harness 0.2.2-rc.1 with evidence-based relationship clusters, native UI settings and explicit book-format migration. Runtime prompts and skills are included; model services are configured by the user.
+DSH Scriptor is a local-first fiction writing workspace for DeepSeek Harness. Version 8.4.2 targets DeepSeek Harness 0.2.2-rc.1 with evidence-based relationship clusters, native UI settings and explicit book-format migration. Runtime prompts and skills are included; model services are configured by the user.
 
-**8.4.1升级须知：使用DSH 0.2.2-rc.1或允许范围内的版本，先备份作品。** 旧线索/时间线正文前缀、非空旧记忆分类和旧特殊字符索引不再由正常读取自动转换。先用书仓检查与整仓升级预览，核对差异和影响，再决定是否批准升级。只安装插件不会迁移书稿。完整步骤见[升级说明](docs/user/upgrade-backup.md)。
+**8.4.2升级须知：使用DSH 0.2.2-rc.1或允许范围内的版本，先备份作品。** 旧线索/时间线正文前缀、非空旧记忆分类和旧特殊字符索引不再由正常读取自动转换。先用书仓检查与整仓升级预览，核对差异和影响，再决定是否批准升级。只安装插件不会迁移书稿。完整步骤见[升级说明](docs/user/upgrade-backup.md)。
 
-8.4.1 二开发行不改变运行能力；沿用 8.4.0 的千章关系星团、逐章证据、原文定位、原生设置和书仓维护。桌宠仍为独立可选包，书稿编辑器保留稿纸排版。
+8.4.2 二开发行不改变运行能力；沿用 8.4.0 的千章关系星团、逐章证据、原文定位、原生设置和书仓维护。桌宠仍为独立可选包，书稿编辑器保留稿纸排版。
 
 ## 创作工作流程
 
@@ -64,9 +64,9 @@ Scriptor 将长篇小说的生产拆分为**作品设计**与**章节闭环**两
 | 产品线 | 运行环境 | 入口 |
 | --- | --- | --- |
 | v6 | Claude Code 插件 | 当前仓库不提供 v6 安装文档 |
-| v8（本分支） | DeepSeek Harness 工作台 | [版本发行页](https://github.com/yangda611/dsh-scriptor-full/releases/tag/scriptor-v8.4.1) · [安装教程](docs/user/install.md) |
+| v8（本分支） | DeepSeek Harness 工作台 | [版本发行页](https://github.com/yangda611/dsh-scriptor-full/releases/tag/scriptor-v8.4.2) · [安装教程](docs/user/install.md) |
 
-两个版本安装方式不同。当前没有经过验证的 v6/v7 书仓直接迁移方案。`v8` 是产品线名称，`8.4.1` 是安装包版本。
+两个版本安装方式不同。当前没有经过验证的 v6/v7 书仓直接迁移方案。`v8` 是产品线名称，`8.4.2` 是安装包版本。
 
 ## 能做什么
 
@@ -83,10 +83,10 @@ Scriptor 将长篇小说的生产拆分为**作品设计**与**章节闭环**两
 ## 开始使用
 
 > [!WARNING]
-> 本仓库的插件包名已切换到 `@yangda611` scope。该 scope 下的 8.4.1 包尚未发布到 npm；在完成 npm 发布前，下方安装标识不可从 registry 安装。源码构建步骤见[开发指南](docs/development.md)。
+> 本仓库的插件包名已切换到 `@yangda611` scope。该 scope 下的 8.4.2 包尚未发布到 npm；在完成 npm 发布前，下方安装标识不可从 registry 安装。源码构建步骤见[开发指南](docs/development.md)。
 
 1. 安装配套的 **DSH 0.2.2-rc.1** 桌面端，打开侧栏 **插件 → 添加插件**。
-2. 输入 `@yangda611/dsh-scriptor@8.4.1`，核对预览并安装，按提示应用变更。
+2. 输入 `@yangda611/dsh-scriptor@8.4.2`，核对预览并安装，按提示应用变更。
 3. 配置聊天模型与凭据，新建对话并选择 **写作模式**，打开作品工作区，按 [第一本书与第一章](docs/user/first-book.md) 开始。
 
 逐步说明见 [安装教程](docs/user/install.md) 和 [新手教程](docs/user/beginner.md)。正式版发布到 npm latest，教程使用精确版本便于核对宿主。
@@ -94,12 +94,12 @@ Scriptor 将长篇小说的生产拆分为**作品设计**与**章节闭环**两
 | 可选插件 | 安装标识 | 用途 |
 | --- | --- | --- |
 | 检索增强 | 随主包提供，无需单独安装 | 嵌入、场景识别、重排，分别配置和启用 |
-| 鲸鱼娘 | `@yangda611/dsh-scriptor-companion@8.4.1` | 窗口内陪伴与会话状态反馈，不调用模型 |
-| 完整版 | `@yangda611/dsh-scriptor-full@8.4.1` | 与主包相同，检索已包含在内；不含桌宠；与主包二选一 |
+| 鲸鱼娘 | `@yangda611/dsh-scriptor-companion@8.4.2` | 窗口内陪伴与会话状态反馈，不调用模型 |
+| 完整版 | `@yangda611/dsh-scriptor-full@8.4.2` | 与主包相同，检索已包含在内；不含桌宠；与主包二选一 |
 
 旧包迁移与备份见 [升级说明](docs/user/upgrade-backup.md)，不要同时启用旧检索包和新检索包。
 
-本次四包统一为 8.4.1；检索已包含在主包内，桌宠保持兼容发行。只更新你实际使用的组件；不用桌宠就无需安装它。已验证的推荐组合为同版本，桌宠始终独立。老用户如果同时装了主包和独立检索包，升级时卸载独立检索包、只留主包，配置与凭据按原来的条目 id 保留。
+本次四包统一为 8.4.2；检索已包含在主包内，桌宠保持兼容发行。只更新你实际使用的组件；不用桌宠就无需安装它。已验证的推荐组合为同版本，桌宠始终独立。老用户如果同时装了主包和独立检索包，升级时卸载独立检索包、只留主包，配置与凭据按原来的条目 id 保留。
 
 ## 文档
 
