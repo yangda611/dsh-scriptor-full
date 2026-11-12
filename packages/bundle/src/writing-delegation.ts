@@ -45,18 +45,45 @@ export function writingAssignmentOf(agent: AgentLike): WritingAssignment | undef
 }
 
 /** Add one typed role field while reusing the native tool's routing and lifecycle. */
+
+// 写作委派 fiber 按主 Agent 去重（8.4.6）：installFor 会在能力/预设/角色变化
+// 时反复重装同一主 Agent，旧 fiber 的异步 dispose 会在新 fiber 注册之后才
+// 落地，其 effect 清理 off() 按名注销，会把新注册的 novel_delegate 一并
+// 抹掉（真实回归：插件禁/启用后 46 个业务工具都在，唯独 novel_delegate
+// 缺失）。因此委派 fiber 每个主 Agent 只挂一份、重装时不拆：attach 幂等，
+// 卸载只发生在插件禁用（disposeAllDelegations）或 Agent ctx 销毁时。
+const attachedDelegations = new WeakMap<AgentLike, () => Promise<void>>()
+const liveDelegationDisposes = new Set<() => Promise<void>>()
+
+export async function disposeAllDelegations(): Promise<void> {
+  const disposals = [...liveDelegationDisposes]
+  liveDelegationDisposes.clear()
+  await Promise.all(disposals.map(async (dispose) => { try { await dispose() } catch { /* 幂等清理 */ } }))
+}
+
 export function attachWritingDelegationToAgent(agent: AgentLike): (() => Promise<void>) | undefined {
+  const existing = attachedDelegations.get(agent)
+  if (existing !== undefined) return existing
   const context = agent.ctx as Context | undefined
   if (typeof context?.inject !== 'function') return undefined
-  const fiber = context.inject(['tools'], scope => {
-    scope.effect(function* () {
+  let fiber: { dispose?: () => unknown } | undefined
+  try {
+    fiber = context.inject(['tools'], scope => {
+      // 最小宿主（如 headless 冒烟测试的 mock ctx）没有 effect/tools：
+      // 委派挂不上也不应炸掉整条装机链；真实宿主一定有这两个 API。
+      const host = scope as unknown as { effect?: unknown; tools?: unknown }
+      if (typeof host.effect !== 'function' || typeof host.tools !== 'object' || host.tools === null) return
+      scope.effect(function* () {
       let native: ToolDefinition | undefined
       let off: (() => void) | undefined
       let updating = false
       const refresh = () => {
         if (updating) return
         const current = scope.tools.get('subagent', agent as Parameters<typeof scope.tools.get>[1])
-        if (current === native) return
+        // 自愈：current 与 native 一致时旧逻辑直接返回，但注册本身可能
+        // 已被先前 fiber 的滞后清理抹掉——以实际注册为准，缺失即重挂。
+        const registered = scope.tools.get(WRITING_DELEGATE_TOOL, agent as Parameters<typeof scope.tools.get>[1])
+        if (current === native && registered) return
         updating = true
         try {
           off?.(); off = undefined
@@ -94,6 +121,20 @@ export function attachWritingDelegationToAgent(agent: AgentLike): (() => Promise
       yield scope.on('tools/change', refresh)
       refresh()
     })
-  })
-  return async () => { await fiber.dispose() }
+    }) as unknown as { dispose?: () => unknown } | undefined
+  } catch {
+    return undefined
+  }
+  if (fiber === undefined || typeof fiber.dispose !== 'function') return undefined
+  let disposed = false
+  const dispose = async (): Promise<void> => {
+    if (disposed) return
+    disposed = true
+    attachedDelegations.delete(agent)
+    liveDelegationDisposes.delete(dispose)
+    await fiber.dispose()
+  }
+  attachedDelegations.set(agent, dispose)
+  liveDelegationDisposes.add(dispose)
+  return dispose
 }

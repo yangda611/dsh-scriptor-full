@@ -144,6 +144,32 @@ export async function checkWorkerPolicy({ root, book, workspace, ctx, service, c
         independentPreset: true, explicitBookChapterPreserved: true, nativeWorkflowLifecycle: true, activationThenCompletion: true, failedCompletion: true, cancelledWithoutWrite: true,
         tools: { business: toolCatalog.business.length, conditional: toolCatalog.conditional.length, registered: novelNames().length } }
     })
+    await check('标准预设主会话也能拿到写作委派（8.4.6）', async () => {
+      const standard = await createPresetAgent(service('agents'), { sessionId: 'worker-standard', meta: { cwd: workspace },
+        agentOptions: { provider: 'worker-fixture', model: 'fixture' } }, 'standard')
+      const standardNames = () => service('tools').schemas(standard.agent).map(tool => tool.name).filter(name => name.startsWith('novel_')).sort()
+      assert.deepEqual(standardNames(), [...toolCatalog.production].sort())
+      assert.ok(service('tools').get('novel_delegate', standard.agent))
+      // 子代理仍看不到任何小说工具。
+      const key = String(++serial)
+      const test = { role: undefined, requests: 0, file: path.join(book, `草稿区/草稿/卷01-角色${key}/稿1.md`),
+        entered: Promise.withResolvers(), release: Promise.withResolvers(), hold: true }
+      cases.set(key, test)
+      const args = { description: '标准预设子代理探针', prompt: `[probe:${key}] 检查工具可用性并返回。` }
+      test.callId = `workflow-${key}`
+      workflowLog.push({ type: 'tool/call', time: Date.now(), data: { callId: test.callId, name: 'subagent', arguments: JSON.stringify(args) } })
+      const result = await execute(standard.agent, 'subagent', args)
+      assert.equal(result.isError, false, JSON.stringify(result))
+      assert.equal(result.value.kind, 'activation')
+      test.childId = result.value.subagentId
+      await test.entered.promise
+      const child = service('agents').get(test.childId)
+      assert.ok(child)
+      assert.deepEqual(service('tools').schemas(child).map(tool => tool.name).filter(name => name.startsWith('novel_')), [])
+      test.release.resolve()
+      await service('subagents').waitForChildren(standard.agent)
+      await standard.agent.whenIdle()
+    })
     await check('委派工具随原生入口和插件装卸且角色可恢复', async () => {
       await toggle('subagent-tool', true)
       assert.equal(service('tools').get('novel_delegate', main.agent), undefined)

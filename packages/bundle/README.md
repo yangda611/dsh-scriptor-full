@@ -1,23 +1,23 @@
 # Webnovel Writer · 网文写作工作台
 
-Scriptor 8.4.5 适配 DSH 0.2.2-rc.1。安装范围为 `>=0.2.2-rc.1 <0.3.0-0`，Node最低24.9；实际验证按具体版本记录。
+Scriptor 8.4.6 适配 DSH 0.2.2-rc.1。安装范围为 `>=0.2.2-rc.1 <0.3.0-0`，Node最低24.9；实际验证按具体版本记录。
 
 [产品主页](https://yangda611.github.io/dsh-scriptor-full/) · [新手教程](https://yangda611.github.io/dsh-scriptor-full/docs/beginner.html)
 
-> Scriptor 8.4.5 配套 **DSH 0.2.2-rc.1**。旧格式先备份并使用书仓维护预览，按明确批准执行升级。
+> Scriptor 8.4.6 配套 **DSH 0.2.2-rc.1**。旧格式先备份并使用书仓维护预览，按明确批准执行升级。
 
-DSH 插件 `@yangda611/dsh-scriptor` 提供写作工作台。8.4.5包含12个写作与维护技能和八个脚本入口。
+DSH 插件 `@yangda611/dsh-scriptor` 提供写作工作台。8.4.6包含14个写作与维护技能和八个脚本入口。
 要求 Node.js至少24.9，DSH 0.2.2-rc.1。许可证 GPL-3.0-only。
 
 ## 安装
 
-在 DSH 0.2.2-rc.1 桌面端侧栏打开“插件 → 添加插件”，输入 `@yangda611/dsh-scriptor@8.4.5`，核对后安装并应用变更。桌面端自带运行时，不需要另外安装 Node/pnpm。
+在 DSH 0.2.2-rc.1 桌面端侧栏打开“插件 → 添加插件”，输入 `@yangda611/dsh-scriptor@8.4.6`，核对后安装并应用变更。桌面端自带运行时，不需要另外安装 Node/pnpm。
 
 以下是进阶用户创建独立 Web profile 的方式，不用于桌面端保留的 `desktop` profile：
 
 ```powershell
 dsh --profile webnovel --from-default-profile web --dump-config
-dsh plugin --profile webnovel add C:/scriptor-dist/yangda611-dsh-scriptor-8.4.5.tgz
+dsh plugin --profile webnovel add C:/scriptor-dist/yangda611-dsh-scriptor-8.4.6.tgz
 dsh --profile webnovel --host 127.0.0.1 --port 6104 --no-open
 ```
 
@@ -27,7 +27,7 @@ dsh --profile webnovel --host 127.0.0.1 --port 6104 --no-open
 
 ## 更新与卸载
 
-先停止指定 profile 的运行实例，再安装目标精确版本并重启（本版为 `C:/scriptor-dist/yangda611-dsh-scriptor-8.4.5.tgz`）。
+先停止指定 profile 的运行实例，再安装目标精确版本并重启（本版为 `C:/scriptor-dist/yangda611-dsh-scriptor-8.4.6.tgz`）。
 卸载后可执行上面的安装命令重装：
 
 ```powershell
@@ -37,7 +37,7 @@ dsh --profile webnovel --dump-config
 
 卸载插件不会删除作品书仓。安装不需要源码、安装时构建或 npm 账号。tarball 放在无空格目录，并核对对应 Release 提供的 SHA256。首次下载宿主依赖仍可能需要网络。
 
-## 8.4.5 更新与旧项目升级
+## 8.4.6 更新与旧项目升级
 
 本二开版保持原有的千章关系星团、证据轨迹、原生设置与书仓维护能力。先升级到 DSH 0.2.2-rc.1，再更新已用插件。旧格式须先备份，检查并预览整仓升级；正常读取不再转换旧字段。升级后新建写作模式对话，打开原工作区继续；旧对话不会自动迁移。
 
@@ -49,7 +49,7 @@ dsh --profile webnovel --dump-config
 
 ## 公开文档
 
-当前主包 8.4.5。完整的安装、配置、首章和备份教程见 [公开使用文档](https://github.com/yangda611/dsh-scriptor-full/tree/main/docs/user)。
+当前主包 8.4.6。完整的安装、配置、首章和备份教程见 [公开使用文档](https://github.com/yangda611/dsh-scriptor-full/tree/main/docs/user)。
 
 第三方组件的原始声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，许可证文本随包放在 licenses/。源码及校验和由对应的 GitHub Release 提供。
 

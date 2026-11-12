@@ -24,7 +24,7 @@ import z from '@deepseek-ai/schemastery'
 import { attachFileGateToAgent } from './gates'
 import { attachDraftLengthFeedbackToAgent } from './draft-length-feedback'
 import { attachWorkerPolicyToAgent } from './worker-policy'
-import { attachWritingDelegationToAgent, writingRoleOf } from './writing-delegation'
+import { attachWritingDelegationToAgent, disposeAllDelegations, writingRoleOf } from './writing-delegation'
 import { writingCapabilityOf, type WritingCapability } from './agent-mode'
 import { uniqueBookRoot, scanBooks } from './bookshelf'
 import { attachStatusToAgent, type SystemPromptLike } from './status-context'
@@ -659,10 +659,24 @@ export function apply(ctx: Context, entry?: ReturnType<typeof Config> | Webnovel
       const rootOf = (): string | undefined => agentWorkspaceRoot(agent)
       if (!isSubagent) {
         // 主 Agent：小说工具一律注册（8.4.5，不再以写作预设能力为门；toolKit
-        // 未就绪时由第三步反应式补装）。persona、书架总览与委派仍只在写作预设下挂载。
+        // 未就绪时由第三步反应式补装）。写作委派同样不设预设门（8.4.6）：
+        // 起草/润色/改稿/审读/沉淀都要走 novel_delegate，而默认会话用标准
+        // 预设、书房向导不自动切预设——委派留在写作预设门内，第一章正文就
+        // 写不出来（8.4.5 真实 Web 实证：46 个 novel_* 都进了会话，唯独缺
+        // novel_delegate，AI 只能叫停起草子代理）。persona、书架总览仍只在
+        // 写作预设下挂载。
         const workspace = rootOf()
         if (workspace) indexing.addWorkspace(workspace)
         registerToolsInto(agent)
+        // 写作委派：主 Agent 一律挂载（8.4.6）。attach 内部是原生 subagent
+        // 的克隆注册，原生入口未就绪时由 tools/change 反应式补挂；子 Agent
+        // 仍由 restrict 全封，execute 层也只认主控本人调用。
+        // 注意：委派 fiber 每个主 Agent 只挂一份（attach 幂等），不要收进
+        // attached——重装时 detachAgent 会异步拆它，新 fiber 注册后旧清理
+        // 才落地，会把 novel_delegate 按名注销（8.4.6 回归根因）。fiber
+        // 只在插件禁用时由 disposeAllDelegations 统一拆，或随 Agent ctx
+        // 销毁自动回收。
+        attachWritingDelegationToAgent(agent)
         if (capability !== undefined) {
           // 主 Agent persona（轻适配：scoped shadow deployment:persona-prefix，不压 dsh 原生指引段）。
           // 每件挂载独立容错（运行时对齐批）：单件失败只 warn，不中断装机序列、不拖垮工具/门禁。
@@ -679,8 +693,6 @@ export function apply(ctx: Context, entry?: ReturnType<typeof Config> | Webnovel
           } catch (err) {
             ctx.logger.warn(`[webnovel-bundle] 状态注入挂载失败（${agentId}）：${err instanceof Error ? err.message : String(err)}`)
           }
-          const offDelegation = attachWritingDelegationToAgent(agent)
-          if (offDelegation !== undefined) attached.push(offDelegation)
         }
       } else {
         // 子 Agent 运行时全封（E2＋R8，运行时对齐批）：
@@ -782,6 +794,7 @@ export function apply(ctx: Context, entry?: ReturnType<typeof Config> | Webnovel
       await Promise.all([...installedAgents.values()].map(agent => detachAgent(agent)))
       await Promise.all(detachJobs)
       disposeAllAgentTools()
+      await disposeAllDelegations()
       await agentsReg.fiber?.dispose?.()
       await presetReg.fiber?.dispose?.()
     }
@@ -813,6 +826,7 @@ export function apply(ctx: Context, entry?: ReturnType<typeof Config> | Webnovel
     if (!toolsReg.reactive) registerAllInstalled(ctx)
     return () => {
       disposeAllAgentTools()
+      void disposeAllDelegations()
       void toolsReg.fiber?.dispose?.()
     }
   })

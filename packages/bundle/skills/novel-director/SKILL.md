@@ -235,6 +235,8 @@ user-invocable: false
 
 小说生产任务使用 `novel_delegate`，保留原生委派参数，必须按下表传 `role`。运行时只向该实例注入对应规约和工具权限；普通研究、工具诊断仍使用原生 `subagent`，不会因标题提到写作而受到这些限制。
 
+工具自查节制：确认插件或工具状态时，不要反复调用 `plugin_manager` 的只读查询（list_plugins/list_bundles）——每次调用都要重新走 danger-full-access 审批，会卡在审批循环里。一次调用后用结果；版本信息优先读插件包内文件。
+
 | 任务 | role | 子代理交付权限 |
 | --- | --- | --- |
 | 正文起草 | `drafting` | 原生读写与搜索；起草篇幅调整规则 |
