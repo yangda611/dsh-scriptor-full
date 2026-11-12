@@ -4,8 +4,8 @@
 
 ```powershell
 dsh --profile scriptor --from-default-profile web --dump-config
-dsh plugin --profile scriptor add @yangda611/dsh-scriptor@8.4.2
-dsh plugin --profile scriptor add @yangda611/dsh-scriptor-companion@8.4.2
+dsh plugin --profile scriptor add @yangda611/dsh-scriptor@8.4.3
+dsh plugin --profile scriptor add @yangda611/dsh-scriptor-companion@8.4.3
 dsh --profile scriptor
 ```
 
@@ -13,7 +13,7 @@ dsh --profile scriptor
 
 已有 profile 不再初始化。Desktop 使用自己的 desktop profile，不套用 Web 模板；优先在桌面插件页管理。
 
-完整版 @yangda611/dsh-scriptor-full@8.4.2 与主包相同，检索已包含在内，不能与主包或独立检索包混装；桌宠独立可选。
+完整版 @yangda611/dsh-scriptor-full@8.4.3 与主包相同，检索已包含在内，不能与主包或独立检索包混装；桌宠独立可选。
 
 ## 旧包迁移
 
