@@ -20,6 +20,11 @@ export const DOCUMENT_FIELDS = {
     name: '输出形态', description: '输出形态：短剧、电影剧本或小说；创建时选定',
     type: 'single-line-text', owner: 'system',
   },
+  /** 建书硬性流程（8.4.4）：创建时选定的目标总字数（汉字数），决定篇幅规划；建书前必须问作者拿到答案，不静默用默认值。 */
+  targetTotalWords: {
+    name: '目标总字数', description: '目标总字数（汉字数）；创建时选定，决定篇幅规划',
+    type: 'positive-integer', owner: 'system',
+  },
   timelineEvent: {
     name: '事件', description: '实际发生的事件描述，不是事件条目的名称或记录章号',
     type: 'single-line-text', owner: 'content',

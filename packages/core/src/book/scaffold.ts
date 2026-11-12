@@ -6,7 +6,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { applyVersionFields, initialVersion } from '../provenance'
 import { 契约六部, 分卷布局八部, 故事骨架九部, 世界书最小模块 } from '../derive/design'
-import { parseConcept, serializeConcept, marketOf, outputFormOf, DEFAULT_MARKET, DEFAULT_OUTPUT_FORM, type Concept } from '../inspire/concept'
+import { parseConcept, serializeConcept, marketOf, outputFormOf, targetTotalWordsOf, DEFAULT_MARKET, DEFAULT_OUTPUT_FORM, type Concept } from '../inspire/concept'
 import { DOCUMENT_FIELDS, isMarketValue, isOutputFormValue, type Market, type OutputForm } from '../repo/document-fields'
 import { writeBatchAtomic, type FileOp } from '../repo/atomic'
 import { runtimeIgnoreLine } from '../repo/transaction'
@@ -21,16 +21,19 @@ function labeledHeadings(names: readonly string[], state: string): string {
   return names.map((n) => `## ${n} 〔${state}〕\n`).join('\n')
 }
 
-/** 影视剧扩展（muse-dev）：建书时选定的市场 / 输出形态，未指定时写默认值（中文 / 小说）。非法值拒绝写入。 */
+/** 影视剧扩展（muse-dev）：建书时选定的市场 / 输出形态，未指定时写默认值（中文 / 小说）。非法值拒绝写入。
+ *  建书硬性流程（8.4.4）：目标总字数有值才写，没值不写——不编默认值。 */
 export interface ContractFieldOptions {
   readonly 市场?: Market
   readonly 输出形态?: OutputForm
+  readonly 目标总字数?: number
 }
 
-export function resolveContractFields(opts: ContractFieldOptions = {}): { readonly 市场: Market; readonly 输出形态: OutputForm } {
+export function resolveContractFields(opts: ContractFieldOptions = {}): { readonly 市场: Market; readonly 输出形态: OutputForm; readonly 目标总字数?: number } {
   if (opts.市场 !== undefined && !isMarketValue(opts.市场)) throw new Error(`市场取值非法：${String(opts.市场)}，只接受 海外 / 中文`)
   if (opts.输出形态 !== undefined && !isOutputFormValue(opts.输出形态)) throw new Error(`输出形态取值非法：${String(opts.输出形态)}，只接受 短剧 / 电影剧本 / 小说`)
-  return { 市场: opts.市场 ?? DEFAULT_MARKET, 输出形态: opts.输出形态 ?? DEFAULT_OUTPUT_FORM }
+  if (opts.目标总字数 !== undefined && (!Number.isSafeInteger(opts.目标总字数) || opts.目标总字数 <= 0)) throw new Error(`目标总字数取值非法：${String(opts.目标总字数)}，只接受正整数汉字数`)
+  return { 市场: opts.市场 ?? DEFAULT_MARKET, 输出形态: opts.输出形态 ?? DEFAULT_OUTPUT_FORM, ...(opts.目标总字数 === undefined ? {} : { 目标总字数: opts.目标总字数 }) }
 }
 
 export function emptyContractBody(bookId?: string, fieldOpts: ContractFieldOptions = {}): string {
@@ -40,7 +43,8 @@ export function emptyContractBody(bookId?: string, fieldOpts: ContractFieldOptio
     [BOOK_FORMAT_VERSION_FIELD]: CURRENT_BOOK_FORMAT_VERSION,
     [DOCUMENT_FIELDS.market.name]: fields.市场,
     [DOCUMENT_FIELDS.outputForm.name]: fields.输出形态,
-  }, `# 作品契约\n\n${labeledHeadings(契约六部, '留白')}`, ['书id', BOOK_FORMAT_VERSION_FIELD, DOCUMENT_FIELDS.market.name, DOCUMENT_FIELDS.outputForm.name])
+    ...(fields.目标总字数 === undefined ? {} : { [DOCUMENT_FIELDS.targetTotalWords.name]: fields.目标总字数 }),
+  }, `# 作品契约\n\n${labeledHeadings(契约六部, '留白')}`, ['书id', BOOK_FORMAT_VERSION_FIELD, DOCUMENT_FIELDS.market.name, DOCUMENT_FIELDS.outputForm.name, ...(fields.目标总字数 === undefined ? [] : [DOCUMENT_FIELDS.targetTotalWords.name])])
 }
 
 export function emptySkeletonBody(): string {
@@ -76,10 +80,12 @@ export function conceptSnapshotText(concept: Concept | string): string {
 
 export function scaffoldBookFiles(bookRoot: string, concept: Concept | string, opts: { readonly bookId?: string } & ContractFieldOptions = {}): void {
   // 影视剧扩展：市场 / 输出形态优先用显式 opts，否则取构想上的选择，再否则取默认值；构想快照本身也带这两个字段（见 serializeConcept）。
+  // 建书硬性流程（8.4.4）：目标总字数同样优先用显式 opts，否则取构想上的值；没值不写（不编默认值）。
   const parsedConcept = typeof concept === 'string' ? parseConcept(concept) : concept
   const fields = resolveContractFields({
     市场: opts.市场 ?? (parsedConcept === null ? undefined : marketOf(parsedConcept)),
     输出形态: opts.输出形态 ?? (parsedConcept === null ? undefined : outputFormOf(parsedConcept)),
+    目标总字数: opts.目标总字数 ?? (parsedConcept === null ? undefined : targetTotalWordsOf(parsedConcept)),
   })
   const ops: FileOp[] = [
     { relPath: paths.契约(), content: emptyContractBody(opts.bookId, fields) },

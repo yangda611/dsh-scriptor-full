@@ -23,7 +23,7 @@ describe('主 Agent 专用 Tools (方案 A)', () => {
     let writes = 0
     const tools = createNovelTools({ workspaceRoot: () => ws, bookRootOfBookId: () => root,
       nativeWrite: async (...args) => { writes++; await nativeWriteStub(...args) } })
-    const created = await tools.find(t => t.name === 'novel_create_book')!.execute({ bookName: '篇幅约定', concept: { 状态: '已确认', 核心创意: '小铺经营', 题材与目标读者: '仙侠' } }) as { ok: boolean; bookId: string }
+    const created = await tools.find(t => t.name === 'novel_create_book')!.execute({ bookName: '篇幅约定', 市场: '中文', 输出形态: '小说', 目标总字数: 1000000, concept: { 状态: '已确认', 核心创意: '小铺经营', 题材与目标读者: '仙侠' } }) as { ok: boolean; bookId: string }
     expect(created.ok).toBe(true)
     const contract = path.join(root, '作品契约/契约.md')
     const before = fs.readFileSync(contract, 'utf8')
@@ -43,7 +43,7 @@ describe('主 Agent 专用 Tools (方案 A)', () => {
     const bookRoot = path.join(ws, '旧书')
     const tools = createNovelTools({ nativeWrite: nativeWriteStub, workspaceRoot: () => ws, bookRootOfBookId: () => bookRoot })
     const call = async (name: string, args: Record<string, unknown>) => tools.find(t => t.name === name)!.execute(args) as Promise<any>
-    const created = await call('novel_create_book', { bookName: '旧书', concept: { 状态: '已确认', 核心创意: '寻找失踪家人', 题材与目标读者: '悬疑' } })
+    const created = await call('novel_create_book', { bookName: '旧书', 市场: '中文', 输出形态: '小说', 目标总字数: 1000000, concept: { 状态: '已确认', 核心创意: '寻找失踪家人', 题材与目标读者: '悬疑' } })
     expect(created.ok).toBe(true)
     writeContract(bookRoot, Object.fromEntries(契约六部.map(name => [name, { state: '已确认' as const, body: '围绕裴笑寻找妹妹展开悬疑故事。' }])))
     const declaration = path.join(bookRoot, '世界书/模块声明.md')
@@ -78,7 +78,7 @@ describe('主 Agent 专用 Tools (方案 A)', () => {
     const bookRoot = path.join(ws, '循环回归')
     const tools = createNovelTools({ nativeWrite: nativeWriteStub, workspaceRoot: () => ws, bookRootOfBookId: () => bookRoot })
     const created = await tools.find(t => t.name === 'novel_create_book')!.execute({
-      bookName: '循环回归', concept: { 状态: '已确认', 核心创意: 'x', 题材与目标读者: 'x', 主角核心欲望: 'x', 主要冲突: 'x', 核心看点: 'x', 差异化方向: 'x', 明确不要什么: 'x' },
+      bookName: '循环回归', 市场: '中文', 输出形态: '小说', 目标总字数: 1000000, concept: { 状态: '已确认', 核心创意: 'x', 题材与目标读者: 'x', 主角核心欲望: 'x', 主要冲突: 'x', 核心看点: 'x', 差异化方向: 'x', 明确不要什么: 'x' },
     }) as { ok: boolean; bookId: string }
     expect(created.ok).toBe(true)
     const update = tools.find(t => t.name === 'novel_update_contract')!
@@ -117,6 +117,7 @@ describe('主 Agent 专用 Tools (方案 A)', () => {
     // 1. 建书
     const createRes = (await createTool.execute({
       bookName: '仙途长生',
+      市场: '中文', 输出形态: '小说', 目标总字数: 1000000,
       concept: {
         状态: '已确认',
         核心创意: '凡人流修仙与上古残魂',
@@ -181,6 +182,7 @@ describe('主 Agent 专用 Tools (方案 A)', () => {
       (await tools.find((t) => t.name === name)!.execute(args, { agent: { id: 'agent-1', session: { append: () => {} } } })) as { ok: boolean; bookId?: string }
     const created = await call('novel_create_book', {
       bookName: '工具书',
+      市场: '中文', 输出形态: '小说', 目标总字数: 1000000,
       concept: { 状态: '已确认', 核心创意: 'x', 题材与目标读者: 'x', 主角核心欲望: 'x', 主要冲突: 'x', 核心看点: 'x', 差异化方向: 'x', 明确不要什么: 'x' },
     })
     expect(created.ok).toBe(true)
@@ -210,6 +212,7 @@ describe('主 Agent 专用 Tools (方案 A)', () => {
 
     const createRes = (await createTool.execute({
       bookName: '守卫书',
+      市场: '中文', 输出形态: '小说', 目标总字数: 1000000,
       concept: {
         状态: '已确认',
         核心创意: 'x', 题材与目标读者: 'x', 主角核心欲望: 'x', 主要冲突: 'x',
@@ -242,6 +245,7 @@ describe('主 Agent 专用 Tools (方案 A)', () => {
 
     const createRes = (await createTool.execute({
       bookName: '提交纪律书',
+      市场: '中文', 输出形态: '小说', 目标总字数: 1000000,
       concept: {
         状态: '已确认',
         核心创意: 'x', 题材与目标读者: 'x', 主角核心欲望: 'x', 主要冲突: 'x',
@@ -295,7 +299,7 @@ describe('RW09 世界书字段补丁与历史保全', () => {
     const tools = createNovelTools({ workspaceRoot: () => ws, bookRootOfBookId: () => root,
       nativeWrite: async (...args) => { writes.push(args[1].content); await nativeWriteStub(...args) } })
     const created = await tools.find(t => t.name === 'novel_create_book')!.execute({
-      bookName: '世界书回归', concept: { 状态: '已确认', 核心创意: '寻找失踪家人', 题材与目标读者: '悬疑' },
+      bookName: '世界书回归', 市场: '中文', 输出形态: '小说', 目标总字数: 1000000, concept: { 状态: '已确认', 核心创意: '寻找失踪家人', 题材与目标读者: '悬疑' },
     }) as { ok: boolean; bookId: string }
     expect(created.ok).toBe(true)
     const tool = tools.find(t => t.name === 'novel_confirm_worldbook_entry')!

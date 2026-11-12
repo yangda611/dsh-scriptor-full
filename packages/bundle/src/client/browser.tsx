@@ -10,6 +10,7 @@ import { fileKey } from './store'
 import { useEditor, useSession, useStudy } from './hooks'
 import { useDirectoryWatch } from './watch'
 import type { OpenIndex } from './indexing'
+import { OnboardingWizard } from './onboarding'
 
 export interface StudyUI { readonly host: ClientHost; readonly store: EditorStore; readonly openIndex?: OpenIndex }
 
@@ -70,6 +71,7 @@ function StudyBrowser({ sessionId, store, host, openIndex }: { sessionId: string
   const state = useEditor(store, sessionId)
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
+  const [showWizard, setShowWizard] = useState(false)
   useEffect(() => { const timer = window.setTimeout(() => setSearch(query.trim()), 200); return () => window.clearTimeout(timer) }, [query])
   const shelf = useStudy<StudyShelf>(sessionId, 'shelf', {}, state.refresh)
   const watchError = useDirectoryWatch(host, sessionId, shelf.value?.workspace, store)
@@ -92,9 +94,10 @@ function StudyBrowser({ sessionId, store, host, openIndex }: { sessionId: string
         {found.value && !found.value.entries.length ? <p className="nw-empty">没有匹配的书稿或资料</p> : null}
         {found.value?.limited ? <p className="nw-empty">结果较多，请缩小搜索范围</p> : null}
       </> : shelf.value ? <>
-        <div className="nw-section-title"><span>我的作品</span><span>{shelf.value.books.length}</span></div>
+        <div className="nw-section-title"><span>我的作品</span><span><button type="button" className="nw-onboarding-new" onClick={() => setShowWizard(true)}>＋新建书</button>{shelf.value.books.length}</span></div>
+        {showWizard ? <OnboardingWizard sessionId={sessionId} onSaved={() => { void store.refresh(sessionId) }} onClose={() => setShowWizard(false)} /> : null}
         {shelf.value.books.map((book, index) => <Book key={book.id} sessionId={sessionId} book={book} store={store} host={host} initial={index === 0} />)}
-        {!shelf.value.books.length ? <p className="nw-empty">当前工作范围还没有作品。可在对话中开始构想，或切换到已有书仓的工作区。</p> : null}
+        {!shelf.value.books.length && !showWizard ? <p className="nw-empty">当前工作范围还没有作品。<button type="button" className="nw-onboarding-new" onClick={() => setShowWizard(true)}>新建书（点三下选好市场、形态和字数）</button>，或在对话中开始构想。</p> : null}
         <div className="nw-section-title"><span>共享资料</span></div>
         {shelf.value.shared ? <Tree sessionId={sessionId} refValue={{ space: 'shared', path: '' }} store={store} host={host} absolutePath={shelf.value.workspace + '/书房'} /> : <p className={shelf.value.sharedError ? 'nw-error' : 'nw-empty'}>{shelf.value.sharedError ?? '当前书房暂无共享资料'}</p>}
       </> : null}

@@ -18,6 +18,7 @@ const CONCEPT = {
   状态: '已确认',
   核心创意: 'x', 题材与目标读者: 'x', 主角核心欲望: 'x', 主要冲突: 'x',
   核心看点: 'x', 差异化方向: 'x', 明确不要什么: 'x',
+  市场: '中文', 输出形态: '小说', 目标总字数: 1000000,
 }
 
 async function setup(ask?: NovelToolsDeps['askFn']) {

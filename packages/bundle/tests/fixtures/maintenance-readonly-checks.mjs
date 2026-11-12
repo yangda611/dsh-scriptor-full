@@ -21,7 +21,7 @@ function snapshot(root) {
 export async function checkMaintenanceReadonly({ workspace, main, child, ctx, execute, check, report }) {
   await check('只读开章与主动检查不增加状态调用或书仓写入', async () => {
     const bookName = '开章检查验收'
-    const created = await execute(main, 'novel_create_book', { bookName, concept: { 状态: '已确认', 核心创意: '寻找故人', 题材与目标读者: '悬疑' } })
+    const created = await execute(main, 'novel_create_book', { bookName, 市场: '中文', 输出形态: '小说', 目标总字数: 1000000, concept: { 状态: '已确认', 核心创意: '寻找故人', 题材与目标读者: '悬疑' } })
     assert.equal(created.value?.ok, true, JSON.stringify(created))
     const book = path.join(workspace, bookName), bookId = created.value.bookId
     const before = snapshot(book), calls = []

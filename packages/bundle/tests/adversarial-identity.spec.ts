@@ -8,7 +8,7 @@ import { bookRootOfBookIdFor } from '../src/index'
 import { createNovelTools } from '../src/novel-tools'
 import { StudyService } from '../src/study/service'
 import { decideTargetForFile } from '../src/gates'
-import { createStudyHandler, type StudyWebRuntime } from '../src/study/web'
+import { agentList, agentRoots, createStudyHandler, type StudyWebRuntime } from '../src/study/web'
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'webnovel-identity-'))
 afterAll(() => removeSync(scratch))
@@ -86,5 +86,57 @@ describe('host adversarial repro', () => {
       expect(fs.readFileSync(path.join(root, relative), 'utf8')).not.toBe(original)
       fs.writeFileSync(path.join(ws, 'evidence.json'), JSON.stringify({ read, saved, createdDraft2: true }, null, 2))
     }
+  })
+})
+
+describe('rc.2 agents registry compatibility', () => {
+  const post = async (handler: ReturnType<typeof createStudyHandler>, method: string, sessionId: string) => {
+    const response = await handler(new Request('http://127.0.0.1/api/webnovel/study/' + method, { method: 'POST', headers: { 'x-webnovel-request': '1', 'content-type': 'application/json' }, body: JSON.stringify({ sessionId }) }))
+    return { status: response.status, value: await response.json() as any }
+  }
+
+  it('rc.2 registry (list only, no roots): main agent passes, subagent is rejected via origin fallback', async () => {
+    const ws = workspace('rc2-registry-')
+    const main = { id: 'main', session: { header: { cwd: ws } }, followup: () => {} }
+    const sub = { id: 'sub', session: { header: { cwd: ws, origin: 'subagent' } }, followup: () => {} }
+    // rc.2 删掉了 roots()，只有 list()（返回全部 agent，含子智能体）。
+    const runtime: StudyWebRuntime = { agents: { get: id => id === 'main' ? main : id === 'sub' ? sub : undefined, list: () => [main, sub] } }
+    const handler = createStudyHandler(runtime)
+    const ok = await post(handler, 'shelf', 'main')
+    expect(ok.status).toBe(200)
+    expect(ok.value.ok).toBe(true)
+    const denied = await post(handler, 'shelf', 'sub')
+    expect(denied.status).toBe(400)
+    expect(denied.value).toMatchObject({ ok: false, code: 'read-only', error: expect.stringContaining('主会话') })
+  })
+
+  it('rc.1 registry (roots function): agent outside roots is still rejected', async () => {
+    const ws = workspace('rc1-registry-')
+    const main = { id: 'main', session: { header: { cwd: ws } }, followup: () => {} }
+    const sub = { id: 'sub', session: { header: { cwd: ws, origin: 'subagent' } }, followup: () => {} }
+    const runtime: StudyWebRuntime = { agents: { get: id => id === 'main' ? main : id === 'sub' ? sub : undefined, roots: () => [main] } }
+    const handler = createStudyHandler(runtime)
+    expect((await post(handler, 'shelf', 'main')).status).toBe(200)
+    const denied = await post(handler, 'shelf', 'sub')
+    expect(denied.status).toBe(400)
+    expect(denied.value).toMatchObject({ code: 'read-only' })
+  })
+
+  it('agentRoots/agentList never throw and read every registry shape', () => {
+    const a = { id: 'a' } as any
+    const b = { id: 'b' } as any
+    expect(agentRoots(undefined)).toEqual([])
+    expect(agentRoots(null)).toEqual([])
+    expect(agentRoots({})).toEqual([])
+    expect(agentRoots({ roots: () => [a] })).toEqual([a])
+    expect(agentRoots({ roots: [a] })).toEqual([a])
+    expect(agentRoots({ roots: () => { throw new Error('boom') } })).toEqual([])
+    expect(agentRoots({ roots: 'nope' as any })).toEqual([])
+    // list() 返回全部 agent，不能冒充 roots。
+    expect(agentRoots({ list: () => [a, b] } as any)).toEqual([])
+    expect(agentList(undefined)).toEqual([])
+    expect(agentList({ list: () => [a, b] })).toEqual([a, b])
+    expect(agentList({ list: [a] })).toEqual([a])
+    expect(agentList({ list: () => { throw new Error('boom') } })).toEqual([])
   })
 })

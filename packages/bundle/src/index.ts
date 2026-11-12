@@ -31,7 +31,7 @@ import { attachPersonaToAgent, type AgentCtxLike } from './persona'
 import { createNovelTools, type NovelToolDefinition, type ToolExecContext, type AgentLike } from './novel-tools'
 import type { AskFn, EmbeddingProvider } from '@webnovel/core'
 import { EditorRequestHub } from './study/editor-requests'
-import { attachStudyWeb, notifySaved } from './study/web'
+import { agentList, agentRoots, attachStudyWeb, notifySaved } from './study/web'
 import { StudyService } from './study/service'
 import { createNativeWriteBridge, nativeToolRuntime } from './native-write'
 export { nativeToolRuntime } from './native-write'
@@ -407,9 +407,13 @@ export function apply(ctx: Context, entry?: ReturnType<typeof Config> | Webnovel
         ...[...installedAgents.values()].filter(agent => isMainAgent(agent) && isWritingAgent(agent)).flatMap(agent => { const root = agentWorkspaceRoot(agent); return root ? [root] : [] })]
     },
     notify: (book, notice) => {
-      const registry = typeof ctx.get === 'function' ? ctx.get('agents') as { get(id: string): unknown; roots(): readonly AgentLike[] } | undefined : undefined
-      const agent = registry?.roots().find(candidate => (candidate.id === notice.sessionId || candidate.session?.header?.id === notice.sessionId)
-        && registry.get(candidate.id) === candidate)
+      // rc.2 删掉了 agents.roots()：先读 roots（rc.1），读不到再用 list() 枚举全部 agent；
+      // list() 含子智能体，但下面 isMainAgent 会按 origin 挡掉，通知只会发给主会话。
+      const registry = typeof ctx.get === 'function' ? ctx.get('agents') as { get(id: string): unknown; roots?: readonly AgentLike[] | (() => readonly AgentLike[]); list?: readonly AgentLike[] | (() => readonly AgentLike[]) } | undefined : undefined
+      const roots = agentRoots(registry)
+      const candidates = roots.length > 0 ? roots : agentList(registry)
+      const agent = candidates.find(candidate => (candidate.id === notice.sessionId || candidate.session?.header?.id === notice.sessionId)
+        && registry?.get(candidate.id) === candidate)
       if (!agent || !isMainAgent(agent) || !isWritingAgent(agent) || !agent.session?.header || typeof (agent as { followup?: unknown }).followup !== 'function') return false
       if (bookRootOfBookIdFor(book.bookId, agent) !== book.root) return false
       return notifySaved(agent as Parameters<typeof notifySaved>[0], indexFailureMessage(book, notice)).notification === 'delivered'

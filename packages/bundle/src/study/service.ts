@@ -9,6 +9,8 @@ import {
 } from '@webnovel/core'
 import { scanBooks } from '../bookshelf'
 import { progressLineOf } from '../status-context'
+import { onboardingMissing, validateOnboardingAnswers, type OnboardingAnswers } from './onboarding'
+import { consumeOnboardingDraft, readOnboardingDraft, saveOnboardingDraft } from './onboarding-store'
 import type { ChapterView, FileRef, StudyDocument, StudySave, StudyShelf, TreeEntry } from './types'
 import type { IndexBook } from '../indexing/manager'
 import { readStoryGraph } from './graph'
@@ -90,6 +92,25 @@ export class StudyService {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT' && !(error instanceof AuthorDocumentError && error.code === 'not-found')) sharedError = error instanceof Error ? error.message : '共享资料不可访问'
     }
     return { workspace: this.workspace, books, shared, ...(sharedError ? { sharedError } : {}) }
+  }
+
+  /** 建书向导（8.4.4）：读待建书草稿——书房面板点选的答案，novel_create_book 找不到参数时作后备。 */
+  readOnboarding(): OnboardingAnswers {
+    return readOnboardingDraft(this.workspace)
+  }
+
+  /** 建书向导：保存作者点选的答案。三项必须齐全，缺项直接报可读错误，不存半成品。 */
+  saveOnboarding(answers: unknown): OnboardingAnswers {
+    const validated = validateOnboardingAnswers(answers)
+    const missing = onboardingMissing(validated)
+    if (missing.length > 0) throw new AuthorDocumentError('invalid-document', `新建书还差${missing.join('、')}没选，选完再保存`)
+    saveOnboardingDraft(this.workspace, validated)
+    return validated
+  }
+
+  /** 建书向导：清除待建书草稿。 */
+  clearOnboarding(): void {
+    consumeOnboardingDraft(this.workspace)
   }
 
   indexBook(space: string): IndexBook {

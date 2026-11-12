@@ -30,7 +30,7 @@ export async function checkMaintenanceUpgrade({ workspace, ctx, service, execute
   const child = await createPresetAgent(main.agent.ctx.get('agents'), { parentAgent: main.agent, sessionId: 'maintenance-child', meta: { cwd: workspace } })
   try {
     await check('整仓升级真实批准、失败续办和收据保护', async () => {
-      const created = await execute(main.agent, 'novel_create_book', { bookName: '维护验收', concept: { 状态: '已确认', 核心创意: '在旧城找寻故人', 题材与目标读者: '悬疑' } })
+      const created = await execute(main.agent, 'novel_create_book', { bookName: '维护验收', 市场: '中文', 输出形态: '小说', 目标总字数: 1000000, concept: { 状态: '已确认', 核心创意: '在旧城找寻故人', 题材与目标读者: '悬疑' } })
       assert.equal(created.value?.ok, true, JSON.stringify(created))
       const bookId = created.value.bookId, root = path.join(workspace, '维护验收')
       const contract = path.join(root, '作品契约/契约.md')

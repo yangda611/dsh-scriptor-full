@@ -29,7 +29,7 @@ beforeAll(async () => {
   // Book creation has its own suite. Build one real, pristine Git repository here;
   // every receipt scenario gets a full independent copy, including its Git history.
   fs.mkdirSync(path.dirname(seedRoot), { recursive: true })
-  const created = await toolsFor(seedRoot).find(tool => tool.name === 'novel_create_book')!.execute({ bookName: '复查书', concept: {
+  const created = await toolsFor(seedRoot).find(tool => tool.name === 'novel_create_book')!.execute({ bookName: '复查书', 市场: '中文', 输出形态: '小说', 目标总字数: 1000000, concept: {
     状态: '已确认', 核心创意: 'x', 题材与目标读者: 'x', 主角核心欲望: 'x', 主要冲突: 'x', 核心看点: 'x', 差异化方向: 'x', 明确不要什么: 'x',
   } }, {}) as { ok: boolean; bookId: string }
   expect(created.ok).toBe(true)

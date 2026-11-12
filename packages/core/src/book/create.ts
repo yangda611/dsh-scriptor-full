@@ -14,7 +14,7 @@ import { removeSync } from '../repo/remove'
 import { scaffoldBookFiles } from './scaffold'
 import { scanWorkspaceBooks } from './identity'
 import { withBookLock } from '../repo/lock'
-import { checkConceptCompleteness, marketOf, outputFormOf, type Concept } from '../inspire/concept'
+import { checkConceptCompleteness, isTargetTotalWordsValue, marketOf, outputFormOf, targetTotalWordsOf, type Concept } from '../inspire/concept'
 import { isMarketValue, isOutputFormValue } from '../repo/document-fields'
 
 export interface CreateBookInput {
@@ -77,6 +77,10 @@ export function createBook(input: CreateBookInput): CreateBookResult {
   if (input.concept.输出形态 !== undefined && !isOutputFormValue(input.concept.输出形态)) {
     return { ok: false, reason: `输出形态取值非法：${String(input.concept.输出形态)}，只接受 短剧 / 电影剧本 / 小说` }
   }
+  // 建书硬性流程（8.4.4）：构想上显式填了目标总字数但取值非法时拒绝建书（不填时 core 不补默认值，由工具层强制要求）。
+  if (input.concept.目标总字数 !== undefined && !isTargetTotalWordsValue(input.concept.目标总字数)) {
+    return { ok: false, reason: `目标总字数取值非法：${String(input.concept.目标总字数)}，只接受正整数汉字数` }
+  }
 
   try {
     return withBookLock(workspaceRoot, () => {
@@ -88,7 +92,7 @@ export function createBook(input: CreateBookInput): CreateBookResult {
       try {
         fs.mkdirSync(bookRoot)
         created = true
-        scaffoldBookFiles(bookRoot, input.concept, { bookId, 市场: marketOf(input.concept), 输出形态: outputFormOf(input.concept) })
+        scaffoldBookFiles(bookRoot, input.concept, { bookId, 市场: marketOf(input.concept), 输出形态: outputFormOf(input.concept), 目标总字数: targetTotalWordsOf(input.concept) })
         const commit = initFirstCommit(bookRoot)
         return { ok: true, bookRoot, bookId, commit }
       } catch (err) {

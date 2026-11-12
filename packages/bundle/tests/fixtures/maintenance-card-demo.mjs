@@ -41,7 +41,7 @@ export function createMaintenanceCardDemo(workspace) {
     next(messages) {
       if (step > 7) return undefined
       const stage = step++
-      if (stage === 0) return call('novel_create_book', { bookName, concept: { 状态: '已确认', 核心创意: '在旧港找回失踪友人的信件', 题材与目标读者: '悬疑' } })
+      if (stage === 0) return call('novel_create_book', { bookName, 市场: '中文', 输出形态: '小说', 目标总字数: 1000000, concept: { 状态: '已确认', 核心创意: '在旧港找回失踪友人的信件', 题材与目标读者: '悬疑' } })
       const value = lastResult(messages)
       if (stage === 1) {
         if (!value.ok || !value.bookId) throw new Error('Synthetic maintenance demo book was not created')

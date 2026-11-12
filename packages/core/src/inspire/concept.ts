@@ -48,6 +48,8 @@ export interface Concept {
   readonly 市场?: Market
   /** 影视剧扩展（muse-dev）：输出形态，决定走哪条流水线；不填默认 小说。 */
   readonly 输出形态?: OutputForm
+  /** 建书硬性流程（8.4.4）：目标总字数（汉字数）；建书前必须问作者拿到答案，工具层强制要求，core 不设默认值。 */
+  readonly 目标总字数?: number
 }
 
 /** 读不到或非法时按默认值处理（旧书兼容：不报错、不自动补写）。 */
@@ -58,6 +60,17 @@ export function marketOf(concept: Concept | null | undefined): Market {
 /** 读不到或非法时按默认值处理（旧书兼容：不报错、不自动补写）。 */
 export function outputFormOf(concept: Concept | null | undefined): OutputForm {
   return concept !== null && concept !== undefined && isOutputFormValue(concept.输出形态) ? concept.输出形态 : DEFAULT_OUTPUT_FORM
+}
+
+/** 读不到或非法时返回 undefined（旧书兼容：不报错、不自动补写；建书前的必填由工具层强制）。 */
+export function targetTotalWordsOf(concept: Concept | null | undefined): number | undefined {
+  return concept !== null && concept !== undefined && typeof concept.目标总字数 === 'number'
+    && Number.isSafeInteger(concept.目标总字数) && concept.目标总字数 > 0 ? concept.目标总字数 : undefined
+}
+
+/** 校验目标总字数是否合法（正整数汉字数）。 */
+export function isTargetTotalWordsValue(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
 
 export type Completeness =
@@ -116,6 +129,8 @@ export function parseConcept(text: string): Concept | null {
   // 影视剧扩展：frontmatter 里的市场 / 输出形态只认取值表内的值，其余一律视为未填（按默认值处理）。
   const 市场 = r.data.fields[DOCUMENT_FIELDS.market.name]
   const 输出形态 = r.data.fields[DOCUMENT_FIELDS.outputForm.name]
+  // 建书硬性流程（8.4.4）：目标总字数只认正整数，其余视为未填。
+  const 目标总字数 = r.data.fields[DOCUMENT_FIELDS.targetTotalWords.name]
 
   return {
     状态,
@@ -129,6 +144,7 @@ export function parseConcept(text: string): Concept | null {
     要素状态: states,
     ...(isMarketValue(市场) ? { 市场 } : {}),
     ...(isOutputFormValue(输出形态) ? { 输出形态 } : {}),
+    ...(isTargetTotalWordsValue(目标总字数) ? { 目标总字数 } : {}),
   }
 }
 
@@ -143,10 +159,13 @@ export function serializeConcept(concept: Concept): string {
     }
   }
   // 影视剧扩展：市场 / 输出形态写入 frontmatter，未填时写解析出的默认值，保证快照往返不丢选择。
+  // 建书硬性流程（8.4.4）：目标总字数有值才写进 frontmatter，没值不写（不编默认值）。
+  const totalWords = targetTotalWordsOf(concept)
   return serializeDocument({
     状态: concept.状态,
     [DOCUMENT_FIELDS.market.name]: marketOf(concept),
     [DOCUMENT_FIELDS.outputForm.name]: outputFormOf(concept),
+    ...(totalWords === undefined ? {} : { [DOCUMENT_FIELDS.targetTotalWords.name]: totalWords }),
   }, lines.join('\n').trimEnd() + '\n')
 }
 

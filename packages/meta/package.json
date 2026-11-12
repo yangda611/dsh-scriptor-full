@@ -1,6 +1,6 @@
 {
   "name": "@yangda611/dsh-scriptor-full",
-  "version": "8.4.3",
+  "version": "8.4.4",
   "description": "网文写作工作台完整版入口：与主包相同，检索增强已包含在主包内",
   "keywords": [
     "dsh-plugin",

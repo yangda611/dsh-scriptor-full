@@ -19,16 +19,59 @@ import {
 
 interface StudyAgent extends WorkflowAgent {
   readonly id: string
-  readonly session: WorkflowAgent['session'] & { readonly header: { readonly cwd?: string } }
+  readonly session: WorkflowAgent['session'] & { readonly header: { readonly cwd?: string; readonly origin?: string } }
   followup(message: UserMessage): void
 }
 
 export interface StudyWebRuntime {
-  readonly agents: { get(id: string): StudyAgent | undefined; roots(): readonly StudyAgent[] }
+  readonly agents: {
+    get(id: string): StudyAgent | undefined
+    /** rc.1 有 roots()；rc.2 删掉了 roots，只有 list()（返回全部 agent，非根）。 */
+    roots?: readonly StudyAgent[] | (() => readonly StudyAgent[])
+    list?: readonly StudyAgent[] | (() => readonly StudyAgent[])
+  }
+}
+
+/** 兼容读取根 agent 列表（DSH 0.2.2-rc.2 删掉了 agents.roots()）：
+ *  roots 是函数就调用（rc.1），是数组就直接用，都没有或读失败就返回空数组，绝不抛错。
+ *  注意：不要用 list() 冒充 roots——rc.1 和 rc.2 的 list() 返回的都是全部存活 agent（含子智能体），
+ *  拿它做“是不是主会话”判断会把子智能体也放进来。 */
+export function agentRoots<T>(registry: {
+  readonly roots?: readonly T[] | (() => readonly T[])
+} | undefined | null): readonly T[] {
+  if (!registry) return []
+  const value = registry.roots
+  if (typeof value === 'function') {
+    try {
+      const result = (value as () => readonly T[])()
+      if (Array.isArray(result)) return result
+    } catch { /* 读失败，返回空数组 */ }
+  } else if (Array.isArray(value)) {
+    return value
+  }
+  return []
+}
+
+/** 兼容读取全部存活 agent（rc.1 和 rc.2 都有 list()，返回全部 agent 含子智能体）：
+ *  仅用于“按会话 id 找 agent”这类枚举场景，调用方必须自己再校验主从身份。 */
+export function agentList<T>(registry: {
+  readonly list?: readonly T[] | (() => readonly T[])
+} | undefined | null): readonly T[] {
+  if (!registry) return []
+  const value = registry.list
+  if (typeof value === 'function') {
+    try {
+      const result = (value as () => readonly T[])()
+      if (Array.isArray(result)) return result
+    } catch { /* 读失败，返回空数组 */ }
+  } else if (Array.isArray(value)) {
+    return value
+  }
+  return []
 }
 
 export const STUDY_API_PATH = '/api/webnovel/study/'
-const METHODS = ['shelf', 'tree', 'read', 'resolve', 'search', 'chapters', 'graph', 'graph-view', 'graph-preview', 'graph-control', 'book-inspection', 'workflow', 'save', 'notify', 'retry-commit', 'index-status', 'index-control', 'ask', 'ask-cancel', 'suggestions']
+const METHODS = ['shelf', 'tree', 'read', 'resolve', 'search', 'chapters', 'graph', 'graph-view', 'graph-preview', 'graph-control', 'book-inspection', 'workflow', 'save', 'notify', 'retry-commit', 'index-status', 'index-control', 'ask', 'ask-cancel', 'suggestions', 'onboarding']
 
 function graphReaderRequest(input: Record<string, unknown>): GraphReaderRequest {
   const result: Record<string, unknown> = {}
@@ -221,7 +264,10 @@ export function createStudyHandler(runtime: StudyWebRuntime, indexing?: BookInde
       request.signal.throwIfAborted()
       const sessionId = stringOf(input, 'sessionId')
       const agent = runtime.agents.get(sessionId)
-      if (!agent || !runtime.agents.roots().includes(agent)) throw new AuthorDocumentError('read-only', '请在当前主会话中打开书房')
+      // 拿不到 roots 列表时不直接拒绝：按 session origin 判断主会话（与 isMainAgent 的回退一致）。
+      const roots = agentRoots(runtime.agents)
+      const isRoot = agent !== undefined && (roots.length > 0 ? roots.includes(agent) : agent.session?.header?.origin !== 'subagent')
+      if (!agent || !isRoot) throw new AuthorDocumentError('read-only', '请在当前主会话中打开书房')
       const cwd = agent.session.header.cwd
       if (!cwd || !isFullyQualifiedPath(cwd)) throw new AuthorDocumentError('invalid-path', '当前会话没有有效工作范围')
       const service = new StudyService(cwd)
@@ -315,6 +361,15 @@ export function createStudyHandler(runtime: StudyWebRuntime, indexing?: BookInde
         case 'ask-cancel': value = { items: editorRequests.cancel(agent, requestIdsOf(input)) }; break
         case 'suggestions': value = editorRequests.view(agent, requestIdsOf(input)); break
         case 'retry-commit': value = service.retryCommit(refOf(input), stringOf(input, 'hash'), stringOf(input, 'operationId'), sessionId); break
+        case 'onboarding': {
+          // 建书向导：读 / 保存 / 清除待建书草稿。保存时三项必须齐全，由 service 校验。
+          const action = typeof input['action'] === 'string' ? input['action'] : 'read'
+          if (action === 'save') value = { saved: service.saveOnboarding(input['answers']) }
+          else if (action === 'clear') { service.clearOnboarding(); value = { cleared: true } }
+          else if (action === 'read') value = { answers: service.readOnboarding() }
+          else throw new AuthorDocumentError('invalid-document', '未知的向导操作')
+          break
+        }
         default: return reply(404, { ok: false, code: 'not-found', error: '未知书房操作' })
       }
       return reply(200, { ok: true, value })
