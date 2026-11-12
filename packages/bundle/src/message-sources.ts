@@ -5,6 +5,7 @@ export const MEMORY_CATALOG_SOURCE = 'plugin:webnovel-memory-catalog'
 export const AUTHOR_SAVE_SOURCE = 'plugin:webnovel'
 export const EDITOR_REQUEST_SOURCE = 'plugin:webnovel-editor'
 export const DRAFT_LENGTH_SOURCE = 'plugin:webnovel-draft-length'
+export const ORPHAN_REPAIR_SOURCE = 'plugin:webnovel-orphan'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -12,6 +13,7 @@ declare module '@deepseek-ai/dsh-llm' {
     'plugin:webnovel': { kind: typeof AUTHOR_SAVE_SOURCE; documentPath?: string } & ContextFormed
     'plugin:webnovel-editor': { kind: typeof EDITOR_REQUEST_SOURCE; requestId: string }
     'plugin:webnovel-draft-length': { kind: typeof DRAFT_LENGTH_SOURCE }
+    'plugin:webnovel-orphan': { kind: typeof ORPHAN_REPAIR_SOURCE } & ContextFormed
   }
 }
 

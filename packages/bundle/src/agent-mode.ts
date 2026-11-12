@@ -9,7 +9,10 @@ interface AgentContext {
   readonly ctx?: unknown
 }
 
-/** Use the live preset binding; titles, cwd, and historical origin are not mode evidence. */
+/** Use the live preset binding; titles, cwd, and historical origin are not mode evidence.
+ *
+ * 8.4.5：这个能力不再是小说工具/技能的门（主 Agent 一律注册，见 index.ts）；
+ * 它现在只决定写作预设的附加挂载：主控 persona、书架总览与写作委派。 */
 export function writingCapabilityOf(agent: AgentContext | undefined): WritingCapability | undefined {
   try {
     const ctx = agent?.ctx as { get?(name: string): unknown } | undefined

@@ -1,5 +1,4 @@
-import { isWritingAgent } from '../agent-mode'
-import { AUTHOR_SAVE_SOURCE, EDITOR_REQUEST_SOURCE } from '../message-sources'
+import { AUTHOR_SAVE_SOURCE, EDITOR_REQUEST_SOURCE, ORPHAN_REPAIR_SOURCE } from '../message-sources'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import { boundContextSummary, createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
@@ -71,7 +70,7 @@ export function agentList<T>(registry: {
 }
 
 export const STUDY_API_PATH = '/api/webnovel/study/'
-const METHODS = ['shelf', 'tree', 'read', 'resolve', 'search', 'chapters', 'graph', 'graph-view', 'graph-preview', 'graph-control', 'book-inspection', 'workflow', 'save', 'notify', 'retry-commit', 'index-status', 'index-control', 'ask', 'ask-cancel', 'suggestions', 'onboarding']
+const METHODS = ['shelf', 'tree', 'read', 'resolve', 'search', 'chapters', 'graph', 'graph-view', 'graph-preview', 'graph-control', 'book-inspection', 'workflow', 'save', 'notify', 'retry-commit', 'index-status', 'index-control', 'ask', 'ask-cancel', 'suggestions', 'onboarding', 'orphan-repair']
 
 function graphReaderRequest(input: Record<string, unknown>): GraphReaderRequest {
   const result: Record<string, unknown> = {}
@@ -370,6 +369,21 @@ export function createStudyHandler(runtime: StudyWebRuntime, indexing?: BookInde
           else throw new AuthorDocumentError('invalid-document', '未知的向导操作')
           break
         }
+        case 'orphan-repair': {
+          // 孤儿书稿修复入口：只接受 shelf() 刚扫到的相对路径，拒绝任意路径，
+          // 再以跟进消息请主控用 novel_create_book 重建并迁移已有内容。
+          const relPath = stringOf(input, 'path')
+          const orphan = (service.shelf().orphans ?? []).find(item => item.path === relPath)
+          if (!orphan) throw new AuthorDocumentError('not-found', '没有找到这个未按规范建立的书稿目录，请刷新书房后重试')
+          const message = `书房发现未按规范建立的书稿目录《${orphan.name}》（${orphan.path}，${orphan.detail}），缺作品契约（作品契约/契约.md），所以没出现在「我的作品」里。请用 novel_create_book 重新建书（书名、市场、输出形态、目标总字数先问作者，书房向导已保存的选择直接用），再把已有内容（大纲、章节）按规范迁进新书仓；迁完告诉作者书已出现在「我的作品」里。如果已有内容不值得迁，也请明确告诉作者，不要手写文件冒充建书。`
+          try {
+            agent.followup(createUserMessage({ content: [{ type: 'text', text: message }], source: { kind: ORPHAN_REPAIR_SOURCE } }))
+          } catch {
+            throw new Error('主控没有收到请求')
+          }
+          value = { requested: true, path: orphan.path }
+          break
+        }
         default: return reply(404, { ok: false, code: 'not-found', error: '未知书房操作' })
       }
       return reply(200, { ok: true, value })
@@ -407,7 +421,7 @@ export function attachStudyWeb(ctx: Context, indexing?: BookIndexManager, editor
         return { parentId: observation.header.parentSession, active: false }
       } finally { observation[Symbol.dispose]() }
     }
-    const handler = createStudyHandler(scope, indexing, workflow, editorRequests, agent => isWritingAgent(agent as { ctx?: unknown }), readChild)
+    const handler = createStudyHandler(scope, indexing, workflow, editorRequests, () => true, readChild)
     for (const method of METHODS) {
       scope.connection.fetch.register({ path: STUDY_API_PATH + method, methods: ['POST'], requestBody: 'streaming', fetch: handler })
     }

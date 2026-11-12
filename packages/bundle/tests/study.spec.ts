@@ -64,6 +64,23 @@ describe('真实书房目录服务', () => {
     expect(service.shelf().books.every(book => !!book.error)).toBe(true)
     expect(() => service.read({ space: 'book:fog', path: '作品契约/契约.md' })).toThrow(/不唯一/)
   })
+  it('未按规范建立的书稿目录被扫为孤儿，不进书目也不误判构想草案', () => {
+    // 8.4.4 实证：AI 绕过建书工具手写的文件，落在 书房/夜单听心/ 下。
+    put('书房/夜单听心/书籍信息.json', '{"书名":"夜单听心"}')
+    put('书房/夜单听心/故事大纲.md', '# 大纲\n')
+    put('书房/夜单听心/第一章-雨夜来客.md', '# 第一章\n')
+    put('散稿/书籍信息.json', '{"书名":"散稿"}')
+    put('书房/构想/待建书.md', '# 构想草案\n')
+    const service = new StudyService(root)
+    const shelf = service.shelf()
+    expect(shelf.books.map(book => book.id).sort()).toEqual(['book:fog', 'book:night'])
+    expect(shelf.orphans).toMatchObject([
+      { name: '散稿', path: '散稿' },
+      { name: '夜单听心', path: '书房/夜单听心' },
+    ])
+    expect(shelf.orphans?.[1]?.detail).toContain('书籍信息.json')
+    expect(shelf.orphans?.some(orphan => orphan.path.includes('构想'))).toBe(false)
+  })
   it('解析失败只读，正文不会被截断或重写', () => {
     put('书房/知识库/损坏.md', '---\n不闭合\n原文')
     const doc = new StudyService(root).read({ space: 'shared', path: '知识库/损坏.md' })
@@ -210,6 +227,23 @@ describe('已通过宿主认证的书房 Fetch 保存和原生通知入口', () 
     expect(saved.body.value?.notification).toBe('not-required')
     expect(new StudyService(root).read(contract).body).toContain('。')
     expect(followup).not.toHaveBeenCalled()
+  })
+  it('孤儿书稿修复只接受 shelf 扫到的路径，并请主控用建书工具重建', async () => {
+    put('书房/夜单听心/书籍信息.json', '{"书名":"夜单听心"}')
+    put('书房/夜单听心/第一章-雨夜来客.md', '# 第一章\n')
+    const { post, followup } = await serve()
+    const repaired = await post('orphan-repair', { path: '书房/夜单听心' })
+    expect(repaired.status).toBe(200)
+    expect((repaired.body.value as unknown as { requested: boolean; path: string })).toMatchObject({ requested: true, path: '书房/夜单听心' })
+    expect(followup).toHaveBeenCalledTimes(1)
+    expect(followup.mock.calls[0]?.[0].source).toMatchObject({ kind: 'plugin:webnovel-orphan' })
+    const message = JSON.stringify(followup.mock.calls[0]?.[0].content)
+    expect(message).toContain('夜单听心')
+    expect(message).toContain('novel_create_book')
+    expect(message).toContain('作品契约')
+    expect((await post('orphan-repair', { path: '书房/不存在的书' })).status).toBe(404)
+    expect((await post('orphan-repair', { path: '../长夜' })).status).toBe(404)
+    expect(followup).toHaveBeenCalledTimes(1)
   })
 })
 

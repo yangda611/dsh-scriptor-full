@@ -18,12 +18,14 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolExecutionToken, ToolRuntime } from '@deepseek-ai/dsh-tools'
+import * as skillFilesystem from '@deepseek-ai/dsh-skill-filesystem'
+import { fileURLToPath } from 'node:url'
 import z from '@deepseek-ai/schemastery'
 import { attachFileGateToAgent } from './gates'
 import { attachDraftLengthFeedbackToAgent } from './draft-length-feedback'
 import { attachWorkerPolicyToAgent } from './worker-policy'
 import { attachWritingDelegationToAgent, writingRoleOf } from './writing-delegation'
-import { isWritingAgent, writingCapabilityOf, type WritingCapability } from './agent-mode'
+import { writingCapabilityOf, type WritingCapability } from './agent-mode'
 import { uniqueBookRoot, scanBooks } from './bookshelf'
 import { attachStatusToAgent, type SystemPromptLike } from './status-context'
 import { canonicalizePath, isFullyQualifiedPath, isInsidePath } from '@webnovel/core'
@@ -364,6 +366,20 @@ export function apply(ctx: Context, entry?: ReturnType<typeof Config> | Webnovel
     refresh(): Promise<void> { return refreshInstalledAgents() },
   }
   if (typeof ctx.provide === 'function') ctx.provide('webnovelHost', writingHost)
+  // 捆绑技能（8.4.5）：不再只挂在写作预设的隔离插件里——实测里标准预设会话
+  // 的技能目录只有 dsh-doc + office，模型看不到 novel-* 技能。改由主包在根
+  // scope 挂一次（preset.ts 不再重复挂，避免同一 provider 注册两次），任何
+  // 预设的主会话都能按需加载写作技能；写作预设本身只保留能力提供与刷新。
+  step(ctx, 'webnovel:bundled-skills', () => {
+    const fiber = typeof ctx.plugin === 'function'
+      ? ctx.plugin(skillFilesystem, {
+        providerName: 'webnovel-bundled',
+        includeDefaultRoots: true,
+        bundledSkillDir: fileURLToPath(new URL('../skills/', import.meta.url)),
+      }) as unknown as FiberLike | undefined
+      : undefined
+    return () => { void fiber?.dispose?.() }
+  })
   // 每会话 agent 装机状态与工具注册产物（effect 可回滚：undo 清空）。
   const installedAgents = new Map<string, AgentLike>()
   const installedModes = new Map<string, WritingCapability | undefined>()
@@ -404,7 +420,7 @@ export function apply(ctx: Context, entry?: ReturnType<typeof Config> | Webnovel
     workspaces: () => {
       const registry = typeof ctx.get === 'function' ? ctx.get('workspaceRegistry') as { list(): readonly { path?: string }[] } | undefined : undefined
       return [...(typeof registry?.list === 'function' ? registry.list() : []).flatMap(workspace => workspace.path ? [workspace.path] : []),
-        ...[...installedAgents.values()].filter(agent => isMainAgent(agent) && isWritingAgent(agent)).flatMap(agent => { const root = agentWorkspaceRoot(agent); return root ? [root] : [] })]
+        ...[...installedAgents.values()].filter(agent => isMainAgent(agent)).flatMap(agent => { const root = agentWorkspaceRoot(agent); return root ? [root] : [] })]
     },
     notify: (book, notice) => {
       // rc.2 删掉了 agents.roots()：先读 roots（rc.1），读不到再用 list() 枚举全部 agent；
@@ -414,7 +430,7 @@ export function apply(ctx: Context, entry?: ReturnType<typeof Config> | Webnovel
       const candidates = roots.length > 0 ? roots : agentList(registry)
       const agent = candidates.find(candidate => (candidate.id === notice.sessionId || candidate.session?.header?.id === notice.sessionId)
         && registry?.get(candidate.id) === candidate)
-      if (!agent || !isMainAgent(agent) || !isWritingAgent(agent) || !agent.session?.header || typeof (agent as { followup?: unknown }).followup !== 'function') return false
+      if (!agent || !isMainAgent(agent) || !agent.session?.header || typeof (agent as { followup?: unknown }).followup !== 'function') return false
       if (bookRootOfBookIdFor(book.bookId, agent) !== book.root) return false
       return notifySaved(agent as Parameters<typeof notifySaved>[0], indexFailureMessage(book, notice)).notification === 'delivered'
     },
@@ -492,9 +508,15 @@ export function apply(ctx: Context, entry?: ReturnType<typeof Config> | Webnovel
   }
 
   /** 主 Agent scoped 注册（E1/E2 落码）：经 agent 的 scope 层注册，对该 agent
-   *  与其后代可见，兄弟 agent 不可见；off 收进 agentToolOffs 随插件卸载撤销。 */
+   *  与其后代可见，兄弟 agent 不可见；off 收进 agentToolOffs 随插件卸载撤销。
+   *
+   *  8.4.5（DSH Web 实证）：novel_* 工具不再以写作预设能力为门——实测里
+   *  「写作模式」预设确实存在于选择器中，但默认会话用标准预设，用户从书房
+   *  向导进对话也不会自动切预设，工具于是全程缺席，书建不出来。用户的硬要求
+   *  是装上插件就能建书，预设隔离只是 nice-to-have；因此主 Agent 一律注册，
+   *  子 Agent 仍由 restrictNovelToolsInto 全封，文件门禁也照旧。写作预设仍
+   *  保留：它继续提供 persona、书架总览与委派策略。 */
   function registerToolsInto(agent: AgentLike): boolean {
-    if (!isWritingAgent(agent)) return false
     if (toolKit === undefined) return false
     if (agentToolOffs.has(agent.id)) return true
     const registry = agentCtxGet<ToolRuntime>(agent, 'tools')
@@ -527,9 +549,12 @@ export function apply(ctx: Context, entry?: ReturnType<typeof Config> | Webnovel
 
   /** 子 Agent restrict（E2）：deny 名单须是子 Agent 当前可见面的已知名字，
    *  工具尚未注册到祖先层时 restrict 会抛「未知名字」——此时返回 false，
-   *  由第三步反应式驱动在工具面就绪后重挂（registerAllInstalled 尾部）。 */
+   *  由第三步反应式驱动在工具面就绪后重挂（registerAllInstalled 尾部）。
+   *
+   *  8.4.5：小说工具现在注册给每一个主 Agent，子 Agent 会从祖先 scope 继承
+   *  看到它们，因此 restrict 不再以写作能力或委派角色为条件——所有子 Agent
+   *  一律全封，写作只走主 Agent 与 novel_delegate 委派。 */
   function restrictNovelToolsInto(agent: AgentLike): boolean {
-    if (!isWritingAgent(agent) && writingRoleOf(agent) === undefined) return false
     if (toolKit === undefined) return false
     if (agentRestrictOffs.has(agent.id)) return true
     const tools = agentCtxGet<{ restrict?: (filter: { deny?: readonly string[] }) => () => void }>(agent, 'tools')
@@ -632,29 +657,32 @@ export function apply(ctx: Context, entry?: ReturnType<typeof Config> | Webnovel
       // origin 是持久化历史；服务按当前活体归属区分主控与受委派者。
       // D10：本 agent 会话所附工作区根（会话 cwd 优先，全局认领兜底）。
       const rootOf = (): string | undefined => agentWorkspaceRoot(agent)
-      if (capability !== undefined && !isSubagent) {
+      if (!isSubagent) {
+        // 主 Agent：小说工具一律注册（8.4.5，不再以写作预设能力为门；toolKit
+        // 未就绪时由第三步反应式补装）。persona、书架总览与委派仍只在写作预设下挂载。
         const workspace = rootOf()
         if (workspace) indexing.addWorkspace(workspace)
-        // 主 Agent persona（轻适配：scoped shadow deployment:persona-prefix，不压 dsh 原生指引段）。
-        // 每件挂载独立容错（运行时对齐批）：单件失败只 warn，不中断装机序列、不拖垮工具/门禁。
-        try {
-          const offPersona = attachPersonaToAgent(agentCtx as unknown as AgentCtxLike, undefined, { logger: ctx.logger })
-          if (offPersona !== undefined) attached.push(offPersona)
-        } catch (err) {
-          ctx.logger.warn(`[webnovel-bundle] persona 挂载失败（${agentId}）：${err instanceof Error ? err.message : String(err)}`)
-        }
-        // 书架总览——经 agent.ctx 挂 scoped systemPrompt.context。
-        try {
-          const offStatus = attachStatusToAgent(agentCtx, { workspaceRoot: rootOf })
-          if (offStatus !== undefined) attached.push(offStatus)
-        } catch (err) {
-          ctx.logger.warn(`[webnovel-bundle] 状态注入挂载失败（${agentId}）：${err instanceof Error ? err.message : String(err)}`)
-        }
-        // 主 Agent scoped 工具注册（toolKit 未就绪时由第三步反应式补装）。
         registerToolsInto(agent)
-        const offDelegation = attachWritingDelegationToAgent(agent)
-        if (offDelegation !== undefined) attached.push(offDelegation)
-      } else if (isSubagent && (capability !== undefined || role !== undefined)) {
+        if (capability !== undefined) {
+          // 主 Agent persona（轻适配：scoped shadow deployment:persona-prefix，不压 dsh 原生指引段）。
+          // 每件挂载独立容错（运行时对齐批）：单件失败只 warn，不中断装机序列、不拖垮工具/门禁。
+          try {
+            const offPersona = attachPersonaToAgent(agentCtx as unknown as AgentCtxLike, undefined, { logger: ctx.logger })
+            if (offPersona !== undefined) attached.push(offPersona)
+          } catch (err) {
+            ctx.logger.warn(`[webnovel-bundle] persona 挂载失败（${agentId}）：${err instanceof Error ? err.message : String(err)}`)
+          }
+          // 书架总览——经 agent.ctx 挂 scoped systemPrompt.context。
+          try {
+            const offStatus = attachStatusToAgent(agentCtx, { workspaceRoot: rootOf })
+            if (offStatus !== undefined) attached.push(offStatus)
+          } catch (err) {
+            ctx.logger.warn(`[webnovel-bundle] 状态注入挂载失败（${agentId}）：${err instanceof Error ? err.message : String(err)}`)
+          }
+          const offDelegation = attachWritingDelegationToAgent(agent)
+          if (offDelegation !== undefined) attached.push(offDelegation)
+        }
+      } else {
         // 子 Agent 运行时全封（E2＋R8，运行时对齐批）：
         // ① tools.restrict({deny}) 收掉小说工具继承面；原生工具面由预设和角色策略分配；
         //    工具面未就绪时由第三步反应式补挂；

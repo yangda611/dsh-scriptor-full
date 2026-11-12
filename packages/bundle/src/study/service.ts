@@ -54,6 +54,37 @@ function fieldLabel(text: string): { badge?: string; version: string | number | 
   return { badge, version }
 }
 
+/** 疑似书稿目录的信号文件名：手写建书常留下的痕迹（8.4.4 实证：AI 绕过
+ *  novel_create_book，用通用写工具在 书房/夜单听心/ 下写了这三类文件）。
+ *  构想草案（书房/构想/ 下的单篇 md）不在此列，不会被误判。 */
+const ORPHAN_SIGNALS = ['书籍信息.json', '故事大纲.md', '大纲.md']
+
+function orphanSignals(dir: string): readonly string[] | undefined {
+  let entries: string[]
+  try { entries = fs.readdirSync(dir) } catch { return undefined }
+  const found = entries.filter(name => ORPHAN_SIGNALS.includes(name) || /^第.+章/.test(name)).sort()
+  return found.length > 0 ? found : undefined
+}
+
+/** 扫描未按规范建立的疑似书稿目录：工作范围根下一级目录（除已认的书与
+ *  书房本身）与 书房/ 下的子目录中，含书稿痕迹、却缺 作品契约/契约.md 的。
+ *  只读扫描，不写不删；返回工作范围相对路径，供书房面板提示与修复入口用。 */
+export function scanOrphanDrafts(workspace: string, bookNames: ReadonlySet<string>): readonly { name: string, path: string, detail: string }[] {
+  const orphans: { name: string, path: string, detail: string }[] = []
+  const scanLevel = (parent: string, prefix: string, skip: ReadonlySet<string>): void => {
+    let entries: fs.Dirent[]
+    try { entries = fs.readdirSync(parent, { withFileTypes: true }) } catch { return }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || skip.has(entry.name)) continue
+      const signals = orphanSignals(path.join(parent, entry.name))
+      if (signals !== undefined) orphans.push({ name: entry.name, path: prefix + entry.name, detail: `含 ${signals.join('、')}` })
+    }
+  }
+  scanLevel(workspace, '', new Set([...bookNames, '书房']))
+  scanLevel(path.join(workspace, '书房'), '书房/', new Set())
+  return orphans
+}
+
 export class StudyService {
   readonly workspace: string
   constructor(workspace: string) {
@@ -61,7 +92,6 @@ export class StudyService {
     this.workspace = canonicalizePath(workspace)
     if (!fs.existsSync(this.workspace) || !fs.statSync(this.workspace).isDirectory()) throw new AuthorDocumentError('not-found', '工作范围目录不存在')
   }
-
   private source(space: string): { root: string; owner: string; bookId?: string } {
     if (space === 'shared') {
       const root = authorDocumentPath(this.workspace, '书房')
@@ -91,7 +121,8 @@ export class StudyService {
     try { shared = fs.statSync(this.source('shared').root).isDirectory() } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT' && !(error instanceof AuthorDocumentError && error.code === 'not-found')) sharedError = error instanceof Error ? error.message : '共享资料不可访问'
     }
-    return { workspace: this.workspace, books, shared, ...(sharedError ? { sharedError } : {}) }
+    const orphans = scanOrphanDrafts(this.workspace, new Set(scanned.map(book => book.name)))
+    return { workspace: this.workspace, books, shared, ...(sharedError ? { sharedError } : {}), orphans }
   }
 
   /** 建书向导（8.4.4）：读待建书草稿——书房面板点选的答案，novel_create_book 找不到参数时作后备。 */

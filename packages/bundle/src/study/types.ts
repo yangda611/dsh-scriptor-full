@@ -21,11 +21,21 @@ export interface StudyBook {
   readonly error?: string
 }
 
+export interface StudyOrphan {
+  readonly name: string
+  /** 工作范围相对路径，如 `书房/夜单听心`。 */
+  readonly path: string
+  /** 目录里已有的书稿痕迹，如 `含 书籍信息.json、故事大纲.md`。 */
+  readonly detail: string
+}
+
 export interface StudyShelf {
   readonly workspace: string
   readonly books: readonly StudyBook[]
   readonly shared: boolean
   readonly sharedError?: string
+  /** 未按规范建立的疑似书稿目录（缺作品契约/契约.md，书房不认）。 */
+  readonly orphans?: readonly StudyOrphan[]
 }
 
 export interface TreeEntry {

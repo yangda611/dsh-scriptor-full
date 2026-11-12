@@ -181,7 +181,7 @@ try {
   })).agent
   report.identities = { main: main.id, child: child.id, sessionFormat: main.session.header.version, runtimeRoots: service('agents').roots().map(agent => agent.id) }
 
-  await check('写作模式与普通模式并存且普通文件遵循宿主路径', async () => {
+  await check('普通模式也有小说工具、persona 与总览仍按预设隔离', async () => {
     const ordinaryCwd = path.join(root, 'ordinary-workspace')
     fs.mkdirSync(ordinaryCwd)
     const ordinary = await createPresetAgent(service('agents'), { sessionId: 'ordinary-main', meta: { cwd: ordinaryCwd } }, 'standard')
@@ -189,12 +189,14 @@ try {
     let approvals = 0
     const off = ctx.on('approval/request', async () => { approvals++; return 'rejected' })
     try {
-      assert.deepEqual(schemas(ordinary.agent), [])
+      // 8.4.5：小说工具与捆绑技能不再以写作预设为门，标准预设主会话也有；
+      // persona 与书架总览仍只在写作预设下挂载；子 Agent 仍全封。
+      assert.equal(schemas(ordinary.agent).length, toolCatalog.business.length)
       assert.deepEqual(schemas(delegated.agent), [])
       const ordinaryPrompt = await presentation(ordinary.agent)
       assert.equal(ordinaryPrompt.persona.some(section => section.text.includes('写作工作台')), false)
       assert.deepEqual(ordinaryPrompt.status, [])
-      assert.equal((await service('skills').list({ cwd: ordinaryCwd, scope: ordinary.agent })).filter(skill => skill.name.startsWith('novel-')).length, 0)
+      assert.equal((await service('skills').list({ cwd: ordinaryCwd, scope: ordinary.agent })).filter(skill => skill.name.startsWith('novel-')).length, 14)
       assert.equal(service('approval').overrideOf(delegated.agent.session), undefined)
       const written = await execute(ordinary.agent, 'write', { file_path: 'relative.md', content: 'ordinary' })
       assert.equal(written.isError, false, JSON.stringify(written))
@@ -205,7 +207,7 @@ try {
       assert.equal(denied.isError, true)
       assert.ok(fs.readFileSync(chapter, 'utf8').includes('原定稿正文'))
       assert.equal(schemas(main).length, toolCatalog.business.length)
-      report.writingMode = { separateTools: true, separateContext: true, separateSkills: true, ordinaryRelativePath: true, bookStillProtected: true }
+      report.writingMode = { separateTools: false, separateContext: true, separateSkills: false, ordinaryRelativePath: true, bookStillProtected: true }
     } finally { off(); await delegated.dispose(); await ordinary.dispose() }
   })
 
@@ -554,7 +556,7 @@ try {
       assert.equal(bundle.currentWorkspaceRoot(), fs.realpathSync.native(next))
     }
   })
-  await check('写作能力停用与技能依赖中断期间即时撤销', async () => {
+  await check('写作能力停用期间工具保留、persona 与总览撤销', async () => {
     // Inspect the exact capability owner; newer presets expose detached inventory only.
     const capability = service('agentPresets').serviceFor(main, 'webnovelWriting')
     const implementation = Object.getOwnPropertySymbols(ctx.reflect.store)
@@ -564,13 +566,14 @@ try {
     const tree = writingEntry.parent.tree
     const assertInactive = async () => {
       assert.equal(service('agentPresets').serviceFor(main, 'webnovelWriting'), undefined)
-      assert.deepEqual(schemas(main), [])
+      // 8.4.5：小说工具不再以写作能力为门，能力停用后主 Agent 的工具仍在，
+      // 只有 persona 与书架总览随能力撤销；建书工具照常可用，文件门禁照旧。
+      assert.equal(schemas(main).length, toolCatalog.business.length)
       const prompt = await presentation(main)
       assert.equal(prompt.persona.some(section => section.text.includes('写作工作台')), false)
       assert.deepEqual(prompt.status, [])
-      const rejected = await execute(main, 'novel_select_book', { bookId: 'loader-book' })
-      assert.equal(rejected.isError, true)
-      assert.match(JSON.stringify(rejected), /UNKNOWN_TOOL/)
+      const selected = await execute(main, 'novel_select_book', { bookId: 'loader-book' })
+      assert.equal(selected.value.ok, true, JSON.stringify(selected))
       const before = fs.readFileSync(chapter, 'utf8')
       assert.equal((await execute(main, 'write', { file_path: chapter, content: '不能绕过保护' })).isError, true)
       assert.equal(fs.readFileSync(chapter, 'utf8'), before)
@@ -595,11 +598,11 @@ try {
     const original = structuredClone(declaration.options.config)
     let newer
     try {
-      assert.deepEqual(schemas(blank.agent), [])
+      assert.equal(schemas(blank.agent).length, toolCatalog.business.length)
       await presets.select(blank.agent, 'scriptor')
       assert.equal(schemas(blank.agent).length, toolCatalog.business.length)
       await presets.select(blank.agent, 'standard')
-      assert.deepEqual(schemas(blank.agent), [])
+      assert.equal(schemas(blank.agent).length, toolCatalog.business.length)
       assert.equal((await presentation(blank.agent)).status.length, 0)
       const originalCapability = presets.serviceFor(main, 'webnovelWriting')
       await declaration.update({ config: { ...original, description: '同 ID 的新代际' } }, false, true)
@@ -609,7 +612,7 @@ try {
       assert.equal(presets.serviceFor(main, 'webnovelWriting'), originalCapability)
       assert.equal(schemas(main).length, toolCatalog.business.length)
       assert.equal(schemas(newer.agent).length, toolCatalog.business.length)
-      assert.deepEqual(schemas(blank.agent), [])
+      assert.equal(schemas(blank.agent).length, toolCatalog.business.length)
     } finally {
       await newer?.dispose()
       await declaration.update({ config: original }, false, true)

@@ -7,6 +7,7 @@ import { HintTooltip } from './tooltip'
 import type { ClientHost, WorkspaceProps } from './host'
 import type { EditorStore } from './store'
 import { fileKey } from './store'
+import { callStudy } from './api'
 import { useEditor, useSession, useStudy } from './hooks'
 import { useDirectoryWatch } from './watch'
 import type { OpenIndex } from './indexing'
@@ -75,6 +76,22 @@ function StudyBrowser({ sessionId, store, host, openIndex }: { sessionId: string
   useEffect(() => { const timer = window.setTimeout(() => setSearch(query.trim()), 200); return () => window.clearTimeout(timer) }, [query])
   const shelf = useStudy<StudyShelf>(sessionId, 'shelf', {}, state.refresh)
   const watchError = useDirectoryWatch(host, sessionId, shelf.value?.workspace, store)
+  const [repairing, setRepairing] = useState<string | undefined>(undefined)
+  const [repaired, setRepaired] = useState<readonly string[]>([])
+  const [repairError, setRepairError] = useState<string | undefined>(undefined)
+  const repairOrphan = async (orphanPath: string) => {
+    if (repairing !== undefined) return
+    setRepairing(orphanPath)
+    setRepairError(undefined)
+    try {
+      await callStudy(sessionId, 'orphan-repair', { path: orphanPath })
+      setRepaired(previous => [...previous, orphanPath])
+    } catch (err) {
+      setRepairError(err instanceof Error ? err.message : '修复请求失败')
+    } finally {
+      setRepairing(undefined)
+    }
+  }
   const found = useStudy<{ entries: readonly TreeEntry[]; limited: boolean }>(sessionId, search ? 'search' : null, { query: search }, state.refresh)
   return <div className="nw-study">
     <div className="nw-search-row"><Input className="nw-search" icon={<IconSearch size={14} />} aria-label="搜索书名或文件" placeholder="搜索书名或文件…" value={query} onChange={event => setQuery(event.target.value)} />
@@ -97,6 +114,10 @@ function StudyBrowser({ sessionId, store, host, openIndex }: { sessionId: string
         <div className="nw-section-title"><span>我的作品</span><span><button type="button" className="nw-onboarding-new" onClick={() => setShowWizard(true)}>＋新建书</button>{shelf.value.books.length}</span></div>
         {showWizard ? <OnboardingWizard sessionId={sessionId} onSaved={() => { void store.refresh(sessionId) }} onClose={() => setShowWizard(false)} /> : null}
         {shelf.value.books.map((book, index) => <Book key={book.id} sessionId={sessionId} book={book} store={store} host={host} initial={index === 0} />)}
+        {shelf.value.orphans?.map(orphan => <p key={orphan.path} className="nw-error" role="alert">发现未按规范建立的书稿目录《{orphan.name}》（{orphan.detail}），缺作品契约（作品契约/契约.md），所以没出现在「我的作品」里。
+          {repaired.includes(orphan.path) ? '已请对话里的 AI 修复，请看对话回复。' : <button type="button" className="nw-onboarding-new" disabled={repairing === orphan.path} onClick={() => void repairOrphan(orphan.path)}>{repairing === orphan.path ? '正在请 AI 修复…' : '请 AI 帮我修复'}</button>}
+        </p>)}
+        {repairError ? <p className="nw-error" role="alert">{repairError}</p> : null}
         {!shelf.value.books.length && !showWizard ? <p className="nw-empty">当前工作范围还没有作品。<button type="button" className="nw-onboarding-new" onClick={() => setShowWizard(true)}>新建书（点三下选好市场、形态和字数）</button>，或在对话中开始构想。</p> : null}
         <div className="nw-section-title"><span>共享资料</span></div>
         {shelf.value.shared ? <Tree sessionId={sessionId} refValue={{ space: 'shared', path: '' }} store={store} host={host} absolutePath={shelf.value.workspace + '/书房'} /> : <p className={shelf.value.sharedError ? 'nw-error' : 'nw-empty'}>{shelf.value.sharedError ?? '当前书房暂无共享资料'}</p>}

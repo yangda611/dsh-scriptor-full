@@ -13,9 +13,9 @@ import { buildCli } from '../scripts/build-cli.mjs'
 const run = promisify(execFile)
 const packageRoot = path.resolve(__dirname, '..')
 const checks = [
-  '写作能力停用与技能依赖中断期间即时撤销',
+  '写作能力停用期间工具保留、persona 与总览撤销',
   '空白切换与同名预设代际保持隔离',
-  '写作模式与普通模式并存且普通文件遵循宿主路径',
+  '普通模式也有小说工具、persona 与总览仍按预设隔离',
   '真实 Loader 与基线版本',
   '主 Agent 工具与全局隔离',
   '子 Agent 工具拒绝且保留宿主审批策略',
