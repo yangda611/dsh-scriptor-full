@@ -66,6 +66,7 @@ export {
   findPendingReviewDraft,
   listChapterDrafts,
   nextDraftFileName,
+  prepareDraftDemotions,
   splitCandidateFacts,
   草稿字段序,
   type DraftFile,

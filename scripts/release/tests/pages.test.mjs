@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { buildSite, createMarkdown, createSlugger, srtToVtt } from '../../../site/build.mjs'
+import { NAV, buildSite, createMarkdown, createSlugger, srtToVtt } from '../../../site/build.mjs'
 import { PALETTES } from '../../../site/palettes.mjs'
 import { root } from '../version.mjs'
 
@@ -238,6 +238,14 @@ test('srt subtitles convert to webvtt cues', () => {
   assert.match(vtt, /^WEBVTT\n\n1\n00:00:01\.199 --> 00:00:05\.310\n第一句话\n$/)
 })
 
+test('home recommends the main package with its integrated retrieval components', () => {
+  withTempDir(out => {
+    buildSite({ root, out })
+    const home = fs.readFileSync(path.join(out, 'index.html'), 'utf8')
+    assert.doesNotMatch(home, /data-copy="@yangda611\/dsh-scriptor-retrieval@/, 'home must not recommend duplicate retrieval installation beside the main package')
+  })
+})
+
 test('site build renders every guide and keeps links inside the artifact', () => {
   withTempDir(out => {
     const result = buildSite({ root, out })
@@ -293,6 +301,61 @@ test('site build refuses to read or emit private paths', () => {
         assert.ok(!/[A-Z]:[\\/](?:Users|wk)[\\/]/.test(text), `absolute path in ${file}`)
       }
     }
+  })
+})
+
+test('site build rejects linked private assets before replacing an existing artifact', () => {
+  withTempDir(directory => {
+    const source = path.join(directory, 'source')
+    const bundle = path.join(source, 'packages/bundle')
+    const guides = path.join(source, 'docs/user')
+    fs.mkdirSync(bundle, { recursive: true })
+    fs.mkdirSync(guides, { recursive: true })
+    for (const file of ['packages/bundle/package.json', 'dsh-baseline.json']) {
+      fs.copyFileSync(path.join(root, file), path.join(source, file))
+    }
+    fs.symlinkSync(path.join(root, 'node_modules'), path.join(source, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
+    fs.symlinkSync(path.join(root, 'packages/bundle/node_modules'), path.join(bundle, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
+    for (const { name } of NAV.flatMap(group => group.pages)) fs.writeFileSync(path.join(guides, `${name}.md`), `# ${name}\n`)
+    for (const file of ['images/video-poster.png', 'media/intro.mp4', 'media/intro.srt', 'images/editor-8.2/menu.png', 'images/editor-8.2/suggestion.png', 'images/editor-8.2/comment.png']) {
+      const target = path.join(guides, file)
+      fs.mkdirSync(path.dirname(target), { recursive: true })
+      fs.writeFileSync(target, 'public fixture asset')
+    }
+    const privateAssets = path.join(directory, 'private-assets')
+    fs.mkdirSync(privateAssets)
+    fs.writeFileSync(path.join(privateAssets, 'private.png'), 'synthetic private material')
+    fs.symlinkSync(privateAssets, path.join(guides, 'linked-assets'), process.platform === 'win32' ? 'junction' : 'dir')
+    fs.writeFileSync(path.join(guides, 'linked-input.md'), '# Linked input\n\n![private](linked-assets/private.png)\n')
+    const out = path.join(directory, 'site')
+    fs.mkdirSync(out)
+    fs.writeFileSync(path.join(out, 'keep.txt'), 'previous public artifact')
+    assert.throws(() => buildSite({ root: source, out }), /Public input/, 'linked private inputs must be rejected before reading or copying')
+    assert.ok(!fs.existsSync(path.join(out, 'docs/linked-assets/private.png')))
+    assert.equal(fs.readFileSync(path.join(out, 'keep.txt'), 'utf8'), 'previous public artifact')
+    const internalPrivate = path.join(source, '.tmp/private-assets')
+    fs.mkdirSync(internalPrivate, { recursive: true })
+    fs.writeFileSync(path.join(internalPrivate, 'private.png'), 'synthetic private material')
+    fs.symlinkSync(internalPrivate, path.join(guides, 'internal-assets'), process.platform === 'win32' ? 'junction' : 'dir')
+    fs.writeFileSync(path.join(guides, 'linked-input.md'), '# Linked input\n\n![private](internal-assets/private.png)\n')
+    assert.throws(() => buildSite({ root: source, out }), /outside public allowlist/, 'resolved inputs inside the checkout must still be public')
+    assert.equal(fs.readFileSync(path.join(out, 'keep.txt'), 'utf8'), 'previous public artifact')
+    fs.unlinkSync(path.join(guides, 'linked-input.md'))
+    fs.unlinkSync(path.join(guides, 'linked-assets'))
+    fs.unlinkSync(path.join(guides, 'internal-assets'))
+
+    const privateGuide = path.join(directory, 'private-guide.md')
+    fs.writeFileSync(privateGuide, '# Private document\n\nSynthetic private material.\n')
+    fs.unlinkSync(path.join(guides, 'first-book.md'))
+    fs.linkSync(privateGuide, path.join(guides, 'first-book.md'))
+    assert.throws(() => buildSite({ root: source, out }), /multiple hard links/, 'hard-linked guide content must be rejected before rendering')
+    assert.equal(fs.readFileSync(path.join(out, 'keep.txt'), 'utf8'), 'previous public artifact')
+
+    fs.unlinkSync(path.join(guides, 'first-book.md'))
+    fs.copyFileSync(path.join(root, 'packages/bundle/package.json'), path.join(bundle, 'package.json'))
+    fs.linkSync(path.join(bundle, 'package.json'), path.join(directory, 'package-manifest-link.json'))
+    assert.throws(() => buildSite({ root: source, out }), /multiple hard links/, 'hard-linked manifest input must be rejected')
+    assert.equal(fs.readFileSync(path.join(out, 'keep.txt'), 'utf8'), 'previous public artifact')
   })
 })
 

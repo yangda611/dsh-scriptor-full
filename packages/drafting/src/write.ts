@@ -9,14 +9,15 @@ import {
   assertSegment,
   bumpVersion,
   composeBody,
-  demoteOtherPendingDrafts,
   extractVersionFields,
   initialVersion,
   parseDocument,
   paths,
+  prepareDraftDemotions,
   scanChapter,
   serializeDocument,
   splitCandidateFacts,
+  writeBatchAtomic,
   writeFileAtomic,
   type ChapterKey,
 } from '@webnovel/core'
@@ -197,7 +198,7 @@ export type ImportAuthorDraftResult =
 
 /**
  * 作者稿导入(写稿 seam 的「作者手写/作者手改」实现,PRD §3.5.3):作者稿与 AI 稿地位相同,
- * 只在 生成模块 留痕。角色 待审稿 时先降级既有待审稿再写(与润色同一纪律)。
+ * 只在 生成模块 留痕。角色 待审稿 时将旧稿降级与新稿写入放进同一事务。
  * R1:细纲/材料包状态只播报不拒绝。
  */
 function importAuthorDraftLocked(bookRoot: string, input: ImportAuthorDraftInput): ImportAuthorDraftResult {
@@ -218,7 +219,6 @@ function importAuthorDraftLocked(bookRoot: string, input: ImportAuthorDraftInput
   const ver = explicitParent === null ? initialVersion('作者稿导入') : bumpVersion(explicitParent, '作者稿导入')
   const file = nextFileName(bookRoot, key)
   const relPath = path.posix.join(draftDir(key), file)
-  if (input.角色 === '待审稿') demoteOtherPendingDrafts(bookRoot, key, relPath)
   const fields = applyVersionFields(
     {
       身份: { 卷: input.卷, 章: input.章, 章名: input.章名 },
@@ -227,7 +227,9 @@ function importAuthorDraftLocked(bookRoot: string, input: ImportAuthorDraftInput
     },
     { ...ver, 生成模块: input.生成模块 },
   )
-  writeFileAtomic(bookRoot, relPath, serializeDocument(fields, composeBody(prose, facts), DRAFT_KEYS))
+  const ops = input.角色 === '待审稿' ? [...prepareDraftDemotions(bookRoot, key, relPath)] : []
+  ops.push({ relPath, content: serializeDocument(fields, composeBody(prose, facts), DRAFT_KEYS) })
+  writeBatchAtomic(bookRoot, ops)
   return { ok: true, relPath, 播报 }
 }
 

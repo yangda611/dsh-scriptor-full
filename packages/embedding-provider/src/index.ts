@@ -16,10 +16,12 @@ declare module '@deepseek-ai/cordis' { interface Context { embeddings: Embedding
 export class EmbeddingService extends Service {
   private currentClient: HttpEmbeddingProvider | undefined
   private readonly closing = new Set<Promise<void>>()
+  private closed = false
 
   constructor(ctx: Context, private readonly source: () => EmbeddingSettings) { super(ctx, 'embeddings') }
 
   current(): EmbeddingProvider | undefined {
+    if (this.closed) return undefined
     const configuration = resolveSettings(this.source())
     if (!configuration) { this.retire(); return undefined }
     if (!this.currentClient || JSON.stringify(configuration) !== JSON.stringify(this.currentClient.config)) {
@@ -42,7 +44,7 @@ export class EmbeddingService extends Service {
     void task.then(() => this.closing.delete(task), () => this.closing.delete(task))
   }
 
-  async close(): Promise<void> { this.retire(); await Promise.allSettled([...this.closing]) }
+  async close(): Promise<void> { this.closed = true; this.retire(); await Promise.allSettled([...this.closing]) }
 }
 
 export function apply(ctx: Context, entry: ReturnType<typeof Config>): void {

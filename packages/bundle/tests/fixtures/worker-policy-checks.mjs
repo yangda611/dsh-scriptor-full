@@ -24,12 +24,13 @@ export async function checkWorkerPolicy({ root, book, workspace, ctx, service, c
     { type: 'finish', reason: { kind: 'tool-calls' } }]
   const done = [{ type: 'block-start', index: 0, blockType: 'text' }, { type: 'text-delta', index: 0, text: '完成' },
     { type: 'block-end', index: 0, block: { type: 'text', text: '完成' } }, { type: 'finish', reason: { kind: 'stop' } }]
-  const readOnly = role => role && role !== 'drafting' && role !== 'polish'
+  const readOnly = role => role && !['drafting', 'polish', 'screenplay', 'shortdrama'].includes(role)
   const textOf = message => message.content.filter(part => part.type === 'text').map(part => part.text).join('\n')
   const verify = (options, test) => {
     const system = options.messages.filter(message => message.role === 'system').map(textOf).join('\n')
     assert.equal(system.includes('写作子代理执行规约'), test.role !== undefined)
     for (const [role, label] of Object.entries(labels)) assert.equal(system.includes(`【当前角色：${label}】`), test.role === role)
+    assert.equal(system.includes('【当前角色：电影剧本改编】'), test.role === 'screenplay')
     assert.equal(system.includes('最多一次篇幅调整'), test.role === 'drafting')
     if (test.role) {
       assert.ok(system.includes('字数未核验'))
@@ -55,6 +56,24 @@ export async function checkWorkerPolicy({ root, book, workspace, ctx, service, c
       verify(options, test)
       test.requests++
       test.childId = options.sessionId
+      if (test.chunkCalls) {
+        const previous = test.chunkCalls[test.requests - 2]
+        if (previous) {
+          const result = options.messages.filter(message => message.role === 'tool').at(-1)
+          assert.equal(result.isError, Boolean(previous.isError), textOf(result))
+          if (previous.after === undefined) assert.equal(fs.existsSync(test.file), false)
+          else assert.equal(fs.readFileSync(test.file, 'utf8'), previous.after)
+          if (previous.finalRead) {
+            const readText = textOf(result)
+            assert.ok(readText.includes(test.firstParagraph))
+            assert.ok(readText.includes(test.lastParagraph))
+            assert.equal(readText.includes(test.marker), false)
+          }
+        }
+        const next = test.chunkCalls[test.requests - 1]
+        yield* next ? call(next.name, { file_path: test.file, ...next.args }) : done
+        return
+      }
       if (test.requests === 1) {
         test.entered.resolve()
         if (test.hold) await test.release.promise
@@ -98,13 +117,14 @@ export async function checkWorkerPolicy({ root, book, workspace, ctx, service, c
   const finishCase = async test => {
     await service('subagents').waitForChildren(main.agent)
     await main.agent.whenIdle()
-    assert.equal(test.requests, test.fail ? 1 : 2)
+    assert.equal(test.requests, test.fail ? 1 : test.chunkCalls ? test.chunkCalls.length + 1 : 2)
     assert.ok(parentNotices.has(test.childId), 'the parent must receive the final completion notice')
     if (test.fail) assert.match(parentNotices.get(test.childId), /failed before it finished/)
     else assert.match(parentNotices.get(test.childId), /完成/)
     assert.equal(service('agents').get(test.childId), undefined, 'settled children release their live Agent')
     const { role } = test
-    if (role) assert.equal(workflow.read(workflowAgent, 'worker-fixture-book').calls.find(call => call.id === test.callId)?.state, test.fail ? 'error' : 'success')
+    // The workflow observer defines stages for the five chapter roles only.
+    if (Object.hasOwn(labels, role)) assert.equal(workflow.read(workflowAgent, 'worker-fixture-book').calls.find(call => call.id === test.callId)?.state, test.fail ? 'error' : 'success')
     assert.equal(fs.existsSync(test.file), Boolean(role && !readOnly(role)))
     return test
   }
@@ -169,6 +189,43 @@ export async function checkWorkerPolicy({ root, book, workspace, ctx, service, c
       test.release.resolve()
       await service('subagents').waitForChildren(standard.agent)
       await standard.agent.whenIdle()
+    })
+    await check('电影子代理用原生尾标记分段保存长中文且失败编辑不改盘', async () => {
+      const header = '# 故事稿\n\n'
+      const marker = `__SCRIPTOR_CHUNK_${serial + 1}__`
+      const paragraphs = Array.from({ length: 32 }, (_, index) => `第${index + 1}段：林𠮷说：“留下这盏灯。”她在纸上写下 "等雨停了再走"，又划去一行\\旧约。楼下的脚步停住，门外的人没有回答。`)
+      const body = paragraphs.join('\n\n') + '\n'
+      const fullText = header + body
+      assert.ok(fullText.length > 1024)
+      // Script model tool calls; the SDK's real JSON parser, file tools and
+      // observation policy execute them. This does not simulate model compliance
+      // with the prompt or repair an upstream MALFORMED_RESPONSE.
+      const points = Array.from(body)
+      const chunks = []
+      for (let offset = 0; offset < points.length; offset += 320) chunks.push(points.slice(offset, offset + 320).join(''))
+      const chunkCalls = [
+        { name: 'read', args: {}, isError: true },
+        { name: 'write', args: { content: header + marker }, after: header + marker },
+      ]
+      for (const [index, chunk] of chunks.entries()) {
+        const tail = index === chunks.length - 1 ? '' : marker
+        const after = header + chunks.slice(0, index + 1).join('') + tail
+        chunkCalls.push({ name: 'edit', args: { old_string: marker, new_string: chunk + tail }, after })
+        if (index === 0) {
+          chunkCalls.push({ name: 'edit', args: { old_string: '__MISSING_CHUNK_MARKER__', new_string: '不得落盘' }, after, isError: true })
+          chunkCalls.push({ name: 'read', args: {}, after })
+        }
+      }
+      chunkCalls.push({ name: 'read', args: {}, after: fullText, finalRead: true })
+      const savedChunks = chunkCalls.flatMap(step => step.name === 'write' ? [step.args.content] : step.name === 'edit' ? [step.args.new_string] : [])
+      assert.ok(savedChunks.every(text => text.length <= 400))
+      const test = await runCase('screenplay', { file: path.join(book, '草稿区/剧本/分段试验故事稿.md'), chunkCalls,
+        marker, firstParagraph: paragraphs[0], lastParagraph: paragraphs.at(-1) })
+      assert.equal(fs.readFileSync(test.file, 'utf8'), fullText)
+      assert.equal(fs.readFileSync(test.file, 'utf8').includes(marker), false)
+      report.workerPolicy.nativeChunkSave = { nativeCalls: chunkCalls.length, savedCharacters: fullText.length,
+        maximumChunkCharacters: Math.max(...savedChunks.map(text => text.length)), exactFinalContent: true,
+        failedEditUnchanged: true, finalRead: true }
     })
     await check('委派工具随原生入口和插件装卸且角色可恢复', async () => {
       await toggle('subagent-tool', true)

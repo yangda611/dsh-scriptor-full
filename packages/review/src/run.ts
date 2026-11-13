@@ -17,6 +17,7 @@ import {
   loadReviewRecord,
   loadScreenplayReviewRecord,
   paths,
+  parseEpisodeScript,
   planReviewRecord,
   renderEpisodeScript,
   writeEpisodeReviewRecord,
@@ -61,7 +62,7 @@ import {
   剧本语义审读名,
 } from './film-drama'
 import { getCheck, listChecks, type ReviewScope } from './registry'
-import { bookWriter } from '@webnovel/core'
+import { bookWriter, withBookWrite } from '@webnovel/core'
 
 export interface ReviewKey {
   readonly 卷: number
@@ -313,6 +314,9 @@ function ingestFindingsLocked(
   if (check === undefined) {
     return { ok: false, reason: `未注册的审读模块:${模块名}`, record: null }
   }
+  if (check.适用范围 !== '章') {
+    return { ok: false, reason: `审读模块 ${模块名} 适用范围是 ${check.适用范围}，不能回写进章的审核记录`, record: null }
+  }
   const authorOpinion = check.执行形态 === '作者'
   if (!authorOpinion && (typeof expectedFingerprint !== 'string' || expectedFingerprint.trim() === '')) {
     return { ok: false, reason: '自动审读结果必须携带审读指纹：每个模块回写均需提供实际审读输入的指纹，请重新运行审核', record: null }
@@ -537,6 +541,9 @@ export function computeScreenplayReview(bookRoot: string, input: ScreenplayRevie
 /** 短剧单集审读（纯计算 + 组装记录，不写盘）。剧本文本由 renderEpisodeScript 从剧本对象统一渲染（与 ingest 回写时的重算同一口径，指纹才对得上），调用方不传文本。 */
 export function computeEpisodeReview(bookRoot: string, key: EpisodeReviewKey, input: EpisodeReviewRunInput): FilmDramaReviewResult {
   registerFilmDramaChecks()
+  if (key.集 !== input.剧本.集 || key.集 !== input.大纲.集) {
+    return { ok: false, reason: '集号不一致：审核记录、单集剧本和分集大纲必须属于同一集', record: null }
+  }
   const 剧本文本 = renderEpisodeScript(input.剧本).内容
   const computed = computeEpisodeFindings({ 集: key.集, 剧本: input.剧本, 剧本文本, 大纲: input.大纲, 材料版本: input.材料版本 })
   const existing = loadEpisodeReviewRecord(bookRoot, key.集) ?? emptyReviewRecord()
@@ -595,6 +602,10 @@ export interface FilmDramaIngestResult {
  * 指纹不一致拒绝回写（过期结果不能进记录），与章节的 fail-closed 一致。
  */
 export function ingestFilmDramaFindings(args: FilmDramaIngestArgs): FilmDramaIngestResult {
+  return withBookWrite(args.bookRoot, () => ingestFilmDramaFindingsLocked(args))
+}
+
+function ingestFilmDramaFindingsLocked(args: FilmDramaIngestArgs): FilmDramaIngestResult {
   registerFilmDramaChecks()
   const { bookRoot, scope, 模块名 } = args
   const check = getCheck(模块名)
@@ -636,6 +647,14 @@ export function ingestFilmDramaFindings(args: FilmDramaIngestArgs): FilmDramaIng
   }
   if (!authorOpinion && expectedFingerprint !== recomputed) {
     return { ok: false, reason: '审读结果已过期：回写指纹与当前审核输入不一致，请重新运行审核', record: null }
+  }
+  if (scope === '集') {
+    const script = parseEpisodeScript(args.剧本文本!)
+    const outlineEpisode = /^集(\d+)\s/.exec(args.大纲文本!)?.[1]
+    if (!script.ok || script.episode === undefined) return { ok: false, reason: '单集剧本文本解析失败，不能回写审读结果', record: null }
+    if (script.episode.集 !== args.集 || outlineEpisode === undefined || Number(outlineEpisode) !== args.集) {
+      return { ok: false, reason: '集号不一致：审核记录、单集剧本和分集大纲必须属于同一集', record: null }
+    }
   }
   const record0 = existing ?? emptyReviewRecord()
   const hasPriorReviewState = record0.完成 || record0.问题.length > 0 || Object.keys(record0.模块).length > 0

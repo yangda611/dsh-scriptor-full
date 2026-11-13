@@ -24,6 +24,24 @@ const savePolicy = `【草稿保存】
 仅为正确交付而调整角色、选定标记时，保留正文及其余元数据，不伪造新版本。
 报告准确交付路径、新写或复用、统计来源及未决项。篇幅达标不代表审读通过。`
 
+const longWriteRecovery = `【长文本写入恢复】
+新文件超过 400 字符时，首次保存就分段。
+先 read 目标，确认不存在；其他读取错误即停。
+先 write 正确头部和本任务创建的唯一随机 ASCII 尾标记。
+首次 write 的内容也限 400 字符。
+每次 edit 只替换尾标记，new_string 含标记限 400 字符。
+每段成功后才提交下一段，不并行改同一文件。
+末段也限 400 字符，替换时移除标记。
+read 文件末尾，确认标记已移除、交付完整。
+错误信息：Unterminated string in JSON。
+错误信息：Malformed response。
+出现任一错误，先 read 目标。
+不要重复提交相同的长参数。
+edit 失败后先 read，只在已写末尾与本任务标记明确时续写。
+目标已有内容且无本任务标记时，停止并报告主控。
+无法确认续写边界时，停止；不得覆盖或猜补。
+此方法仅构建新文本，不改已有正文。`
+
 const rolePolicies: Record<WritingRole, string> = {
   drafting: `【当前角色：正文起草】
 第一份完整稿以已确认的契约篇幅区间为目标。未配置、未确认或配置错误时如实说明，不编造范围。
@@ -47,17 +65,26 @@ const rolePolicies: Record<WritingRole, string> = {
   settle: `【当前角色：沉淀对账】
 沉淀对账只读不写，按任务底本返回候选；计划、推测和人物证言不冒充已发生事实，不直接修改账本。`,
   screenplay: `【当前角色：电影剧本改编】
-只在契约输出形态=电影剧本时走本管线。按故事稿→分场大纲→剧本草稿→审读四步走，中间稿落在草稿区/剧本/（故事稿.md、分场大纲.md、剧本草稿.md），定稿只认剧本/电影/剧本.md。
-编剧层格式：场景标题（场号 INT./EXT. 地点 - 时间）、动作行现在时只写可见/可听、角色名全大写、台词、括号提示；停顿只用 (pause)，不用 (beat)；音效写进动作行，不用 SFX:/MUSIC: 独占行；音乐与镜头提示不进编剧层。
+只在契约输出形态=电影剧本时走本管线。
+剧本按故事稿、分场大纲、剧本草稿、审读四步推进。
+中间稿放草稿区/剧本/，文件名依次为故事稿.md、分场大纲.md、剧本草稿.md。
+定稿只认剧本/电影/剧本.md。
+场景标题写为“场号 INT./EXT. 地点 - 时间”。
+动作行用现在时，只写可见或可听内容。
+角色名全大写，后接台词和括号提示；停顿只用 (pause)，不用 (beat)。
+音效写进动作行，不用 SFX:/MUSIC: 独占行；音乐与镜头提示不进编剧层。
 审读三模块跑完再定稿，任一高级别发现项即阻断，不把待写占位当成稿。`,
   shortdrama: `【当前角色：短剧管线】
 只在契约输出形态=短剧时走本管线。按分集钩子/爽点大纲→单集剧本→审读走，每集一个核心想法；定稿只认剧本/短剧/集001.md 起。
-竖屏与横屏是两套节奏模板，不要混用：竖屏 60–120 秒/集、冲突 5 秒内、每 20–30 秒一个反转、结尾 5–10 秒留悬念；横屏 10–20 分钟/集、起承转合齐全。
+竖屏与横屏节奏分开，不混用。竖屏每集 60–120 秒，5 秒内起冲突。
+每 20–30 秒安排反转，结尾 5–10 秒留悬念。
+横屏每集 10–20 分钟，具备起承转合。
 每集跑节拍检查器，不通过的集不进定稿。台词要短（一行约 <12 字），台词即行动。`,
 }
 
 export function workerPolicyFor(role: WritingRole): string {
-  return [commonPolicy, role === 'drafting' || role === 'polish' ? savePolicy : '', rolePolicies[role]].filter(Boolean).join('\n\n')
+  const canWrite = role === 'drafting' || role === 'polish' || role === 'screenplay' || role === 'shortdrama'
+  return [commonPolicy, canWrite ? longWriteRecovery : '', role === 'drafting' || role === 'polish' ? savePolicy : '', rolePolicies[role]].filter(Boolean).join('\n\n')
 }
 
 /** Scoped native policy; dependency teardown and agent disposal both release it. */

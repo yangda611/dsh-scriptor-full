@@ -12,6 +12,17 @@ test('public policy rejects private files and permits runtime Markdown', () => {
   checkPublicPath('docs/user/install.md')
   checkPublicPath('docs/tool-catalog.md')
 })
+test('public examples and indexed QA evidence are allowed without admitting private files', () => {
+  for (const file of ['docs/examples/电影剧本示例/故事稿.md', 'docs/research/film-drama-research.md', 'docs/plan-film-drama.md',
+    'DSH-8.4.7-WEB-TEST.md', 'DSH-FULL-QA-REPORT.md', 'web-test-conversations.md', 'web-test-conversations-8.4.7.md',
+    'web-test-screenshots/01-home.webp', 'web-test-screenshots-8.4.7/03-workspace.jpg']) checkPublicPath(file)
+  for (const file of ['web-test-screenshots/.env', 'web-test-screenshots/credentials.json', 'DSH-private-notes.md',
+    'docs/private/notes.md', 'web-test-conversations-secret.md']) assert.throws(() => checkPublicPath(file))
+})
+test('the obsolete simulator helper is permitted only in historical trees', () => {
+  assert.throws(() => checkPublicPath('.sim.sh'), /outside public allowlist/)
+  checkPublicPath('.sim.sh', { historical: true })
+})
 test('credential and personal-path checks do not echo their values', () => {
   for (const value of ['sk-' + 'a'.repeat(40), 'ghp_' + 'b'.repeat(40), ['C:', 'Users', 'private', 'book'].join('/')]) {
     assert.throws(() => checkPublicText('README.md', value), error => !error.message.includes(value))

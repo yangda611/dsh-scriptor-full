@@ -136,6 +136,17 @@ describe('M1:applyRevision 契约加固', () => {
 })
 
 describe('M1:ingestAuthorRevision 原样落盘', () => {
+  it('新稿目标不可写时不降级已有待审稿', () => {
+    const root = mkBook()
+    readyBook(root, BASE)
+    const draftDir = path.join(root, '草稿区/草稿/卷01-开篇任务')
+    const original = fs.readFileSync(path.join(draftDir, '稿1.md'), 'utf-8')
+    fs.mkdirSync(path.join(draftDir, '稿2.md'))
+    expect(() => ingestAuthorRevision(root, key, '作者的新正文。')).toThrow(/原子写失败/)
+    expect(fs.readFileSync(path.join(draftDir, '稿1.md'), 'utf-8')).toBe(original)
+    expect(fs.statSync(path.join(draftDir, '稿2.md')).isDirectory()).toBe(true)
+  })
+
   it('整章正文原样写入(含换行与标点),生成模块=作者手改,发现项处置不动', () => {
     const root = mkBook()
     withRecord(root)

@@ -2,24 +2,24 @@
 
 **[🌐 产品主页](https://yangda611.github.io/dsh-scriptor-full/) · [📖 新手教程](https://yangda611.github.io/dsh-scriptor-full/docs/beginner.html) · [下载正式版](https://github.com/yangda611/dsh-scriptor-full/releases/latest)**
 
-> Scriptor 8.4.7 配套 **DSH 0.2.2-rc.1**。旧格式先备份并使用书仓维护预览，按明确批准执行升级。
+> Scriptor 8.4.8 配套 **DSH 0.2.2-rc.1**。旧格式先备份并使用书仓维护预览，按明确批准执行升级。
 
 安装范围为 `>=0.2.2-rc.1 <0.3.0-0`，最低Node为24.9。可下载的版本和原件以 GitHub Release 为准。
 
 基于 [DeepSeek Harness](https://www.deepseek.com/harness/) 的长篇小说写作工作台。把构想、设定、大纲、写章、审读、修改、定稿、记忆与导出放进一个能够暂停和继续的工作流程，作品以本地文件保存。
 
-**本文对应版本：8.4.7。** Windows 首发；重要作品使用前请备份。模型服务由你配置，调用可能产生费用。
+**本文对应版本：8.4.8。** Windows 首发；重要作品使用前请备份。模型服务由你配置，调用可能产生费用。
 
 [![DSH Scriptor 项目介绍视频](docs/user/images/video-poster.png)](docs/user/media/intro.mp4)
 
 > 📹 **2 分钟视频快速了解 DSH Scriptor**：[点击播放或下载视频 (1080P/MP4)](docs/user/media/intro.mp4) · [字幕文件](docs/user/media/intro.srt)  
 > 视频演示了核心设计理念、全流程写作闭环、断更无损恢复以及书稿编辑器的交互操作。
 
-DSH Scriptor is a local-first fiction writing workspace for DeepSeek Harness. Version 8.4.7 targets DeepSeek Harness 0.2.2-rc.1 with evidence-based relationship clusters, native UI settings and explicit book-format migration. Runtime prompts and skills are included; model services are configured by the user.
+DSH Scriptor is a local-first fiction writing workspace for DeepSeek Harness. Version 8.4.8 targets DeepSeek Harness 0.2.2-rc.1 with evidence-based relationship clusters, native UI settings and explicit book-format migration. Runtime prompts and skills are included; model services are configured by the user.
 
-**8.4.7升级须知：使用DSH 0.2.2-rc.1或允许范围内的版本，先备份作品。** 旧线索/时间线正文前缀、非空旧记忆分类和旧特殊字符索引不再由正常读取自动转换。先用书仓检查与整仓升级预览，核对差异和影响，再决定是否批准升级。只安装插件不会迁移书稿。完整步骤见[升级说明](docs/user/upgrade-backup.md)。
+**8.4.8升级须知：使用DSH 0.2.2-rc.1或允许范围内的版本，先备份作品。** 旧线索/时间线正文前缀、非空旧记忆分类和旧特殊字符索引不再由正常读取自动转换。先用书仓检查与整仓升级预览，核对差异和影响，再决定是否批准升级。只安装插件不会迁移书稿。完整步骤见[升级说明](docs/user/upgrade-backup.md)。
 
-8.4.7 修复 DSH Web 工作区左栏会话列表空白：插件把原生会话列表以子插槽重挂后，滚动 hook（`useSectionScroller`）没传过去，列表渲染直接崩掉，进插件页就回不去正在运行的任务；现在 hook 从宿主侧栏经插槽声明与渲染调用两路转发，会话列表正常渲染、可点。沿用 8.4.6 的第一章断链修复（`novel_delegate` 在任何预设下都可得，确认细纲后即可起草第一章）、8.4.5 的建书断链修复（小说工具与捆绑技能不再以「写作模式」预设为门，书能正常出现在书房「我的作品」里）、8.4.4 的 rc.2 兼容、建书三问硬关卡与新建书点选向导，以及 8.4.0 的千章关系星团、逐章证据、原文定位、原生设置和书仓维护。建书防手写写死（只能调建书工具，禁止手写书稿文件冒充建书）；书房 0 本时若扫到未按规范建立的书稿目录会提示缺作品契约并给修复入口。桌宠仍为独立可选包，书稿编辑器保留稿纸排版。
+8.4.8 补强长稿原生分段保存和失败恢复；加固文件事务、影视剧审读/导出一致性、DSH Agent 注册表兼容与检索关闭状态；修复旧会话事件污染桌宠新会话状态，并阻止静态站点经路径链接复制私有资料。长稿兜底不能修复上游模型或宿主的 JSON 解析器。它继承 8.4.7 的 DSH Web 会话列表空白修复，以及 8.4.6 的第一章断链、8.4.5 的建书断链、8.4.4 的 rc.2 兼容，和 8.4.0 的千章关系星团、逐章证据、原文定位、原生设置与书仓维护。建书防手写仍然只用建书工具；书房扫描到缺少作品契约的目录时提供修复入口。桌宠仍为独立可选包，书稿编辑器保留稿纸排版。
 
 ## 创作工作流程
 
@@ -64,9 +64,9 @@ Scriptor 将长篇小说的生产拆分为**作品设计**与**章节闭环**两
 | 产品线 | 运行环境 | 入口 |
 | --- | --- | --- |
 | v6 | Claude Code 插件 | 当前仓库不提供 v6 安装文档 |
-| v8（本分支） | DeepSeek Harness 工作台 | [版本发行页](https://github.com/yangda611/dsh-scriptor-full/releases/tag/scriptor-v8.4.7) · [安装教程](docs/user/install.md) |
+| v8（本分支） | DeepSeek Harness 工作台 | [版本发行页](https://github.com/yangda611/dsh-scriptor-full/releases/tag/scriptor-v8.4.8) · [安装教程](docs/user/install.md) |
 
-两个版本安装方式不同。当前没有经过验证的 v6/v7 书仓直接迁移方案。`v8` 是产品线名称，`8.4.7` 是安装包版本。
+两个版本安装方式不同。当前没有经过验证的 v6/v7 书仓直接迁移方案。`v8` 是产品线名称，`8.4.8` 是安装包版本。
 
 ## 能做什么
 
@@ -82,10 +82,10 @@ Scriptor 将长篇小说的生产拆分为**作品设计**与**章节闭环**两
 
 ## 开始使用
 
-> 本仓库的插件包名是 `@yangda611` scope，8.4.7 已发布到 npm，可直接用下方安装标识安装。源码构建步骤见[开发指南](docs/development.md)。
+> 本仓库的插件包名是 `@yangda611` scope，8.4.8 已发布到 npm，可直接用下方安装标识安装。源码构建步骤见[开发指南](docs/development.md)。
 
 1. **装 DSH**：桌面端安装 **DSH 0.2.2-rc.1** 或允许范围内的版本（安装范围 `>=0.2.2-rc.1 <0.3.0-0`，最低 Node 24.9）；也可以用 Web 版：`npx @deepseek-ai/dsh web`，打开 http://127.0.0.1:3080。
-2. **装插件**：打开侧栏 **插件 → 添加插件**，输入 `@yangda611/dsh-scriptor@8.4.7`，核对预览并安装，按提示应用变更。只装主包，不要同时装完整版（`dsh-scriptor-full`）或独立检索包。
+2. **装插件**：打开侧栏 **插件 → 添加插件**，输入 `@yangda611/dsh-scriptor@8.4.8`，核对预览并安装，按提示应用变更。只装主包，不要同时装完整版（`dsh-scriptor-full`）或独立检索包。
 3. **配模型**：在 DSH 里配置聊天模型与凭据（模型服务由你配置，调用可能产生费用）。
 4. **新建对话，回答向导三题**：新建对话后出现新建书向导，点选回答三个问题——**市场**（中文 / 海外）、**输出形态**（短剧 / 电影剧本 / 小说）、**字数**（如短篇·5 万字）；三题答完保存按钮才可用。保存后直接说你的构想，AI 会给设计草案。
 5. **确认设计，建书**：确认设计草案后，AI 调用建书工具建书；书出现在书房 **「我的作品」** 里（书仓目录下有 `作品契约/契约.md` 才是正常建好的书）。
@@ -103,12 +103,12 @@ Scriptor 将长篇小说的生产拆分为**作品设计**与**章节闭环**两
 | 可选插件 | 安装标识 | 用途 |
 | --- | --- | --- |
 | 检索增强 | 随主包提供，无需单独安装 | 嵌入、场景识别、重排，分别配置和启用 |
-| 鲸鱼娘 | `@yangda611/dsh-scriptor-companion@8.4.7` | 窗口内陪伴与会话状态反馈，不调用模型 |
-| 完整版 | `@yangda611/dsh-scriptor-full@8.4.7` | 与主包相同，检索已包含在内；不含桌宠；与主包二选一 |
+| 鲸鱼娘 | `@yangda611/dsh-scriptor-companion@8.4.8` | 窗口内陪伴与会话状态反馈，不调用模型 |
+| 完整版 | `@yangda611/dsh-scriptor-full@8.4.8` | 与主包相同，检索已包含在内；不含桌宠；与主包二选一 |
 
 旧包迁移与备份见 [升级说明](docs/user/upgrade-backup.md)，不要同时启用旧检索包和新检索包。
 
-本次四包统一为 8.4.7；检索已包含在主包内，桌宠保持兼容发行。只更新你实际使用的组件；不用桌宠就无需安装它。已验证的推荐组合为同版本，桌宠始终独立。老用户如果同时装了主包和独立检索包，升级时卸载独立检索包、只留主包，配置与凭据按原来的条目 id 保留。
+本次四包统一为 8.4.8；检索已包含在主包内，桌宠保持兼容发行。只更新你实际使用的组件；不用桌宠就无需安装它。已验证的推荐组合为同版本，桌宠始终独立。老用户如果同时装了主包和独立检索包，升级时卸载独立检索包、只留主包，配置与凭据按原来的条目 id 保留。
 
 ## 文档
 

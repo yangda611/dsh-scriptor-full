@@ -31,8 +31,8 @@ export function watchSession(host: SessionHost, store: CompanionStore): () => vo
   const consume = (entries: readonly SessionEventLikeEntry[], live: boolean) => {
     let completed = false
     for (const { event } of entries) {
-      if (event.type === 'turn/start') { currentTurn = event.data.turn; terminal = false; textSeen = false }
-      if (event.type === 'assistant/live-chunk' && !terminal) {
+      if (event.type === 'turn/start') { currentTurn = event.data.turn; terminal = false; textSeen = false; completed = false }
+      if (event.type === 'assistant/live-chunk' && !terminal && currentTurn === event.data.turn) {
         if (event.data.chunk.type === 'text-delta') textSeen = true
         if (event.data.chunk.type === 'block-start' && event.data.chunk.blockType !== 'text') textSeen = false
       }
@@ -40,7 +40,7 @@ export function watchSession(host: SessionHost, store: CompanionStore): () => vo
         // A baseline may establish the current turn, but never causes celebration.
         if (currentTurn === undefined || currentTurn === event.data.turn) {
           terminal = true; textSeen = false
-          if (live && currentTurn === event.data.turn && event.data.reason.kind === 'completed') completed = true
+          completed = live && currentTurn === event.data.turn && event.data.reason.kind === 'completed'
         }
       }
     }

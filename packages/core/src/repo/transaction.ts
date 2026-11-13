@@ -61,6 +61,12 @@ function inside(root: string, rel: string): string {
   return abs
 }
 
+function hasReservedTopLevel(relPath: string): boolean {
+  let first = relPath.split('/')[0]?.toLowerCase() ?? ''
+  if (process.platform === 'win32') first = first.replace(/[. ]+$/, '')
+  return first === RUNTIME_DIR || first === '.git'
+}
+
 /** Write a new file and flush it to disk before any rename publishes it. */
 function writeDurable(file: string, content: string | Buffer, flag = 'wx'): void {
   const fd = fs.openSync(file, flag, 0o666)
@@ -413,11 +419,17 @@ function runLocked(root: string, ops: readonly { readonly relPath: string; reado
   const id = `${Date.now().toString(36)}-${process.pid}-${randomBytes(5).toString('hex')}`
   const normalized = ops.map((op) => ({ relPath: safeRel(op.relPath), content: op.content }))
   for (const op of normalized) {
-    const first = op.relPath.split('/')[0]?.toLowerCase()
-    if (first === RUNTIME_DIR || first === '.git') throw new Error(`事务目标为保留路径：${op.relPath}`)
+    if (hasReservedTopLevel(op.relPath)) throw new Error(`事务目标为保留路径：${op.relPath}`)
     inside(root, op.relPath)
   }
-  if (new Set(normalized.map((op) => op.relPath)).size !== normalized.length) {
+  const targets = normalized.map((op) => {
+    const target = canonicalizePath(inside(root, op.relPath))
+    const relative = path.relative(root, target).split(path.sep)
+      .map(part => process.platform === 'win32' ? part.replace(/[. ]+$/, '').toLowerCase() : part).join('/')
+    if (hasReservedTopLevel(relative)) throw new Error(`事务目标为保留路径：${op.relPath}`)
+    return relative
+  })
+  if (new Set(targets).size !== normalized.length) {
     throw new Error('事务目标路径重复')
   }
   const txRoot = path.join(root, TRANSACTION_DIR, id)

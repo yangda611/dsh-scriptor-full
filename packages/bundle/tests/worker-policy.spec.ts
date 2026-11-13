@@ -8,7 +8,24 @@ import { promisify } from 'node:util'
 import { removeSync } from '../../core/src/repo/remove'
 import { linkFixtureDependencies } from './fixtures/fixture-dependencies.mjs'
 import { loadSourceHost } from '../scripts/dsh-source.mjs'
+import { workerPolicyFor } from '../src/worker-policy'
 import { writingRoleOf } from '../src/writing-delegation'
+
+it('可写子代理首次保存长文本就分段，失败恢复仅使用本任务标记', () => {
+  for (const role of ['drafting', 'polish', 'screenplay', 'shortdrama'] as const) {
+    const policy = workerPolicyFor(role)
+    expect(policy).toContain('长文本写入恢复')
+    expect(policy).toContain('Unterminated string in JSON')
+    expect(policy).toContain('400')
+    expect(policy).toContain('ASCII 尾标记')
+    expect(policy).toContain('首次保存就分段')
+    expect(policy).toContain('本任务创建')
+    expect(policy).toContain('每段成功后')
+  }
+  for (const role of ['revision', 'review', 'settle'] as const) {
+    expect(workerPolicyFor(role)).not.toContain('长文本写入恢复')
+  }
+})
 
 it('恢复只认首条自身任务标记，忽略父历史、材料及后续改角色消息', () => {
   const message = (text: string) => ({ type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text }] } })
@@ -60,6 +77,9 @@ it('原生 subagent 显式角色、普通同级隔离及持久恢复', async () 
     for (const check of Object.values(report.checks) as Array<{ ok: boolean; error?: string }>) expect(check, check.error).toEqual({ ok: true })
     expect(report.workerPolicy).toMatchObject({ explicitRoles: 5, ordinaryUnchanged: true, concurrentSiblings: true, nativeSchemaPreserved: true, restoredRole: true,
       independentPreset: true, explicitBookChapterPreserved: true, nativeWorkflowLifecycle: true, activationThenCompletion: true, failedCompletion: true, cancelledWithoutWrite: true,
+      nativeChunkSave: { exactFinalContent: true, failedEditUnchanged: true, finalRead: true },
       tools: { business: 46, conditional: 1, registered: 47 } })
+    expect(report.workerPolicy.nativeChunkSave.savedCharacters).toBeGreaterThan(1024)
+    expect(report.workerPolicy.nativeChunkSave.maximumChunkCharacters).toBeLessThanOrEqual(400)
   } finally { removeSync(root) }
 }, 60000)

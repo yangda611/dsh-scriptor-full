@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
 import { validateReleaseAssets, registryStatus, registryReadiness, packagesToVerify } from '../publish-npm.mjs'
-import { checkPublishableManifest, checkMetaPackage } from '../tar.mjs'
+import { packageFiles, checkPublishableManifest, checkMetaPackage } from '../tar.mjs'
 import { root } from '../version.mjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
@@ -64,11 +64,12 @@ function archive(files) {
   })
   return zlib.gzipSync(Buffer.concat([...rows, Buffer.alloc(1024)]))
 }
-async function fixture(callback) {
+async function fixture(callback, releaseVersion = version) {
+  const version = releaseVersion
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'scriptor-npm-test-'))
   const entries = [
     ['@yangda611/dsh-scriptor', version, `yangda611-dsh-scriptor-${version}.tgz`],
-    ['@yangda611/dsh-scriptor-retrieval', version, 'yangda611-dsh-scriptor-retrieval-8.0.0.tgz'],
+    ['@yangda611/dsh-scriptor-retrieval', '8.0.0', 'yangda611-dsh-scriptor-retrieval-8.0.0.tgz'],
     ['@yangda611/dsh-scriptor-full', version, `yangda611-dsh-scriptor-full-${version}.tgz`],
     ['@yangda611/dsh-scriptor-companion', version, `yangda611-dsh-scriptor-companion-${version}.tgz`],
   ]
@@ -82,7 +83,7 @@ async function fixture(callback) {
       Object.assign(files, { 'lib/index.js': '', 'lib/scenes.js': '', 'lib/reranking.js': '', 'lib/graph.js': '', 'lib/client.js': `window.__ModuleLoader__.load({ id: ${JSON.stringify(item.name)},`, 'cordis.patch.yml': fs.readFileSync(path.join(root, 'packages/embedding-provider/cordis.patch.yml'), 'utf8'), 'MODEL_DIMENSIONS.md': '', 'THIRD_PARTY_NOTICES.md': 'Original notices' })
     }
     if (index === 2) {
-      manifest.dependencies = { '@yangda611/dsh-scriptor': version, '@yangda611/dsh-scriptor-retrieval': version }
+      manifest.dependencies = { '@yangda611/dsh-scriptor': version }
       manifest.dsh = { bundle: { patch: ['./cordis.patch.yml', './presets/writing.patch.yml'] } }
       files['cordis.patch.yml'] = fs.readFileSync(path.join(root, 'packages/meta/cordis.patch.yml'), 'utf8')
       files['presets/writing.patch.yml'] = fs.readFileSync(path.join(root, 'packages/meta/presets/writing.patch.yml'), 'utf8')
@@ -115,6 +116,10 @@ test('release assets bind tag, public commit, package identities, bytes and depe
   fs.appendFileSync(packages[0].filename, 'tampered')
   assert.throws(() => validateReleaseAssets(directory, `scriptor-v${version}`, commit), /checksum mismatch/)
 }))
+
+test('release validation rejects a missing patch even when all assets agree', () => fixture(({ directory }) => {
+  assert.throws(() => validateReleaseAssets(directory, 'scriptor-v8.0.', commit), /stable release tag/)
+}, '8.0.'))
 test('release validation rejects unsafe paths and ambiguous optional packages even with consistent checksums', () => fixture(({ directory, manifest, writeManifest }) => {
   manifest.optionalPackages[1].tarball = '../escape.tgz'
   writeManifest()
@@ -149,14 +154,19 @@ test('publish contract rejects private, lifecycle hooks, local dependencies and 
 })
 test('full package requires exact dependencies and a DSH bundle declaration', () => fixture(({ directory, packages }) => {
   const filename = path.join(directory, packages[2].tarball)
-  checkMetaPackage(filename, version, version)
-  assert.throws(() => checkMetaPackage(filename, version, '0.0.9'))
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'packages/meta/package.json'), 'utf8'))
-  manifest.version = version
-  manifest.dependencies = { '@yangda611/dsh-scriptor': version, '@yangda611/dsh-scriptor-retrieval': version }
+  checkMetaPackage(filename, version)
+  const files = Object.fromEntries([...packageFiles(filename)].map(([name, bytes]) => [name, bytes.toString('utf8')]))
+  const manifest = JSON.parse(files['package.json'])
+  for (const dependencies of [
+    { '@yangda611/dsh-scriptor': '0.0.9' },
+    { '@yangda611/dsh-scriptor': version, '@yangda611/dsh-scriptor-retrieval': version },
+  ]) {
+    fs.writeFileSync(filename, archive({ ...files, 'package.json': { ...manifest, dependencies } }))
+    assert.throws(() => checkMetaPackage(filename, version), /deep-equal/)
+  }
   delete manifest.dsh
-  fs.writeFileSync(filename, archive({ 'package.json': manifest }))
-  assert.throws(() => checkMetaPackage(filename, version, version))
+  fs.writeFileSync(filename, archive({ ...files, 'package.json': manifest }))
+  assert.throws(() => checkMetaPackage(filename, version), /deep-equal/)
 }))
 test('first-publication registry serves unchanged tarballs and redirects only other public packages', () => fixture(async ({ directory, packages }) => {
   const filename = path.join(directory, packages[0].tarball)

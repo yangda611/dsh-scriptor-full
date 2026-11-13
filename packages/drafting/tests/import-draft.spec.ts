@@ -1,5 +1,6 @@
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as fs from 'node:fs'
+import { syncBuiltinESMExports } from 'node:module'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import {
@@ -47,6 +48,43 @@ function readyBook(root: string): void {
 }
 
 describe('作者稿导入(A9)', () => {
+  it.skipIf(process.platform !== 'win32')('新稿目标写入失败时保留既有待审稿', () => {
+    const root = mkDir('webnovel-import-write-failure-')
+    readyBook(root)
+    const draftDir = path.join(root, `草稿区/草稿/卷01-${key.章名}`)
+    fs.mkdirSync(draftDir, { recursive: true })
+    const oldDraft = path.join(draftDir, '稿1.md')
+    fs.writeFileSync(oldDraft, `---\n角色: 待审稿\n选定: true\n版本: 1\n父版本: null\n生成模块: 写稿\n---\n旧待审稿。${HARD}。\n`, 'utf-8')
+    const original = fs.readFileSync(oldDraft, 'utf-8')
+    const originalReadDir = fs.readdirSync.bind(fs)
+    const readDir = vi.spyOn(fs.default, 'readdirSync')
+    syncBuiltinESMExports()
+    let chapterDraftDirReads = 0
+    let insertedConflict = false
+    readDir.mockImplementation(((dir: fs.PathLike, ...args: unknown[]) => {
+      const entries = (originalReadDir as (...values: unknown[]) => unknown)(dir, ...args)
+      if (!insertedConflict && path.resolve(String(dir)) === path.resolve(draftDir) && ++chapterDraftDirReads === 3) {
+        insertedConflict = true
+        fs.mkdirSync(path.join(draftDir, '稿2.md'))
+      }
+      return entries
+    }) as typeof fs.readdirSync)
+    try {
+      expect(() => importAuthorDraft(root, {
+        卷: 1, 章: 1, 章名: key.章名,
+        正文: `新作者稿。${HARD}。`,
+        角色: '待审稿',
+        生成模块: '作者手改',
+      })).toThrow(/原子写失败/)
+    } finally {
+      readDir.mockRestore()
+      syncBuiltinESMExports()
+    }
+    expect(fs.readFileSync(oldDraft, 'utf-8')).toBe(original)
+    expect(insertedConflict).toBe(true)
+    expect(fs.statSync(path.join(draftDir, '稿2.md')).isDirectory()).toBe(true)
+  })
+
   it('整章自写:落 稿N+1.md,生成模块 作者手写,角色 草稿,不覆盖既有稿', () => {
     const root = mkDir('webnovel-import-1-')
     readyBook(root)

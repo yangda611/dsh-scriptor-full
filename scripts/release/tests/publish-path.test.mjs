@@ -44,7 +44,7 @@ function writeAssets(directory) {
       Object.assign(files, { 'lib/index.js': '', 'lib/scenes.js': '', 'lib/reranking.js': '', 'lib/graph.js': '', 'lib/client.js': `window.__ModuleLoader__.load({ id: ${JSON.stringify(item.name)},`, 'cordis.patch.yml': fs.readFileSync(path.join(root, 'packages/embedding-provider/cordis.patch.yml'), 'utf8'), 'MODEL_DIMENSIONS.md': '', 'THIRD_PARTY_NOTICES.md': 'Original notices' })
     }
     if (index === 2) {
-      manifest.dependencies = { '@yangda611/dsh-scriptor': version, '@yangda611/dsh-scriptor-retrieval': version }
+      manifest.dependencies = { '@yangda611/dsh-scriptor': version }
       manifest.dsh = { bundle: { patch: ['./cordis.patch.yml', './presets/writing.patch.yml'] } }
       files['cordis.patch.yml'] = fs.readFileSync(path.join(root, 'packages/meta/cordis.patch.yml'), 'utf8')
       files['presets/writing.patch.yml'] = fs.readFileSync(path.join(root, 'packages/meta/presets/writing.patch.yml'), 'utf8')

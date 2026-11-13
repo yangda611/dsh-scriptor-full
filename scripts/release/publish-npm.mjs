@@ -16,7 +16,7 @@ const metaName = '@yangda611/dsh-scriptor-full'
 const digest = (bytes, algorithm = 'sha256', encoding = 'hex') => createHash(algorithm).update(bytes).digest(encoding)
 
 export function validateReleaseAssets(directory, expectedTag, expectedCommit) {
-  assert.match(expectedTag ?? '', /^scriptor-v\d+\.\d+\.\d*$/)
+  assert.match(expectedTag ?? '', /^scriptor-v\d+\.\d+\.\d+$/, 'Expected stable release tag with major, minor and patch versions')
   assert.match(expectedCommit ?? '', /^[a-f0-9]{40}$/)
   const read = filename => {
     assert.match(filename, /^[A-Za-z0-9][A-Za-z0-9._-]*$/, 'Release assets must be flat filenames')
@@ -78,7 +78,7 @@ export function validateReleaseAssets(directory, expectedTag, expectedCommit) {
     return { ...item, filename, integrity: `sha512-${digest(bytes, 'sha512', 'base64')}` }
   })
   checkEmbeddingPackage(packages[1].filename, embedding.version)
-  checkMetaPackage(packages[2].filename, manifest.version, embedding.version)
+  checkMetaPackage(packages[2].filename, manifest.version)
   checkCompanionPackage(packages[3].filename, manifest.version)
   return packages
 }

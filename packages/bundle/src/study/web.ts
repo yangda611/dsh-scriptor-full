@@ -42,7 +42,7 @@ export function agentRoots<T>(registry: {
   const value = registry.roots
   if (typeof value === 'function') {
     try {
-      const result = (value as () => readonly T[])()
+      const result = (value as () => readonly T[]).call(registry)
       if (Array.isArray(result)) return result
     } catch { /* 读失败，返回空数组 */ }
   } else if (Array.isArray(value)) {
@@ -60,7 +60,7 @@ export function agentList<T>(registry: {
   const value = registry.list
   if (typeof value === 'function') {
     try {
-      const result = (value as () => readonly T[])()
+      const result = (value as () => readonly T[]).call(registry)
       if (Array.isArray(result)) return result
     } catch { /* 读失败，返回空数组 */ }
   } else if (Array.isArray(value)) {
@@ -375,7 +375,7 @@ export function createStudyHandler(runtime: StudyWebRuntime, indexing?: BookInde
           const relPath = stringOf(input, 'path')
           const orphan = (service.shelf().orphans ?? []).find(item => item.path === relPath)
           if (!orphan) throw new AuthorDocumentError('not-found', '没有找到这个未按规范建立的书稿目录，请刷新书房后重试')
-          const message = `书房发现未按规范建立的书稿目录《${orphan.name}》（${orphan.path}，${orphan.detail}），缺作品契约（作品契约/契约.md），所以没出现在「我的作品」里。请用 novel_create_book 重新建书（书名、市场、输出形态、目标总字数先问作者，书房向导已保存的选择直接用），再把已有内容（大纲、章节）按规范迁进新书仓；迁完告诉作者书已出现在「我的作品」里。如果已有内容不值得迁，也请明确告诉作者，不要手写文件冒充建书。`
+          const message = `书房发现未按规范建立的书稿目录《${orphan.name}》（${orphan.path}，${orphan.detail}）。目录缺作品契约（作品契约/契约.md），所以没出现在「我的作品」里。请用 novel_create_book 重新建书。书名、市场、输出形态、目标总字数先问作者；书房向导已保存的选择直接用。再把已有内容（大纲、章节）按规范迁进新书仓；迁完告诉作者书已出现在「我的作品」里。如果已有内容不值得迁，也请明确告诉作者，不要手写文件冒充建书。`
           try {
             agent.followup(createUserMessage({ content: [{ type: 'text', text: message }], source: { kind: ORPHAN_REPAIR_SOURCE } }))
           } catch {

@@ -103,7 +103,7 @@ describe('原生工作区子插槽转发（#178）', () => {
   })
 })
 
-describe('工作区原生浏览器的滚动 hook 转发（8.4.7）', () => {
+describe('工作区原生浏览器的滚动 hook 转发（8.4.8）', () => {
   it('子插槽声明携带 sectionScroller 注入，工厂从 hookContext 取回 hook', () => {
     const f = fixture()
     const inject = f.core.specDynamic('webnovel.workspaces')?.inject as unknown as {

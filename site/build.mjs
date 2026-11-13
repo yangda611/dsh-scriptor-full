@@ -195,8 +195,8 @@ export function createMarkdown(root) {
 }
 
 function readContext(root) {
-  const bundle = JSON.parse(fs.readFileSync(path.join(root, 'packages/bundle/package.json'), 'utf8'))
-  const baseline = JSON.parse(fs.readFileSync(path.join(root, 'dsh-baseline.json'), 'utf8'))
+  const bundle = JSON.parse(fs.readFileSync(publicInput(root, 'packages/bundle/package.json'), 'utf8'))
+  const baseline = JSON.parse(fs.readFileSync(publicInput(root, 'dsh-baseline.json'), 'utf8'))
   const repo = String(bundle.repository?.url ?? '').replace(/^git\+/, '').replace(/\.git$/, '')
   assert.match(repo, /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+$/, 'packages/bundle repository.url must be a GitHub URL')
   assert.match(bundle.version, /^\d+\.\d+\.\d+$/, 'Main package version must be a stable SemVer')
@@ -222,7 +222,7 @@ function orderGuides(names) {
 
 function parseGuide(md, root, name) {
   const file = `${GUIDES}${name}.md`
-  const source = fs.readFileSync(path.join(root, file), 'utf8')
+  const source = fs.readFileSync(publicInput(root, file), 'utf8')
   const env = { file }
   const tokens = md.parse(source, env)
   const slug = createSlugger()
@@ -490,8 +490,7 @@ function renderHome(ctx, groups, guides) {
     ['comment', '批注', '原文上的审读批注', 'docs/images/editor-8.2/comment.png'],
   ]
   const plugins = [
-    ['写作工作台', 'dsh-scriptor', '核心写作功能 · 必装'],
-    ['检索增强', 'dsh-scriptor-retrieval', '长篇回查，按意思找旧章节 · 可选'],
+    ['写作工作台', 'dsh-scriptor', '核心写作与检索增强 · 必装'],
     ['鲸鱼娘', 'dsh-scriptor-companion', '桌面陪伴 · 可选'],
     ['完整版', 'dsh-scriptor-full', '写作 + 检索，不含桌宠；与单装二选一'],
   ]
@@ -685,6 +684,19 @@ function containsPath(parent, child, strict = false) {
   return (!strict || relative !== '') && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
 }
 
+/** A public logical path must also resolve to a public file inside the source tree. */
+function publicInput(root, relative) {
+  checkPublicPath(relative)
+  const base = physicalPath(root)
+  const target = absolutePath(fs.realpathSync.native(path.join(root, ...relative.split('/'))))
+  assert.ok(containsPath(base, target, true), `Public input escapes source tree: ${relative}`)
+  checkPublicPath(path.relative(base, target).replaceAll('\\', '/'))
+  const stat = fs.statSync(target)
+  assert.ok(stat.isFile(), `Public input must be a regular file: ${relative}`)
+  assert.equal(stat.nlink, 1, `Public input must not have multiple hard links: ${relative}`)
+  return target
+}
+
 function safeOutput(root, out) {
   const physical = physicalPath(out)
   // Protect both supplied inputs and this module's own site/assets resources.
@@ -712,6 +724,8 @@ export function buildSite({ root = defaultRoot, out = defaultOut } = {}) {
   const assets = new Set(['images/video-poster.png', 'media/intro.mp4', 'media/intro.srt', 'images/editor-8.2/menu.png', 'images/editor-8.2/suggestion.png', 'images/editor-8.2/comment.png'])
   const warnings = []
   for (const guide of guides.values()) rewriteLinks(guide, guides, ctx, root, assets, warnings)
+  const assetInputs = [...assets].sort().map(asset => [asset, publicInput(root, `${GUIDES}${asset}`)])
+  const siteInputs = fs.readdirSync(path.join(here, 'assets')).map(file => [file, publicInput(defaultRoot, `site/assets/${file}`)])
 
   // Recheck after reading inputs, then remove exactly the validated location.
   assert.equal(safeOutput(root, out), out, 'Unsafe Pages output: location changed during build')
@@ -720,12 +734,9 @@ export function buildSite({ root = defaultRoot, out = defaultOut } = {}) {
   for (const guide of guides.values()) writeFile(out, `docs/${guide.name}.html`, renderGuide(md, ctx, guide, groups, guides, order))
   writeFile(out, 'index.html', renderHome(ctx, groups, guides))
   writeFile(out, '404.html', render404(ctx))
-  for (const asset of [...assets].sort()) {
-    checkPublicPath(`${GUIDES}${asset}`)
-    copyFile(path.join(root, GUIDES, ...asset.split('/')), out, `docs/${asset}`)
-  }
-  writeFile(out, 'docs/media/intro.vtt', srtToVtt(fs.readFileSync(path.join(root, GUIDES, 'media/intro.srt'), 'utf8')))
-  for (const file of fs.readdirSync(path.join(here, 'assets'))) copyFile(path.join(here, 'assets', file), out, `assets/${file}`)
+  for (const [asset, input] of assetInputs) copyFile(input, out, `docs/${asset}`)
+  writeFile(out, 'docs/media/intro.vtt', srtToVtt(fs.readFileSync(publicInput(root, `${GUIDES}media/intro.srt`), 'utf8')))
+  for (const [file, input] of siteInputs) copyFile(input, out, `assets/${file}`)
   writeFile(out, 'assets/theme.css', renderThemeCss())
   const index = order.map(name => {
     const guide = guides.get(name)

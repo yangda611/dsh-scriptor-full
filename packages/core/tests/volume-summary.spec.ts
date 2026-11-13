@@ -40,6 +40,27 @@ function mkVolumeBook(root: string, chapters: number, opts: { 缺摘要?: number
 }
 
 describe('卷摘要候选与落盘(任务21, 件一/AC2)', () => {
+  it('章摘要 frontmatter 损坏时不把残缺文档编入卷摘要', () => {
+    const root = mkBook()
+    mkVolumeBook(root, 1)
+    fs.writeFileSync(path.join(root, paths.章摘要(1, 1, '第1案')), '---\n版本: [未闭合\n---\n# 章摘要\n\n残缺摘要。')
+    const result = computeVolumeSummaryCandidate(root, 1)
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toMatch(/章摘要.*解析失败/)
+    expect(fs.existsSync(path.join(root, paths.卷摘要(1)))).toBe(false)
+  })
+
+  it('卷纲 frontmatter 损坏时不把残缺文档当作卷末兑现依据', () => {
+    const root = mkBook()
+    mkVolumeBook(root, 1)
+    fs.writeFileSync(path.join(root, paths.卷纲(1)), '---\n版本: [未闭合\n---\n# 卷纲\n\n## 卷末兑现\n残缺计划。')
+    const result = computeVolumeSummaryCandidate(root, 1)
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.reason).toMatch(/卷纲.*解析失败/)
+  })
+
   it('章摘要齐全 → 候选含章摘要汇编/线索收束/卷末兑现;只算不写', () => {
     const root = mkBook()
     mkVolumeBook(root, 3)

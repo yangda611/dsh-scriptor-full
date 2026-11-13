@@ -13,6 +13,45 @@ function mkRoot(): string {
 afterAll(() => { for (const r of roots) { try { fs.rmSync(r, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }) } catch { /* Windows 句柄延迟释放，%TEMP% 残留无害 */ } } })
 
 describe('批量原子写(机制 B1)', () => {
+  it.skipIf(process.platform !== 'win32')('Windows 尾点别名不能新建 Git 保留目录', () => {
+    const root = mkRoot()
+    expect(() => writeBatchAtomic(root, [{ relPath: '.git./config', content: '覆盖' }])).toThrow(/保留路径/)
+    expect(fs.existsSync(path.join(root, '.git'))).toBe(false)
+  })
+
+  it.each(['.git', '.webnovel'])('目录别名不能绕过保留路径 %s', (reserved) => {
+    const root = mkRoot()
+    const dir = path.join(root, reserved)
+    fs.mkdirSync(dir)
+    fs.writeFileSync(path.join(dir, 'protected'), '保留内容')
+    fs.symlinkSync(dir, path.join(root, '别名'), process.platform === 'win32' ? 'junction' : 'dir')
+    expect(() => writeBatchAtomic(root, [{ relPath: '别名/protected', content: '覆盖' }])).toThrow(/保留路径/)
+    expect(fs.readFileSync(path.join(dir, 'protected'), 'utf-8')).toBe('保留内容')
+  })
+
+  it('拒绝经目录别名重复写入同一目标，保留原文件', () => {
+    const root = mkRoot()
+    const real = path.join(root, '正文')
+    fs.mkdirSync(real)
+    fs.writeFileSync(path.join(real, '章.md'), '原文')
+    fs.symlinkSync(real, path.join(root, '别名'), process.platform === 'win32' ? 'junction' : 'dir')
+    expect(() => writeBatchAtomic(root, [
+      { relPath: '正文/章.md', content: '第一份' },
+      { relPath: '别名/章.md', content: '第二份' },
+    ])).toThrow(/目标路径重复/)
+    expect(fs.readFileSync(path.join(real, '章.md'), 'utf-8')).toBe('原文')
+  })
+
+  it.skipIf(process.platform !== 'win32')('拒绝仅大小写不同的重复目标，保留原文件', () => {
+    const root = mkRoot()
+    fs.writeFileSync(path.join(root, 'draft.md'), '原文')
+    expect(() => writeBatchAtomic(root, [
+      { relPath: 'draft.md', content: '第一份' },
+      { relPath: 'DRAFT.md', content: '第二份' },
+    ])).toThrow(/目标路径重复/)
+    expect(fs.readFileSync(path.join(root, 'draft.md'), 'utf-8')).toBe('原文')
+  })
+
   it('全部成功:目录自动创建,内容正确', () => {
     const root = mkRoot()
     writeBatchAtomic(root, [

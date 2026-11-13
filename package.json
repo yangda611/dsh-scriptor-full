@@ -2,7 +2,7 @@
   "name": "dsh-scriptor-full",
   "private": true,
   "type": "module",
-  "version": "8.4.7",
+  "version": "8.4.8",
   "description": "DSH Scriptor: a long-form fiction writing workspace for DeepSeek Harness",
   "packageManager": "pnpm@11.27.1",
   "scripts": {

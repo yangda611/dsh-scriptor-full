@@ -10,6 +10,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
+import { createHash } from 'node:crypto'
 import {
   assembleMaterials,
   confirmOutline,
@@ -31,6 +32,7 @@ import {
   computeEpisodeReview,
   computeScreenplayReview,
   episodeOutlineText,
+  episodeFingerprint,
   getCheck,
   ingestFilmDramaFindings,
   ingestFindings,
@@ -212,6 +214,75 @@ function ingestAll(root: string): void {
 }
 
 describe('影视剧审读注册表接线', () => {
+  it.each([{ keyEpisode: 2, outlineEpisode: 1 }, { keyEpisode: 1, outlineEpisode: 2 }])('短剧审读拒绝集号不一致的剧本、大纲和记录键：%j', ({ keyEpisode, outlineEpisode }) => {
+    const root = mkBook()
+    const result = runEpisodeReviewRecord(root, { 集: keyEpisode }, {
+      剧本: exampleVerticalScripts[0]!, 大纲: { ...exampleOutlines[0]!, 集: outlineEpisode },
+    })
+    expect(result.ok).toBe(false)
+    expect(result.reason).toMatch(/集号.*不一致/)
+    expect(loadEpisodeReviewRecord(root, keyEpisode)).toBe(null)
+  })
+
+  it('短剧发现项回写不能把第一集输入写进第二集记录', () => {
+    const root = mkBook()
+    const 剧本文本 = renderEpisodeScript(exampleVerticalScripts[0]!).内容
+    const 大纲文本 = episodeOutlineText(exampleOutlines[0]!)
+    const result = ingestFilmDramaFindings({
+      bookRoot: root, scope: '集', 集: 2, 模块名: 短剧审读语义名,
+      发现项: [], 剧本文本, 大纲文本, 审读指纹: episodeFingerprint(剧本文本, 大纲文本),
+    })
+    expect(result.ok).toBe(false)
+    expect(result.reason).toMatch(/集号.*不一致/)
+    expect(loadEpisodeReviewRecord(root, 2)).toBe(null)
+  })
+
+  it('章节回写拒绝影视剧模块，已有审核记录字节不变', () => {
+    const root = mkBook()
+    confirmWithHard(root)
+    putPending(root, '主角现身。')
+    const initial = runReview(root, key)
+    const recordPath = path.join(root, '草稿区/审核/卷01-开篇任务.json')
+    const original = fs.readFileSync(recordPath, 'utf-8')
+    const result = ingestFindings(root, key, 剧本语义审读名, [], initial.record!.审读指纹)
+    expect(result.ok).toBe(false)
+    expect(result.reason).toMatch(/适用范围/)
+    expect(fs.readFileSync(recordPath, 'utf-8')).toBe(original)
+  })
+
+  it('剧本发现项回写先恢复中断事务，再读取既有审读发现项', () => {
+    const root = mkBook()
+    const { draft, outline } = parseDraft()
+    const initial = runScreenplayReviewRecord(root, {
+      剧本草稿: draft, 剧本草稿文本: DRAFT_TEXT,
+      分场大纲: outline, 分场大纲文本: OUTLINE_TEXT, 片长: '短片',
+    })
+    const relPath = '草稿区/审核/审-剧本.json'
+    const original = fs.readFileSync(path.join(root, relPath), 'utf-8')
+    const interrupted = JSON.stringify({ ...initial.record, 问题: [], 模块: {} })
+    const transaction = path.join(root, '.webnovel/transactions/interrupted-review')
+    fs.mkdirSync(path.join(transaction, 'backups'), { recursive: true })
+    fs.writeFileSync(path.join(transaction, 'backups/0.bak'), original)
+    fs.writeFileSync(path.join(root, relPath), interrupted)
+    const hash = (text: string) => createHash('sha256').update(text).digest('hex')
+    fs.writeFileSync(path.join(transaction, 'manifest.json'), JSON.stringify({
+      schemaVersion: 1, id: 'interrupted-review', phase: 'applying', entries: [{
+        relPath, tmpRel: '草稿区/审核/.webnovel-txn-interrupted-review-0.tmp',
+        backupRel: '.webnovel/transactions/interrupted-review/backups/0.bak',
+        originalHash: hash(original), contentHash: hash(interrupted),
+        hadOriginal: true, backupRecorded: true, applied: true,
+      }],
+    }))
+    const result = ingestFilmDramaFindings({
+      bookRoot: root, scope: '剧本', 模块名: 剧本语义审读名, 发现项: [],
+      审读指纹: initial.record!.审读指纹, 剧本草稿文本: DRAFT_TEXT,
+      分场大纲文本: OUTLINE_TEXT, 片长: '短片',
+    })
+    expect(result.ok).toBe(true)
+    expect(result.record?.问题.some(finding => finding.问题说明.includes('(beat)'))).toBe(true)
+    expect(result.record?.模块[剧本对白审读名]?.完成).toBe(true)
+  })
+
   it('注册表按适用范围列出剧本/短剧模块；章节默认注册不变', () => {
     expect(FILM_DRAMA_MODULE_NAMES).toEqual([
       剧本对白审读名,

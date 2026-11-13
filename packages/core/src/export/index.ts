@@ -382,10 +382,10 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
   if (options.形态 !== '电影剧本' && options.形态 !== '短剧') return fail(['导出形态必须是 电影剧本 或 短剧'])
   const 格式 = options.格式 ?? 'storyboard'
   if (格式 !== 'storyboard' && 格式 !== 'master-scene' && 格式 !== 'fountain' && 格式 !== 'both') {
-    return fail(['导出格式必须是 storyboard、master-scene、fountain 或 both（旧值 markdown 已废弃：电影默认 storyboard，次要导出用 master-scene）'])
+    return fail(['导出格式必须是 storyboard、master-scene、fountain 或 both。旧值 markdown 已废弃。电影默认 storyboard，次要导出用 master-scene。'])
   }
   if (options.形态 === '短剧' && 格式 === 'master-scene') {
-    return fail(['短剧没有 master-scene 形态（短剧剧本本身就是分镜剧本）：用 storyboard（默认）、fountain 或 both'])
+    return fail(['短剧没有 master-scene 形态，短剧剧本本身就是分镜剧本。请用 storyboard（默认）、fountain 或 both。'])
   }
   if (options.形态 === '短剧' && (options.集 === undefined || !Number.isSafeInteger(options.集) || options.集 < 1 || options.集 > 100)) {
     return fail(['短剧导出必须传 --集 1–100 的集号'])
@@ -409,9 +409,9 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
   const 定稿相对路径 = options.形态 === '电影剧本' ? paths.电影剧本() : paths.短剧集(options.集!)
   let source: string
   try {
-    source = fs.readFileSync(path.join(root, 定稿相对路径), 'utf-8')
-  } catch {
-    return fail([`剧本定稿不存在：${定稿相对路径}（先把剧本定稿到 剧本/ 目录，见 docs/book-format.md「剧本定稿目录」）`])
+    source = readMaterialFile(root, 定稿相对路径).text
+  } catch (error) {
+    return fail([`剧本定稿读取失败：${定稿相对路径}（${error instanceof Error ? error.message : String(error)}）。请先把剧本定稿到 剧本/ 目录。目录约定见 docs/book-format.md「剧本定稿目录」。`])
   }
 
   const stem = safeFileStem(书名)
@@ -471,6 +471,7 @@ export function computeScreenplayExport(bookRoot: string, options: ScreenplayExp
   const parsed = parseEpisodeScript(source)
   if (!parsed.ok || parsed.episode === undefined) return fail(parsed.problems)
   const episode = parsed.episode
+  if (episode.集 !== options.集) return fail(['集号不一致：定稿文件名和剧本正文必须属于同一集'])
   let rendered: ReturnType<typeof renderEpisodeScript>
   try {
     rendered = renderEpisodeScript(episode)

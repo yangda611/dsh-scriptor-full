@@ -5,10 +5,17 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const rootFiles = new Set(['.gitattributes', '.gitignore', '.npmrc', '.node-version', 'LICENSE', 'README.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md', 'CODE_OF_CONDUCT.md', 'FORK_NOTES.md', 'dsh-baseline.json', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.base.json', 'vitest.config.ts', 'eslint.config.mjs'])
-export function checkPublicPath(file) {
+function checkSafePath(file) {
   assert.ok(!file.includes('\\') && !file.includes(':') && !file.startsWith('/') && !file.split('/').includes('..'), `Unsafe public path: ${file}`)
-  assert.ok(rootFiles.has(file) || /^(packages|scripts\/release|docs\/(user|maintenance)|examples|site|\.github)\//.test(file)
-    || /^docs\/(development|book-format|tool-catalog)\.md$/.test(file) || /^scripts\/(benchmark-(derive|impact|search)|strip-types-loader)\.mjs$/.test(file), `File outside public allowlist: ${file}`)
+}
+export function checkPublicPath(file, { historical = false } = {}) {
+  checkSafePath(file)
+  const evidence = /^DSH-(?:\d+\.\d+\.\d+-WEB-TEST|FULL-QA-REPORT)\.md$/.test(file)
+    || /^web-test-conversations(?:-\d+\.\d+\.\d+)?\.md$/.test(file)
+    || /^web-test-screenshots(?:-\d+\.\d+\.\d+)?\/[^/]+\.(?:png|jpe?g|webp)$/.test(file)
+  assert.ok((historical && file === '.sim.sh') || rootFiles.has(file) || evidence
+    || /^(packages|scripts\/release|docs\/(user|maintenance|examples|research)|examples|site|\.github)\//.test(file)
+    || /^docs\/(development|book-format|tool-catalog|plan-film-drama)\.md$/.test(file) || /^scripts\/(benchmark-(derive|impact|search)|strip-types-loader)\.mjs$/.test(file), `File outside public allowlist: ${file}`)
   assert.ok(!/(^|\/)(\.trellis|\.credentials[^/]*|session[^/]*\.jsonl|node_modules|\.env(?:\..*)?|\.webnovel)(\/|$)/.test(file), `Private content path: ${file}`)
   assert.notEqual(file, 'packages/bundle/dsh-local.yml', 'Local instance config is private')
 }
@@ -33,7 +40,11 @@ export function checkMarkdownLinks(root, file, text) {
 
 export function checkTree(root, history = true) {
   const git = (args, options = {}) => execFileSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true, maxBuffer: 16 * 1024 * 1024, ...options })
-  const files = [...new Set(git(['ls-files', '--cached', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean))]
+  const files = [...new Set(git(['ls-files', '--cached', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean))].filter(file => {
+    checkSafePath(file)
+    try { fs.lstatSync(path.join(root, file)); return true }
+    catch (error) { if (error?.code === 'ENOENT') return false; throw error }
+  })
   for (const file of files) {
     checkPublicPath(file)
     assert.ok(!fs.lstatSync(path.join(root, file)).isSymbolicLink(), `Public symlink: ${file}`)
@@ -53,7 +64,7 @@ export function checkTree(root, history = true) {
         const meta = line.slice(0, separator)
         const file = line.slice(separator + 1)
         const [mode, kind, oid] = meta.split(' ')
-        checkPublicPath(file)
+        checkPublicPath(file, { historical: true })
         assert.ok(kind === 'blob' && ['100644', '100755'].includes(mode), `Non-regular history entry: ${file}`)
         if (!blobs.has(oid)) blobs.set(oid, file)
       }

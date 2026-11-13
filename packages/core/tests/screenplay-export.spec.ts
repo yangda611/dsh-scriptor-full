@@ -60,6 +60,25 @@ function readShotList(name: string): ShotList {
 }
 
 describe('阶段 4：剧本导出格式（Fountain / Markdown 双输出 + 分镜头表）', () => {
+  it('短剧定稿文件名和正文集号不一致时不导出其他集', () => {
+    const root = episodeBook('集号核对')
+    fs.renameSync(path.join(root, '剧本/短剧/集001.md'), path.join(root, '剧本/短剧/集002.md'))
+    const result = computeScreenplayExport(root, { 形态: '短剧', 集: 2 })
+    expect(result.ok).toBe(false)
+    expect(result.gaps.some(gap => /集号.*不一致/.test(gap))).toBe(true)
+    expect(result.markdown).toBe('')
+  })
+
+  it('剧本定稿目录指向仓外时拒绝读取和导出', () => {
+    const root = episodeBook('链接核对')
+    fs.renameSync(path.join(root, '剧本/短剧'), path.join(path.dirname(root), '仓外剧本'))
+    fs.symlinkSync(path.join(path.dirname(root), '仓外剧本'), path.join(root, '剧本/短剧'), process.platform === 'win32' ? 'junction' : 'dir')
+    const result = computeScreenplayExport(root, { 形态: '短剧', 集: 1 })
+    expect(result.ok).toBe(false)
+    expect(result.gaps.some(gap => /链接|别名/.test(gap))).toBe(true)
+    expect(result.markdown).toBe('')
+  })
+
   it('电影 Fountain：标题页 + FADE IN/OUT + 三段式场景标题 + 场号注释，(pause) 保留、无 SFX: 行', () => {
     const text = renderFountainScreenplay(VALID_DRAFT)
     expect(text).toContain('Title: 晚星')

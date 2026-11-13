@@ -57,4 +57,20 @@ describe('native session adapter',()=>{
     expect(f.events.listeners.size).toBe(0)
     f.append('turn/end',{turn:1,reason:{kind:'completed'}});expect(f.store.getSnapshot().action).toBe('idle');f.dispose()
   })
+  it('does not celebrate an earlier success when a batched append ends in cancellation',()=>{
+    const f=fixture()
+    const entries = [
+      {type:'event' as const,event:{type:'turn/start',data:{turn:1}}},
+      {type:'event' as const,event:{type:'turn/end',data:{turn:1,reason:{kind:'completed'}}}},
+      {type:'event' as const,event:{type:'turn/start',data:{turn:2}}},
+      {type:'event' as const,event:{type:'turn/end',data:{turn:2,reason:{kind:'cancelled'}}}},
+    ]
+    f.events.set({entries,revision:1,change:{kind:'append',entries}})
+    expect(f.store.getSnapshot().action).toBe('idle');f.dispose()
+  })
+  it('ignores late text chunks from an earlier turn',()=>{
+    const f=fixture();f.running(true);f.append('turn/start',{turn:2})
+    f.append('assistant/live-chunk',{turn:1,chunk:{type:'text-delta',text:'迟到正文'}})
+    expect(f.store.getSnapshot().action).toBe('thinking');f.dispose()
+  })
 })

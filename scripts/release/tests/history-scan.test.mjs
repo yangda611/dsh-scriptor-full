@@ -40,6 +40,13 @@ test('private paths removed from HEAD are still checked in reachable history', (
   assert.throws(() => checkTree(root), /outside public allowlist/)
 }))
 
+test('unstaged removal of the legacy simulator helper passes while history remains scanned', () => repository(({ root, put, commit }) => {
+  put('README.md', 'public'); put('.sim.sh', '#!/bin/sh\n')
+  commit()
+  fs.unlinkSync(path.join(root, '.sim.sh'))
+  assert.deepEqual(checkTree(root), { ok: true, files: 1, commits: 1 })
+}))
+
 test('historical symlinks reject even when HEAD is a regular file', () => repository(({ root, git, put, commit }) => {
   put('README.md', 'public'); put('packages/link.txt', 'target'); commit()
   const oid = git('rev-parse', 'HEAD:packages/link.txt')

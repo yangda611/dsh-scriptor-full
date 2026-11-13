@@ -37,13 +37,8 @@ function readText(root: string, rel: string): string | null {
   }
 }
 
-function bodyOnly(text: string): string {
-  const r = parseDocument(text)
-  return (r.ok ? r.data.body : text).trim()
-}
-
 function stripSummaryHeading(text: string): string {
-  return bodyOnly(text).replace(/^#\s*章摘要\s*\n+/, '').trim()
+  return text.trim().replace(/^#\s*章摘要\s*\n+/, '').trim()
 }
 
 function extractSection(body: string, title: string): string | null {
@@ -93,7 +88,9 @@ export function computeVolumeSummaryCandidate(bookRoot: string, 卷: number): Vo
       缺章摘要.push(c.章)
       continue
     }
-    const content = stripSummaryHeading(text)
+    const parsed = parseDocument(text)
+    if (!parsed.ok) return { ok: false, reason: `章摘要解析失败：${rel}；${parsed.detail}，不产候选不落盘`, 缺章摘要: [] }
+    const content = stripSummaryHeading(parsed.data.body)
     if (content === '' || content === '（无摘要沉淀）') {
       缺章摘要.push(c.章)
       continue
@@ -131,7 +128,9 @@ export function computeVolumeSummaryCandidate(bookRoot: string, 卷: number): Vo
   const 线索段 = 线索段Parts.join('\n')
 
   const 卷纲文 = readText(bookRoot, paths.卷纲(卷))
-  const 卷末兑现 = 卷纲文 === null ? null : extractSection(bodyOnly(卷纲文), '卷末兑现')
+  const 卷纲 = 卷纲文 === null ? null : parseDocument(卷纲文)
+  if (卷纲 !== null && !卷纲.ok) return { ok: false, reason: `卷纲解析失败：${paths.卷纲(卷)}；${卷纲.detail}，不产候选不落盘`, 缺章摘要: [] }
+  const 卷末兑现 = 卷纲 === null ? null : extractSection(卷纲.data.body, '卷末兑现')
 
   const 候选 = [
     '# 卷摘要',
