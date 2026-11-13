@@ -45,13 +45,18 @@ const ctx = await boot('packaging-source-isolation', configPath, [], async host 
   await host.plugin(PluginPackages, { resolution })
 })
 try {
-  assert.equal((await ctx.skills.list({ cwd: process.cwd() })).length, 0)
-  // Skills are contributed by the installed writing preset, never by the root Host.
+  const rootSkills = await ctx.skills.list({ cwd: process.cwd() })
+  assert.equal(rootSkills.length, 14)
+  assert.ok(rootSkills.every(skill => skill.provider === 'webnovel-bundled'))
+  const rootNames = rootSkills.map(skill => skill.name).sort()
+  assert.equal(new Set(rootNames).size, rootNames.length)
+  // The main bundle mounts skills once at the root so every preset can load them.
   const writing = await ctx.get('agents').create({ sessionId: 'packaging-writing', meta: { cwd: process.cwd(), agentPreset: 'scriptor' },
     setup: async scope => { await scope.get('agentPresets').mount(scope, 'scriptor') },
   })
   const skills = await ctx.skills.list({ cwd: process.cwd(), scope: writing.agent })
   assert.equal(skills.length, 14)
+  assert.deepEqual(skills.map(skill => skill.name).sort(), rootNames)
   for (const skill of skills) {
     const loaded = await ctx.skills.get(skill.name, { cwd: process.cwd(), scope: writing.agent })
     assert.equal(loaded.provider, 'webnovel-bundled')
@@ -64,5 +69,5 @@ try {
   fs.writeFileSync(reportPath, JSON.stringify({ ok: true, sourceReadDenied: true, trustedNativeAddons: true, actualLoader: true, skills: skills.length, embeddingLoaded: checkEmbedding && !!ctx.get('embeddings'), graphLoaded: checkEmbedding && !!ctx.get('graphExtraction') }, null, 2) + '\n')
   console.log('Source-blocked installed Host Loader: 14 skills passed')
   await writing.dispose()
-  assert.equal((await ctx.skills.list({ cwd: process.cwd() })).length, 0)
+  assert.deepEqual((await ctx.skills.list({ cwd: process.cwd() })).map(skill => skill.name).sort(), rootNames)
 } finally { await ctx.fiber.dispose() }
