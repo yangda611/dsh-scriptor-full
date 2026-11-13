@@ -126,13 +126,16 @@ export function attachWritingDelegationToAgent(agent: AgentLike): (() => Promise
     return undefined
   }
   if (fiber === undefined || typeof fiber.dispose !== 'function') return undefined
+  // 注意：fiber 是 let，TS 不把守卫的收窄带进闭包（TS2722），所以这里把
+  // dispose 方法绑定后捕获；bind 保持 this=fiber，行为与 fiber.dispose() 完全一致。
+  const disposeFiber = fiber.dispose.bind(fiber)
   let disposed = false
   const dispose = async (): Promise<void> => {
     if (disposed) return
     disposed = true
     attachedDelegations.delete(agent)
     liveDelegationDisposes.delete(dispose)
-    await fiber.dispose()
+    await disposeFiber()
   }
   attachedDelegations.set(agent, dispose)
   liveDelegationDisposes.add(dispose)

@@ -127,7 +127,7 @@ function StudyBrowser({ sessionId, store, host, openIndex }: { sessionId: string
   </div>
 }
 
-export function WorkspaceStudyTabs({ wide, expandSidebar, renderSlot, host, store, openIndex }: WorkspaceProps & StudyUI) {
+export function WorkspaceStudyTabs({ wide, expandSidebar, renderSlot, host, store, openIndex, useSectionScroller }: WorkspaceProps & StudyUI) {
   const [tab, setTab] = useState<'workspace' | 'study'>('study')
   const sessionId = useSession(host)
   const id = useId()
@@ -139,7 +139,7 @@ export function WorkspaceStudyTabs({ wide, expandSidebar, renderSlot, host, stor
   ] as const
   return <div className="webnovel nw-left">
     <SegmentedTabs className="nw-tabs" label="导航分类" items={tabs} value={tab} onChange={setTab} />
-    <div className="nw-native-workspaces" id={tabs[0].panelId} role="tabpanel" aria-labelledby={tabs[0].id} hidden={tab !== 'workspace'}>{renderSlot('webnovel.workspaces', { wide, expandSidebar })}</div>
+    <div className="nw-native-workspaces" id={tabs[0].panelId} role="tabpanel" aria-labelledby={tabs[0].id} hidden={tab !== 'workspace'}>{renderSlot('webnovel.workspaces', { wide, expandSidebar }, { hookContext: { useSectionScroller } })}</div>
     {tab === 'study' ? <div className="nw-study-panel" id={tabs[1].panelId} role="tabpanel" aria-labelledby={tabs[1].id}>
       {sessionId ? <StudyBrowser key={sessionId} sessionId={sessionId} store={store} host={host} openIndex={openIndex} /> : <p className="nw-empty">打开一个工作区会话后，即可浏览作品与共享资料。</p>}
     </div> : null}

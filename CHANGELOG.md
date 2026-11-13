@@ -2,6 +2,15 @@
 
 此处记录 DSH 工作台安装包版本。v6 的更新记录保留在 master 分支。
 
+## [8.4.7] — 2026-11-13
+
+修复 8.4.6 在 DSH 0.2.2-rc.2 Web 里工作区左栏会话列表空白（用户实测发现：进插件页后回不去正在运行的任务，侧栏没有会话条目可点）。根因已实证：插件把原生 `sidebar.workspaces` 整个替换成工作区/书房两个页签，并把原生会话列表组件以子插槽 `webnovel.workspaces` 重新挂载，但重挂载只抄了原生条目的 inject/store/locale/children，没抄宿主侧栏的 slot 级 `sectionScroller` 注入，也没在渲染调用里传 `hookContext`——原生 `WorkspaceBrowser` 拿到的 `useSectionScroller` 是 `undefined`，一调用就抛 `TypeError: useSectionScroller is not a function`，宿主 SlotErrorBoundary 吞掉错误后只剩空 error 占位。会话数据本身没丢（主区域当前会话照常显示，书房列表正常）。
+
+- 子插槽声明补上宿主同款 slot 级注入：`webnovel.workspaces` 的 children 声明带 `inject: { hooks: { sectionScroller: (_standard, { useSectionScroller }) => useSectionScroller } }`，工厂只转发 hook、不调用。
+- `WorkspaceStudyTabs` 把自己从 `sidebar.workspaces` 拿到的 `useSectionScroller` 经 `{ hookContext: { useSectionScroller } }` 传进 `renderSlot('webnovel.workspaces', …)`；`WorkspaceProps` 类型补上 `SectionScroller` / `UseSectionScroller`（结构声明，不新增包依赖）。
+- 回归测试：子插槽声明的注入工厂从 hookContext 取回同一 hook；工作区页签渲染时 renderSlot 收到含 hookContext 的调用。`mountNativeEntry` 本体不动——缺失的共享在插槽声明与渲染调用，不在条目。
+- 顺带修掉 8.4.6 基底就有的 `tsc` 报错（`writing-delegation.ts` TS2722：`fiber` 是 `let`，守卫的收窄带不进闭包）：把 `fiber.dispose` 绑定后捕获，`bind` 保持 `this=fiber`，行为与原来 `fiber.dispose()` 完全一致；worker-policy 单测覆盖，无行为变化。
+
 ## [8.4.6] — 2026-11-12
 
 修复 8.4.5 在 DSH 0.2.2-rc.2 Web 里第一章写不出来的断链（书能建、能上架，但正文起草被拦）。根因已实证：46 个 `novel_*` 工具进了标准预设会话，唯独缺 `novel_delegate`——它不是 `createNovelTools` 的产物，而是原生 `subagent` 的克隆注册（`attachWritingDelegationToAgent`），而这一步仍留在写作预设能力门内；默认会话用标准预设、书房向导不自动切预设，委派入口于是全程缺席，AI 只能叫停起草子代理。

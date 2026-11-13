@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ClientHost, NativeEntry, WorkspaceProps } from '../src/client/host'
 import { createEditorStore } from '../src/client/store'
+import { WorkspaceStudyTabs } from '../src/client/browser'
 import { installWorkspaceStudyTabs } from '../src/client/workspace-slots'
 
 const workspace = 'sidebar.workspaces'
@@ -60,7 +61,7 @@ describe('原生工作区子插槽转发（#178）', () => {
       return React.createElement('span', null, f.core.entriesOfSlot(key).map(item => item.options.id).join(','))
     })
     let rendered!: ReturnType<typeof create>
-    act(() => { rendered = create(React.createElement(entry.component, { wide: true, expandSidebar: vi.fn(), renderSlot, useSessions: vi.fn() })) })
+    act(() => { rendered = create(React.createElement(entry.component, { wide: true, expandSidebar: vi.fn(), renderSlot, useSessions: vi.fn(), useSectionScroller: vi.fn() })) })
     expect(renderSlot.mock.calls.map(call => call[0])).toEqual([flow, menu, actions, leading, hover].map(mirrored))
     expect(renderSlot).toHaveBeenCalledWith(mirrored(menu), f.owner, { hookContext: f.hookContext })
     expect(rendered.root.findAllByType('span')[1]!.children).toEqual(['pin,rename'])
@@ -99,5 +100,35 @@ describe('原生工作区子插槽转发（#178）', () => {
     expect(f.core.entries(mirrored(nested))).toHaveLength(0)
     expect(f.core.specDynamic(mirrored(nested))).toBeUndefined()
     f.dispose()
+  })
+})
+
+describe('工作区原生浏览器的滚动 hook 转发（8.4.7）', () => {
+  it('子插槽声明携带 sectionScroller 注入，工厂从 hookContext 取回 hook', () => {
+    const f = fixture()
+    const inject = f.core.specDynamic('webnovel.workspaces')?.inject as unknown as {
+      hooks: { sectionScroller: (standard: unknown, hookContext: { useSectionScroller: unknown }) => unknown }
+    } | undefined
+    expect(typeof inject?.hooks?.sectionScroller).toBe('function')
+    const hook = () => ({ bindScrollerRef: () => {} })
+    expect(inject!.hooks.sectionScroller(null, { useSectionScroller: hook })).toBe(hook)
+    f.dispose()
+  })
+
+  it('工作区页签把 useSectionScroller 经 hookContext 传给原生浏览器', () => {
+    vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() })
+    const expandSidebar = vi.fn()
+    const useSectionScroller = vi.fn(() => ({ bindScrollerRef: vi.fn() }))
+    const renderSlot = vi.fn(() => null)
+    const host = { sessions: { list: { getSnapshot: () => ({ byId: {} }), subscribe: () => () => {} } } } as unknown as ClientHost
+    let rendered!: ReturnType<typeof create>
+    act(() => {
+      rendered = create(React.createElement(WorkspaceStudyTabs, {
+        wide: true, expandSidebar, renderSlot, useSessions: vi.fn(), useSectionScroller, host, store: createEditorStore(),
+      }))
+    })
+    expect(renderSlot).toHaveBeenCalledWith('webnovel.workspaces', { wide: true, expandSidebar }, { hookContext: { useSectionScroller } })
+    act(() => rendered.unmount())
+    vi.unstubAllGlobals()
   })
 })

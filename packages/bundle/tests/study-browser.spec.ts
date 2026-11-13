@@ -59,7 +59,7 @@ async function mount() {
   const host = { sessions: { list: { getSnapshot: () => ({ byId: { s: { retainedBy: { mainView: 1 } } } }), subscribe: () => () => {} } }, get: (name: string) => name === 'remote' ? remote() : undefined }
   let renderer!: ReactTestRenderer
   await act(async () => {
-    renderer = create(React.createElement(WorkspaceStudyTabs, { wide: true, expandSidebar() {}, renderSlot: () => null, useSessions: (() => undefined) as never, host: host as unknown as ClientHost, store: createEditorStore() }))
+    renderer = create(React.createElement(WorkspaceStudyTabs, { wide: true, expandSidebar() {}, renderSlot: () => null, useSessions: (() => undefined) as never, useSectionScroller: () => ({ bindScrollerRef: () => {} }), host: host as unknown as ClientHost, store: createEditorStore() }))
   })
   renderers.push(renderer)
   await wait(); await wait()

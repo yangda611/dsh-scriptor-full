@@ -1,8 +1,17 @@
-import type { ComponentType, ReactNode } from 'react'
+import type { ComponentType, ReactNode, RefCallback } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import type { StoredEntry } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { SessionInput } from '@deepseek-ai/dsh-client-ui-conversation/client'
+
+/** Sidebar viewport capability the `sidebar.workspaces` occupant binds its own vertical scroller through (host contract: dsh-client-ui-sidebar `SidebarSectionHookContext`). */
+export interface SectionScroller {
+  /** Ref callback for the occupant's own vertical scroller. */
+  readonly bindScrollerRef: RefCallback<HTMLElement>
+}
+
+/** Hook handed to the `sidebar.workspaces` occupant through the slot's hookContext; the same object on every call for one sidebar. */
+export type UseSectionScroller = () => SectionScroller
 
 export interface SessionListRow {
   readonly cwd?: string
@@ -29,6 +38,8 @@ export interface WorkspaceProps {
   readonly expandSidebar: () => void
   readonly renderSlot: RenderSlot
   readonly useSessions: UseSessions
+  /** Sidebar viewport scroller hook, bound by the host slot-level inject from each render's hookContext — the native browser crashes without it. */
+  readonly useSectionScroller: UseSectionScroller
 }
 
 export interface ClientHost {
