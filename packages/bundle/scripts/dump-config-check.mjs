@@ -8,7 +8,13 @@ import { thinScripts } from './artifact-contract.mjs'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 assert.deepEqual(parse(fs.readFileSync(path.join(root, 'cordis.patch.yml'), 'utf8')), [
-  { insert: [{ id: 'webnovel', name: manifest.name }] },
+  { insert: [
+    { id: 'webnovel', name: manifest.name },
+    { id: 'webnovel-embeddings', name: `${manifest.name}/retrieval` },
+    { id: 'webnovel-scenes', name: `${manifest.name}/scenes` },
+    { id: 'webnovel-reranking', name: `${manifest.name}/reranking` },
+    { id: 'webnovel-graph', name: `${manifest.name}/graph` },
+  ] },
 ])
 assert.deepEqual(manifest.dsh.bundle.patch, ['./cordis.patch.yml', './presets/writing.patch.yml'])
 const writing = parse(fs.readFileSync(path.join(root, 'presets/writing.patch.yml'), 'utf8'))
