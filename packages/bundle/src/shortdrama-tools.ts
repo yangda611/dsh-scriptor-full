@@ -1,36 +1,17 @@
-/**
- * 短剧工具定义（阶段 3）：只定义，不注册。
- *
- * 本文件导出 SHORTDRAMA_TOOL_DEFINITIONS（与 novel-tools.ts 的 NovelToolDefinition
- * 同形）与 SHORTDRAMA_TOOL_NAMES，供协调人接线时在 createNovelTools 里合并注册
- * （见汇报里的注册代码片段）。不要直接改 novel-tools.ts。
- *
- * 四个工具都是纯函数（不读写书仓、不碰 git）：
- * - novel_shortdrama_plan_episodes：分集钩子/爽点大纲规划（只排结构位，不发明情节）。
- * - novel_shortdrama_render_episode：单集剧本渲染（编剧层分场景格式，定稿路径为
- *   paths.短剧集(集号)，即 `剧本/短剧/集001.md` 起；落盘由调用方按定稿流程做，
- *   本工具只返回路径与正文）。
- * - novel_shortdrama_check_beats：节拍检查（逐集逐规则报通过/未通过/不适用）。
- * - novel_shortdrama_review_episode：短剧审读确定性检查（发现项模块名 `短剧审读`，
- *   经共享审读注册表跑完；返回发现项 + 审核编号 + 审读指纹；发现项经
- *   novel_record_review_findings（适用范围 集）回写进分集审读记录
- *   （草稿区/审核/审-集NNN.json），与语义审读（短剧审读（语义））合流）。
- *
- * 核心实现在 @webnovel/core 的 shortdrama 模块；本文件只做参数校验与包装。
- * 注意：core 的包入口（packages/core/src/index.ts）暂未导出 shortdrama（阶段 3
- * 只创建新文件），所以这里用相对路径直引 core 源码——与 bundle 测试里
- * `../../core/src/index` 的写法一致，bundle.mjs 的 esbuild 单文件打包会把它内联。
- * 协调人接线时在 core/index.ts 加一行 `export * from './shortdrama'` 后，
- * 这里可改成从 '@webnovel/core' 导入。
- */
+/** 短剧计算定义与书仓接线。注册后的渲染工具经原生写入保存草稿；定稿另走审读与作者确认。 */
 
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { failureFrom, toolFailure } from './tool-failure'
-import type { NovelToolDefinition } from './novel-tools'
+import type { NovelToolDefinition, NovelToolsDeps, ToolExecContext } from './novel-tools'
 import { computeEpisodeFindings } from '@webnovel/review'
 import {
   checkSeasonBeats,
   planSeason,
   renderEpisodeScript,
+  readExistingContract,
+  gateFileAccess,
+  type FileOp,
   type EpisodeBeats,
   type EpisodeOutline,
   type EpisodeScriptInput,
@@ -119,7 +100,7 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
   },
   {
     name: 'novel_shortdrama_render_episode',
-    description: '短剧单集剧本渲染：编剧层分场景格式（场号. 地点 时间 内/外 + 动作行 + 说话人：台词，停顿只用 (pause)）。返回定稿路径（剧本/短剧/集001.md 起）与正文；台词超长只报警告、不丢稿。只在契约输出形态=短剧时用。',
+    description: '短剧单集剧本渲染预览：返回正文与未来定稿路径，saved=false 表示尚未保存。台词超长只报警告、不丢稿。',
     parameters: {
       type: 'object',
       properties: {
@@ -180,7 +161,10 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
         type: 'object',
         properties: {
           ok: { type: 'boolean' },
-          path: { type: 'string', description: '定稿路径，如 剧本/短剧/集001.md' },
+          path: { type: 'string', description: 'saved=true 时为实际草稿路径；纯渲染预览只返回未来定稿路径' },
+          finalPath: { type: 'string', description: '未来定稿路径；不表示已经定稿' },
+          saved: { type: 'boolean', description: '实际文件读回一致时才为 true' },
+          message: { type: 'string' },
           内容: { type: 'string' },
           警告: { type: 'array' },
           reason: { type: 'string' },
@@ -192,7 +176,7 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
     execute: (args) => run(() => {
       const input = asRecord(args, '参数') as unknown as EpisodeScriptInput
       const rendered = renderEpisodeScript(input)
-      return { ok: true, ...rendered }
+      return { ok: true, ...rendered, finalPath: rendered.path, saved: false, message: '仅渲染预览，尚未保存文件。' }
     }),
   },
   {
@@ -335,3 +319,47 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
     }),
   },
 ]
+
+interface ShortdramaToolsDeps {
+  readonly bookRootOfBookId: NovelToolsDeps['bookRootOfBookId']
+  readonly writeDraft: (root: string, op: FileOp, exec?: ToolExecContext) => Promise<void>
+}
+
+/** 调用方在异步书仓写入锁内执行，复用原生写入的版本保护、取消与操作留痕。 */
+export function createShortdramaTools(deps: ShortdramaToolsDeps): NovelToolDefinition[] {
+  return SHORTDRAMA_TOOL_DEFINITIONS.map(tool => {
+    if (tool.name !== 'novel_shortdrama_render_episode') return tool
+    const parameters = tool.parameters as { properties: Record<string, unknown>; required: string[] }
+    return {
+      ...tool,
+      description: '渲染并保存短剧单集草稿：必传 bookId，核对契约输出形态=短剧，经原生写入保存到草稿区/剧本/短剧/集001.md 起，读回核验后才返回 saved=true 和实际 path。finalPath 是未来定稿路径；草稿仍须节拍检查、审读和作者确认，不代表定稿。台词超长只报警告、不丢稿。',
+      parameters: {
+        ...tool.parameters,
+        properties: { ...parameters.properties, bookId: { type: 'string', description: '当前短剧的书id（必填）' } },
+        required: ['bookId', ...parameters.required],
+      },
+      execute: async (args, exec) => {
+        const bookId = typeof args['bookId'] === 'string' ? args['bookId'].trim() : ''
+        if (bookId === '') return toolFailure('book-not-found', 'bookId 必填，请先核对当前短剧书目。')
+        try {
+          const root = deps.bookRootOfBookId(bookId, exec?.agent)
+          if (root === undefined) return toolFailure('book-not-found', `书id不存在或不唯一：${bookId}`)
+          if (readExistingContract(root).fields['输出形态'] !== '短剧') return toolFailure('invalid-argument', '作品契约的输出形态必须是短剧，不能保存到其他项目。')
+          const rendered = renderEpisodeScript(args as unknown as EpisodeScriptInput)
+          const draftPath = `草稿区/${rendered.path}`
+          const access = gateFileAccess(root, draftPath)
+          if (!access.allow || access.zone !== '草稿区') return toolFailure('runtime-link', `短剧草稿目标必须留在草稿区，请核对目录链接：${access.allow ? draftPath : access.reason}`)
+          exec?.signal?.throwIfAborted()
+          await deps.writeDraft(root, { relPath: draftPath, content: rendered.内容 }, exec)
+          if (fs.readFileSync(path.join(root, draftPath), 'utf8') !== rendered.内容) {
+            return { ...toolFailure('internal', '短剧草稿保存后读回正文不一致，请核对实际文件后再继续。'), saved: false }
+          }
+          return { ok: true, ...rendered, path: draftPath, finalPath: rendered.path, saved: true, message: '短剧草稿已保存并读回核验，尚待节拍检查、审读和作者确认。' }
+        } catch (error) {
+          if (exec?.signal?.aborted) throw error
+          return { ...failureFrom(error, '短剧草稿保存失败：'), saved: false }
+        }
+      },
+    }
+  })
+}

@@ -52,6 +52,8 @@ import {
   type RenderedEpisodeScript,
   type ScriptLine,
   type ScriptScene,
+  isHookType,
+  isShortDramaOrientation,
 } from './types'
 
 /** 停顿标记：只用 `(pause)`，不用 `(beat)`（见文件头约定）。 */
@@ -172,7 +174,82 @@ function fail(message: string): never {
   throw new Error(`单集剧本渲染失败：${message}`)
 }
 
+function requireRecord(value: unknown, field: string): Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) fail(`${field}必须是一个对象`)
+  return value as Record<string, unknown>
+}
+
+function requireArray(value: unknown, field: string): readonly unknown[] {
+  if (!Array.isArray(value)) fail(`${field}必须是一个数组`)
+  return value
+}
+
+function requireString(value: unknown, field: string): void {
+  if (typeof value !== 'string') fail(`${field}必须是字符串`)
+}
+
+function requireNumber(value: unknown, field: string): void {
+  if (typeof value !== 'number') fail(`${field}必须是数字`)
+}
+
+function requireStringArray(value: unknown, field: string): void {
+  for (const [index, item] of requireArray(value, field).entries()) requireString(item, `${field}[${index}]`)
+}
+
+function validateLines(value: unknown, field: string): void {
+  for (const [index, item] of requireArray(value, field).entries()) {
+    const where = `${field}[${index}]`
+    const line = requireRecord(item, where)
+    requireString(line['角色'], `${where}.角色`)
+    requireString(line['台词'], `${where}.台词`)
+    if (line['括号提示'] !== undefined) requireString(line['括号提示'], `${where}.括号提示`)
+  }
+}
+
+/** 工具参数来自运行时 JSON；先检查结构，再执行依赖字符串/数组方法的领域校验。 */
+function validateStructure(input: unknown): void {
+  const value = requireRecord(input, '参数')
+  for (const field of ['标题', '核心想法', '爽点', '结尾悬念']) requireString(value[field], field)
+  if (!isShortDramaOrientation(value['画幅'])) fail('画幅必须是竖屏或横屏')
+  if (!isHookType(value['钩子类型'])) fail('钩子类型必须是身份、情感或顿悟')
+  for (const field of ['开场冲突秒', '结尾钩子秒']) requireNumber(value[field], field)
+  for (const [index, second] of requireArray(value['反转秒'], '反转秒').entries()) requireNumber(second, `反转秒[${index}]`)
+  for (const [index, item] of requireArray(value['场景'], '场景').entries()) {
+    const where = `场景[${index}]`
+    const scene = requireRecord(item, where)
+    for (const field of ['地点', '时间', '动作']) requireString(scene[field], `${where}.${field}`)
+    if (scene['内外'] !== '内' && scene['内外'] !== '外') fail(`${where}.内外必须是内或外`)
+    validateLines(scene['台词'], `${where}.台词`)
+    if (scene['场景环境'] !== undefined) requireString(scene['场景环境'], `${where}.场景环境`)
+    if (scene['人物'] !== undefined) {
+      for (const [personIndex, personItem] of requireArray(scene['人物'], `${where}.人物`).entries()) {
+        const personWhere = `${where}.人物[${personIndex}]`
+        const person = requireRecord(personItem, personWhere)
+        requireString(person['角色'], `${personWhere}.角色`)
+        if (person['形象标识'] !== undefined) requireString(person['形象标识'], `${personWhere}.形象标识`)
+      }
+    }
+    if (scene['镜头'] !== undefined) {
+      for (const [shotIndex, shotItem] of requireArray(scene['镜头'], `${where}.镜头`).entries()) {
+        const shotWhere = `${where}.镜头[${shotIndex}]`
+        const shot = requireRecord(shotItem, shotWhere)
+        requireNumber(shot['镜头号'], `${shotWhere}.镜头号`)
+        for (const field of ['开始秒', '结束秒']) {
+          if (shot[field] !== null) requireNumber(shot[field], `${shotWhere}.${field}（未知时填 null）`)
+        }
+        for (const field of ['景别', '角度', '运镜']) requireString(shot[field], `${shotWhere}.${field}`)
+        requireStringArray(shot['描写'], `${shotWhere}.描写`)
+        validateLines(shot['台词'], `${shotWhere}.台词`)
+        for (const field of ['环境声', '字幕']) {
+          if (shot[field] !== undefined) requireStringArray(shot[field], `${shotWhere}.${field}`)
+        }
+      }
+    }
+  }
+}
+
 function validate(input: EpisodeScriptInput): string[] {
+  validateStructure(input)
   const warnings: string[] = []
   const template = RHYTHM_TEMPLATES[input.画幅]
   if (!Number.isSafeInteger(input.集) || input.集 < 1 || input.集 > 100) {

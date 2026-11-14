@@ -143,6 +143,48 @@ export async function checkNativeWrites({ root, book, main, ctx, service, execut
       for (const [, relative] of cases) {
         assert.ok(audits.some(audit => audit.status === 'failed' && audit.targets.includes(relative)), relative)
       }
+
+      // Keep this regression inside an asserted Loader check so a native-write failure fails Vitest.
+      const draftPath = '草稿区/剧本/短剧/集001.md'
+      const finalPath = '剧本/短剧/集001.md'
+      const beforeContract = text(contractPath)
+      const parsedContract = core.parseDocument(beforeContract).data
+      const previousDraft = '作者保留的短剧旧草稿\n'
+      assert.equal(fs.existsSync(path.join(book, draftPath)), false)
+      try {
+        put(contractPath, core.serializeDocument({ ...parsedContract.fields, 输出形态: '短剧' }, parsedContract.body))
+        put(draftPath, previousDraft)
+        const beforeHead = head()
+        const count = writes.length
+        const unread = await call('novel_shortdrama_render_episode', core.exampleVerticalScripts[0])
+        assert.equal(unread.ok, false, JSON.stringify(unread))
+        assert.equal(unread.saved, false)
+        assert.match(unread.reason, /has not been read/)
+        assert.equal(text(draftPath), previousDraft)
+
+        await read(draftPath)
+        const saved = await call('novel_shortdrama_render_episode', core.exampleVerticalScripts[0])
+        assert.equal(saved.ok, true, JSON.stringify(saved))
+        assert.equal(saved.saved, true)
+        assert.equal(saved.path, draftPath)
+        assert.equal(saved.finalPath, finalPath)
+        assert.equal(text(draftPath), saved.内容)
+        assert.match(saved.内容, /# 集001：/)
+        assert.equal(fs.existsSync(path.join(book, finalPath)), false)
+        assert.equal(writes.length, count + 2)
+        assert.equal(writes.at(-1).result.isError, false)
+        assert.equal(writes.at(-1).exec.agent, main)
+        assert.equal(head(), beforeHead)
+        const draftAudits = fs.readdirSync(path.join(book, '.webnovel/operations'))
+          .map(file => JSON.parse(fs.readFileSync(path.join(book, '.webnovel/operations', file), 'utf8')))
+          .filter(audit => audit.toolName === 'novel_shortdrama_render_episode' && audit.targets.includes(draftPath))
+        assert.ok(draftAudits.some(audit => audit.status === 'failed'))
+        assert.ok(draftAudits.some(audit => audit.status === 'completed'))
+        report.shortdramaNativeDraft = { unreadRejected: true, saved: true, verifiedContent: true, operationRecorded: true, finalUnchanged: true }
+      } finally {
+        put(contractPath, beforeContract)
+        fs.rmSync(path.join(book, draftPath), { force: true })
+      }
     })
 
     await check('作者保存和落盘前并发修改使旧观察失效', async () => {

@@ -1,16 +1,16 @@
 # DSH Scriptor 完整版
 
-Scriptor 8.4.8 适配 DSH 0.2.2-rc.1。安装范围为 `>=0.2.2-rc.1 <0.3.0-0`，Node最低24.9；实际验证按具体版本记录。
+Scriptor 8.4.9 适配 DSH 0.2.2-rc.1。安装范围为 `>=0.2.2-rc.1 <0.3.0-0`，Node最低24.9；实际验证按具体版本记录。
 
 [产品主页](https://yangda611.github.io/dsh-scriptor-full/) · [安装教程](https://yangda611.github.io/dsh-scriptor-full/docs/install.html)
 
-> Scriptor 8.4.8 配套 **DSH 0.2.2-rc.1**。旧格式先备份并使用书仓维护预览，按明确批准执行升级。
+> Scriptor 8.4.9 配套 **DSH 0.2.2-rc.1**。旧格式先备份并使用书仓维护预览，按明确批准执行升级。
 
 `@yangda611/dsh-scriptor-full` 是主包的完整版入口：与单独安装主包效果相同，检索增强（嵌入、场景识别、重排、图谱）已包含在主包内，默认停用，需要自行配置后才启用。
 
 ## 安装
 
-配套 DSH 0.2.2-rc.1。在 DSH 侧栏“插件 → 添加插件”输入 `@yangda611/dsh-scriptor-full@8.4.8`，核对预览并安装，按提示启用或重启。Desktop 自带运行时，不需要另装 Node/pnpm。
+配套 DSH 0.2.2-rc.1。在 DSH 侧栏“插件 → 添加插件”输入 `@yangda611/dsh-scriptor-full@8.4.9`，核对预览并安装，按提示启用或重启。Desktop 自带运行时，不需要另装 Node/pnpm。
 
 完整版只依赖主包，不包含鲸鱼娘。不要把完整版和主包、独立检索包同时装进同一个 profile：三者注册同一组模块 id，重复安装会留下重复入口。老用户如果现在是“主包 + 独立检索包”两件套，升级时卸载独立检索包、只留主包（或只留完整版）即可，配置与凭据都按原来的条目 id 保存，不会丢失。旧版本先备份、卸载旧入口，再安装新版本，详见 [安装与迁移](https://github.com/yangda611/dsh-scriptor-full/blob/main/docs/user/install.md)。
 
@@ -18,7 +18,7 @@ Scriptor 8.4.8 适配 DSH 0.2.2-rc.1。安装范围为 `>=0.2.2-rc.1 <0.3.0-0`�
 
 ## 更新与卸载
 
-8.4.8 配套 DSH 0.2.2-rc.1，加入千章关系星团、证据轨迹、原生设置与书仓维护。先升级宿主，再更新 full 并重启。旧格式须先备份、检查并预览整仓升级；安装本身不迁移作品。升级后新建 **写作模式** 对话，打开原工作区继续；旧对话不会自动迁移。旧项目须保留原契约内容，补充并确认“章节篇幅”后启用范围核对。操作见 [新编辑器教程](https://github.com/yangda611/dsh-scriptor-full/blob/main/docs/user/editor.md) 和 [旧项目升级指南](https://github.com/yangda611/dsh-scriptor-full/blob/main/docs/user/upgrade-backup.md)。检索增强增加独立图谱模型，需在插件页配置并按书启用。
+8.4.9 配套 DSH 0.2.2-rc.1，加入千章关系星团、证据轨迹、原生设置与书仓维护。先升级宿主，再更新 full 并重启。旧格式须先备份、检查并预览整仓升级；安装本身不迁移作品。升级后新建 **写作模式** 对话，打开原工作区继续；旧对话不会自动迁移。旧项目须保留原契约内容，补充并确认“章节篇幅”后启用范围核对。操作见 [新编辑器教程](https://github.com/yangda611/dsh-scriptor-full/blob/main/docs/user/editor.md) 和 [旧项目升级指南](https://github.com/yangda611/dsh-scriptor-full/blob/main/docs/user/upgrade-backup.md)。检索增强增加独立图谱模型，需在插件页配置并按书启用。
 
 停止该 profile 的实例后，安装新精确版本并重启。卸载完整版：
 

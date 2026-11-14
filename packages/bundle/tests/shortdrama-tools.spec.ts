@@ -15,6 +15,16 @@ describe('阶段 3：短剧工具定义（shortdrama-tools，注册表接线后�
     expect(SHORTDRAMA_TOOL_NAMES).toHaveLength(4)
   })
 
+  it('纯渲染定义明确标记未保存，不能把预览当作已落盘', async () => {
+    expect(await byName.get('novel_shortdrama_render_episode')!.execute({ ...exampleVerticalScripts[0] }))
+      .toMatchObject({ ok: true, saved: false, finalPath: '剧本/短剧/集001.md' })
+  })
+
+  it('缺失台词字段返回具体参数错误', async () => {
+    expect(await byName.get('novel_shortdrama_render_episode')!.execute({ ...exampleVerticalScripts[0], 标题: undefined }))
+      .toMatchObject({ ok: false, code: 'invalid-argument', reason: expect.stringContaining('标题必须是字符串') })
+  })
+
   it('审读工具：示例集零发现，经注册表返回审核编号与指纹，待回写语义模块', async () => {
     const tool = byName.get('novel_shortdrama_review_episode')!
     const r = await tool.execute({ 剧本: exampleVerticalScripts[0], 大纲: exampleOutlines[0] }) as {

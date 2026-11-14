@@ -47,6 +47,89 @@ function baseScript(over: Partial<EpisodeScriptInput> = {}): EpisodeScriptInput 
 }
 
 describe('阶段 3：单集剧本', () => {
+  it.each([
+    ['标题', undefined],
+    ['核心想法', null],
+    ['爽点', 123],
+    ['结尾悬念', {}],
+  ])('运行时参数校验：%s 缺失或类型不对时指出字段', (field, value) => {
+    const input = { ...baseScript(), [field as string]: value } as unknown as EpisodeScriptInput
+    expect(() => renderEpisodeScript(input)).toThrow(new RegExp(`${field}.*字符串`))
+  })
+
+  it.each([
+    [null, '参数'],
+    [{ ...baseScript(), 画幅: '方屏' }, '画幅'],
+    [{ ...baseScript(), 钩子类型: undefined }, '钩子类型'],
+    [{ ...baseScript(), 场景: null }, '场景'],
+    [{ ...baseScript(), 场景: [null, baseScript().场景[1]] }, '场景\\[0\\]'],
+    [{ ...baseScript(), 反转秒: '25,55' }, '反转秒'],
+    [{ ...baseScript(), 反转秒: [25, '55'] }, '反转秒\\[1\\]'],
+    [{ ...baseScript(), 开场冲突秒: undefined }, '开场冲突秒'],
+  ])('运行时参数校验：拒绝错误的对象、枚举和数组（%#）', (input, field) => {
+    expect(() => renderEpisodeScript(input as unknown as EpisodeScriptInput)).toThrow(new RegExp(`${field}.*必须`))
+  })
+
+  it.each([
+    ['地点', undefined],
+    ['时间', 123],
+    ['动作', null],
+    ['场景环境', []],
+    ['台词', null],
+    ['人物', {}],
+    ['镜头', {}],
+  ])('运行时参数校验：场景的 %s 类型不对时指出字段', (field, value) => {
+    const input = baseScript({ 场景: [
+      { ...baseScript().场景[0], [field as string]: value },
+      baseScript().场景[1],
+    ] } as unknown as Partial<EpisodeScriptInput>)
+    expect(() => renderEpisodeScript(input)).toThrow(new RegExp(`场景\\[0\\].*${field}.*必须`))
+  })
+
+  it.each([
+    [null, '台词\\[0\\]'],
+    [{ 台词: '你说。' }, '角色'],
+    [{ 角色: '苏晚', 台词: 123 }, '台词'],
+    [{ 角色: '苏晚', 台词: '你说。', 括号提示: null }, '括号提示'],
+  ])('运行时参数校验：台词缺字段或类型不对时指出位置（%#）', (line, field) => {
+    const input = baseScript({ 场景: [
+      { ...baseScript().场景[0], 台词: [line] },
+      baseScript().场景[1],
+    ] } as unknown as Partial<EpisodeScriptInput>)
+    expect(() => renderEpisodeScript(input)).toThrow(new RegExp(`场景\\[0\\].*${field}.*必须`))
+  })
+
+  it.each([
+    ['景别', undefined],
+    ['角度', 123],
+    ['运镜', null],
+    ['描写', null],
+    ['描写', [undefined]],
+    ['台词', null],
+    ['开始秒', undefined],
+    ['环境声', '风声'],
+    ['字幕', [123]],
+  ])('运行时参数校验：镜头的 %s 缺失或类型不对时指出位置（%#）', (field, value) => {
+    const shot = {
+      镜头号: 1, 开始秒: 0, 结束秒: 10, 景别: '近景', 角度: '平视正面', 运镜: '固定镜头',
+      描写: ['苏晚站在门口。'], 台词: [{ 角色: '苏晚', 台词: '你说。' }],
+      [field as string]: value,
+    }
+    const input = baseScript({ 场景: [
+      { ...baseScript().场景[0], 镜头: [shot] },
+      baseScript().场景[1],
+    ] } as unknown as Partial<EpisodeScriptInput>)
+    expect(() => renderEpisodeScript(input)).toThrow(new RegExp(`场景\\[0\\].*镜头\\[0\\].*${field}.*必须`))
+  })
+
+  it('运行时参数校验：人物行缺少角色时指出位置', () => {
+    const input = baseScript({ 场景: [
+      { ...baseScript().场景[0], 人物: [{ 形象标识: '毛衣女子' }] },
+      baseScript().场景[1],
+    ] } as unknown as Partial<EpisodeScriptInput>)
+    expect(() => renderEpisodeScript(input)).toThrow(/场景\[0\].*人物\[0\].*角色.*字符串/)
+  })
+
   it('渲染格式：中文分场景标头、说话人冒号对白、节拍表；定稿路径用 paths.短剧集', () => {
     const rendered = renderEpisodeScript(baseScript())
     expect(rendered.path).toBe('剧本/短剧/集001.md')

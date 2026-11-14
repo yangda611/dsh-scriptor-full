@@ -1,6 +1,6 @@
 {
   "name": "@yangda611/dsh-scriptor-retrieval",
-  "version": "8.4.8",
+  "version": "8.4.9",
   "type": "module",
   "main": "./lib/index.js",
   "exports": {

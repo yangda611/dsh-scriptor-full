@@ -1,7 +1,7 @@
 import { validateJsonSchemaValue, type JsonSchemaNode, type ToolExecutionToken } from '@deepseek-ai/dsh-tools'
 import { createReferenceTools } from './reference/tools'
 import { createScreenplayTools } from './screenplay-tools'
-import { SHORTDRAMA_TOOL_DEFINITIONS } from './shortdrama-tools'
+import { createShortdramaTools } from './shortdrama-tools'
 import type { ReferenceHost } from './reference/host'
 /**
  * 主 Agent 专用 Tools（方案 A：core 能力结构化包装为 Tool）。
@@ -2136,14 +2136,13 @@ ${摘要现文}`,
     },
   ]
 
-  // 影视剧扩展（muse-dev 阶段 2/3）：电影剧本与短剧工具，纯计算不写文件，
-  // 不进 locked（不做 read-modify-write），随 tools 一起走 guarded 包装。
+  // 影视剧扩展；短剧渲染保存草稿，纳入下方异步写入锁。
   tools.push(
     ...createScreenplayTools({
       bookRootOfBookId: deps.bookRootOfBookId,
       readContractFields: (bookRoot) => readExistingContract(bookRoot).fields,
     }),
-    ...SHORTDRAMA_TOOL_DEFINITIONS,
+    ...createShortdramaTools({ bookRootOfBookId: deps.bookRootOfBookId, writeDraft: writeNative }),
   )
 
   // Tool calls are the product write boundary. Keep the read-modify-write
@@ -2158,8 +2157,9 @@ ${摘要现文}`,
     'novel_assemble_materials', 'novel_apply_revision', 'novel_apply_revision_batch',
     'novel_import_draft', 'novel_record_review_findings', 'novel_record_proposal',
     'novel_resolve_proposal', 'novel_note_pending',
+    'novel_shortdrama_render_episode',
   ])
-  const nativeTools = NATIVE_DESIGN_TOOLS
+  const nativeTools = new Set([...NATIVE_DESIGN_TOOLS, 'novel_shortdrama_render_episode'])
   const registered = deps.testTools === true ? tools : tools.filter((tool) => !NOVEL_TEST_TOOL_NAMES.includes(tool.name))
   const guarded = registered.map((tool) => {
     if (!locked.has(tool.name)) return tool
@@ -2172,7 +2172,10 @@ ${摘要现文}`,
         try {
           if (nativeTools.has(tool.name)) {
             return withBookWriteAsync(root, async () => tool.execute(args, sessionContext), provenanceOf(sessionContext))
-              .catch((error: unknown) => failureFrom(error))
+              .catch((error: unknown) => {
+                if (sessionContext?.signal?.aborted) throw error
+                return failureFrom(error)
+              })
           }
           return withBookWrite(root, () => tool.execute(args, sessionContext), provenanceOf(sessionContext))
         } catch (error) {
