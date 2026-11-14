@@ -97,7 +97,8 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '24.15.0'
+          # Avoid the Windows native install crash reported in nodejs/node#62991.
+          node-version: '24.22.1'
       - name: Download the exact release assets
         working-directory: source
         env:
