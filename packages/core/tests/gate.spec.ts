@@ -50,6 +50,13 @@ describe('文件门禁(不变量 4/5)', () => {
     if (d.kind === 'deny') expect(d.reason).toMatch(/真源区.*文件工具不得改写.*novel_update_skeleton/)
   })
 
+  it('拒绝直接写入剧本/短剧/(真源) 并引导改用短剧定稿工具', () => {
+    const root = mkBook()
+    const d = decidePreExecute(root, write(path.join(root, '剧本/短剧/集001.md')))
+    expect(d.kind).toBe('deny')
+    if (d.kind === 'deny') expect(d.reason).toMatch(/真源区.*novel_shortdrama_settle_episode/)
+  })
+
   it('路径逃逸拒绝', () => {
     const root = mkBook()
     const escaped = decidePreExecute(root, write(path.join(root, '..', '越界.md')))

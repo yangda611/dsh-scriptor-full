@@ -52,6 +52,13 @@ export function toolFailure(code: ToolFailureCode, reason: string, next: string 
   return { ok: false, code, reason, next }
 }
 
+/** 作者没有批准：区分关闭窗口与明确驳回，都不要重试。 */
+export function notApproved(reason: string): ToolFailure {
+  return /取消|abort/i.test(reason)
+    ? toolFailure('author-cancelled', `作者裁决已取消，没有做出决定（${reason}），本次没有写入`)
+    : toolFailure('author-declined', `未获作者批准：${reason}`)
+}
+
 /** 错误的可读文本：只取 message，避免 `Error:` 前缀层层嵌套。 */
 export function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)

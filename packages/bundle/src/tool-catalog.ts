@@ -46,6 +46,7 @@ export const NOVEL_TOOL_NAMES: readonly string[] = [
   'novel_shortdrama_render_episode',
   'novel_shortdrama_check_beats',
   'novel_shortdrama_review_episode',
+  'novel_shortdrama_settle_episode',
 ]
 
 export const WRITING_DELEGATE_TOOL = 'novel_delegate'

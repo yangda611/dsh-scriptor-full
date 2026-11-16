@@ -1,20 +1,34 @@
-/** 短剧计算定义与书仓接线。注册后的渲染工具经原生写入保存草稿；定稿另走审读与作者确认。 */
+/** 短剧计算定义与书仓接线。渲染工具保存草稿，定稿入档须经作者裁决原子提交。 */
 
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { failureFrom, toolFailure } from './tool-failure'
+import { captureApprovalFiles } from './approval-snapshot'
+import { failureFrom, notApproved, toolFailure } from './tool-failure'
 import type { NovelToolDefinition, NovelToolsDeps, ToolExecContext } from './novel-tools'
 import { computeEpisodeFindings } from '@webnovel/review'
 import {
+  archiveChapter,
+  askAuthor,
+  authorDocumentPath,
+  AuthorDocumentError,
   checkSeasonBeats,
-  planSeason,
-  renderEpisodeScript,
-  readExistingContract,
+  draftHashOf,
+  episodeNo,
   gateFileAccess,
-  type FileOp,
+  loadEpisodeReviewRecord,
+  parseEpisodeScript,
+  paths,
+  planSeason,
+  readExistingContract,
+  renderEpisodeScript,
+  totalDialogueChars,
+  withBookWrite,
+  type AskFn,
   type EpisodeBeats,
   type EpisodeOutline,
   type EpisodeScriptInput,
+  type FileOp,
+  type OperationProvenance,
 } from '@webnovel/core'
 
 export const SHORTDRAMA_TOOL_NAMES = [
@@ -22,6 +36,7 @@ export const SHORTDRAMA_TOOL_NAMES = [
   'novel_shortdrama_render_episode',
   'novel_shortdrama_check_beats',
   'novel_shortdrama_review_episode',
+  'novel_shortdrama_settle_episode',
 ] as const
 
 function asRecord(value: unknown, name: string): Record<string, unknown> {
@@ -318,16 +333,229 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
       }
     }),
   },
+  {
+    name: 'novel_shortdrama_settle_episode',
+    description: '短剧单集定稿入档：必传 bookId、集（1–100）和 summary。核对契约输出形态=短剧、校验草稿区/剧本/短剧/集NNN.md 且检查分集审读记录状态后，弹出作者裁决窗口；仅在作者明确批准后将单集剧本原子写入 剧本/短剧/集NNN.md 并做单次 ch: Git 提交。定稿只增不改；未获批准严禁入档。',
+    parameters: {
+      type: 'object',
+      properties: {
+        bookId: { type: 'string', description: '当前短剧的书id（必填）' },
+        集: { type: 'integer', description: '集号，1–100' },
+        summary: { type: 'string', description: '提交摘要（如 集001 等了三年的面）' },
+      },
+      required: ['bookId', '集', 'summary'],
+    },
+    output: {
+      schema: {
+        type: 'object',
+        properties: {
+          ok: { type: 'boolean', description: '是否成功' },
+          path: { type: 'string', description: '已定稿剧本路径（剧本/短剧/集NNN.md）' },
+          draftPath: { type: 'string', description: '来源草稿路径（草稿区/剧本/短剧/集NNN.md）' },
+          集: { type: 'integer', description: '集号' },
+          标题: { type: 'string', description: '本集标题' },
+          alreadyCommitted: { type: 'boolean', description: '是否此前已核实同一提交，未重复写入' },
+          审读状态: { type: 'string', description: '本集分集审读记录核对结果' },
+          message: { type: 'string', description: '结果说明（含入档去处）' },
+          reason: { type: 'string', description: '失败原因' },
+        },
+        required: ['ok'],
+      },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+    },
+    execute: () => toolFailure('host-unavailable', '裁决通道不可用：当前环境无法弹出作者裁决窗口，本次没有写入'),
+  },
 ]
 
 interface ShortdramaToolsDeps {
   readonly bookRootOfBookId: NovelToolsDeps['bookRootOfBookId']
   readonly writeDraft: (root: string, op: FileOp, exec?: ToolExecContext) => Promise<void>
+  readonly askFn?: AskFn
+  readonly provenanceOf?: (ctx: ToolExecContext | undefined, targets?: readonly string[]) => OperationProvenance | undefined
 }
 
-/** 调用方在异步书仓写入锁内执行，复用原生写入的版本保护、取消与操作留痕。 */
+function resolveShortdramaBook(
+  deps: Pick<ShortdramaToolsDeps, 'bookRootOfBookId'>,
+  rawBookId: unknown,
+  exec: ToolExecContext | undefined,
+  action: string,
+): { readonly ok: true; readonly bookId: string; readonly bookRoot: string } | ReturnType<typeof toolFailure> {
+  const bookId = typeof rawBookId === 'string' ? rawBookId.trim() : ''
+  if (bookId === '') return toolFailure('book-not-found', 'bookId 必填，请先核对当前短剧书目。')
+  const bookRoot = deps.bookRootOfBookId(bookId, exec?.agent)
+  if (bookRoot === undefined) return toolFailure('book-not-found', `书id不存在或不唯一：${bookId}`)
+  if (readExistingContract(bookRoot).fields['输出形态'] !== '短剧') {
+    return toolFailure('invalid-argument', `作品契约的输出形态必须是短剧，不能${action}。`)
+  }
+  return { ok: true, bookId, bookRoot }
+}
+
+function episodeReviewSummary(bookRoot: string, 集: number, draftText: string): string {
+  const record = loadEpisodeReviewRecord(bookRoot, 集)
+  if (record === null) return `未找到审读记录（${paths.短剧审核记录(集)}）`
+  if (record.审稿哈希 !== draftHashOf(draftText)) return '审读记录已过期（当前草稿与被审稿件哈希不一致）'
+  const pendingModules = Object.entries(record.模块)
+    .filter(([, state]) => !state.完成 || state.待回写 === true)
+    .map(([name]) => name)
+  if (!record.完成 || Object.keys(record.模块).length === 0 || pendingModules.length > 0) {
+    return pendingModules.length > 0 ? `审读未完成（待完成模块：${pendingModules.join('、')}）` : '审读尚未全部完成'
+  }
+  const pendingFindings = record.问题.filter((item) => !item.处置状态 || item.处置状态 === '待处理').length
+  if (pendingFindings > 0) return `审读已回写，仍有 ${pendingFindings} 项发现项待处置`
+  return '审读通过（模块齐全且零项待处置）'
+}
+
+function resolvePlainBookFile(
+  bookRoot: string,
+  relPath: string,
+): { readonly ok: true; readonly absPath: string } | ReturnType<typeof toolFailure> {
+  try {
+    return { ok: true, absPath: authorDocumentPath(bookRoot, relPath) }
+  } catch (error) {
+    if (error instanceof AuthorDocumentError && error.code === 'invalid-path') {
+      return toolFailure('runtime-link', `短剧路径必须是普通文件且不得经过链接：${relPath}（${error.message}）`)
+    }
+    return failureFrom(error, '短剧路径校验失败：')
+  }
+}
+
+async function executeSettleEpisode(
+  deps: ShortdramaToolsDeps,
+  args: Record<string, unknown>,
+  exec?: ToolExecContext,
+): Promise<unknown> {
+  if (!deps.askFn) return toolFailure('host-unavailable', '裁决通道不可用：当前环境无法弹出作者裁决窗口，本次没有写入')
+  let resolved: { readonly ok: true; readonly bookId: string; readonly bookRoot: string } | ReturnType<typeof toolFailure>
+  try {
+    resolved = resolveShortdramaBook(deps, args['bookId'], exec, '走短剧定稿')
+  } catch (error) {
+    return failureFrom(error, '短剧单集定稿失败：')
+  }
+  if (!resolved.ok) return resolved
+  const { bookId, bookRoot } = resolved
+
+  const rawEp = args['集']
+  if (typeof rawEp !== 'number' || !Number.isSafeInteger(rawEp) || rawEp < 1 || rawEp > 100) {
+    return toolFailure('invalid-argument', `集必须是 1–100 的整数（收到：${String(rawEp ?? '未传')}）`)
+  }
+  const 集 = rawEp
+  const summary = typeof args['summary'] === 'string' ? args['summary'].trim() : ''
+  if (summary === '') {
+    return toolFailure('invalid-argument', 'summary 不能为空，请填写本次定稿提交摘要（如「集001 定稿」）。')
+  }
+
+  const finalRel = paths.短剧集(集)
+  const draftRel = `草稿区/${finalRel}`
+  const draftAccess = gateFileAccess(bookRoot, draftRel)
+  if (!draftAccess.allow || draftAccess.zone !== '草稿区') {
+    return toolFailure('runtime-link', `短剧草稿必须留在草稿区，请核对目录链接：${draftAccess.allow ? draftRel : draftAccess.reason}`)
+  }
+  const draftPathCheck = resolvePlainBookFile(bookRoot, draftRel)
+  if (!draftPathCheck.ok) return draftPathCheck
+  const finalPathCheck = resolvePlainBookFile(bookRoot, finalRel)
+  if (!finalPathCheck.ok) return finalPathCheck
+
+  let draftText: string
+  try {
+    draftText = fs.readFileSync(draftPathCheck.absPath, 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return toolFailure('invalid-argument', `短剧单集草稿不存在：${draftRel}，请先调用 novel_shortdrama_render_episode 保存草稿。`)
+    }
+    return failureFrom(error, '短剧单集草稿读取失败：')
+  }
+
+  const parsed = parseEpisodeScript(draftText)
+  if (!parsed.ok || parsed.episode === undefined) {
+    return toolFailure('parse-error', `短剧单集草稿解析失败（${draftRel}）：${parsed.problems.join('；')}`)
+  }
+  if (parsed.episode.集 !== 集) {
+    return toolFailure('invalid-argument', `草稿集号不一致：期望集${集}，文件内为集${parsed.episode.集}`)
+  }
+
+  if (fs.existsSync(finalPathCheck.absPath)) {
+    const existingFinal = fs.readFileSync(finalPathCheck.absPath, 'utf8')
+    if (existingFinal !== draftText) {
+      return toolFailure('source-conflict', `定稿只增不改：目标 ${finalRel} 已存在且内容不同，本次没有写入。请把冲突呈报作者。`)
+    }
+  }
+
+  const approvalFiles = [draftRel, finalRel, paths.契约(), paths.短剧审核记录(集)]
+  const approvalReq = { bookId, 集, summary }
+  const before = captureApprovalFiles(bookRoot, approvalFiles, approvalReq)
+  if (!before.ok) return before
+
+  const ep = parsed.episode
+  const reviewStatus = episodeReviewSummary(bookRoot, 集, draftText)
+  const approvalSummary = [
+    `集${episodeNo(集)}：${ep.标题}（${ep.画幅}，${ep.时长秒} 秒，${ep.场景.length} 场，台词 ${totalDialogueChars(ep.场景)} 字）`,
+    `来源草稿：${draftRel}`,
+    `审读状态：${reviewStatus}`,
+    `提交摘要：${summary}`,
+  ].join('｜')
+
+  const decision = await askAuthor(
+    deps.askFn,
+    '定稿入档',
+    { 范围: finalRel, 摘要: approvalSummary },
+    { agent: exec?.agent, signal: exec?.signal },
+  )
+  if (!decision.ok) return notApproved(decision.reason)
+  if (exec?.signal?.aborted) return toolFailure('author-cancelled', '作者裁决已取消（会话已中止），没有做出决定，本次没有写入')
+  if (decision.决定 !== '已批准') return toolFailure('author-declined', `未获作者批准：作者${decision.决定}，本集没有入档`)
+
+  const provenance = deps.provenanceOf?.(exec, [finalRel])
+  return withBookWrite(bookRoot, () => {
+    if (exec?.signal?.aborted) return toolFailure('author-cancelled', '作者裁决已取消（会话已中止），没有做出决定，本次没有写入')
+    const current = resolveShortdramaBook(deps, bookId, exec, '走短剧定稿')
+    if (!current.ok || current.bookRoot !== bookRoot) {
+      return toolFailure('approval-stale', '等待作者裁决期间书id或归属已变化，本次没有写入', '调用 novel_select_book 核对书目，再重新呈报作者。')
+    }
+    const after = captureApprovalFiles(bookRoot, approvalFiles, approvalReq)
+    if (!after.ok || after.fingerprint !== before.fingerprint) {
+      return toolFailure('approval-stale', '短剧单集草稿或审读状态在等待作者裁决期间已变化，旧批准不可使用')
+    }
+    try {
+      const res = archiveChapter({
+        bookRoot,
+        files: [{ 目标: finalRel, 内容: draftText, sha256: draftHashOf(draftText) }],
+        summary,
+        lines: [
+          `短剧单集定稿：集${episodeNo(集)} ${ep.标题}`,
+          `来源草稿：${draftRel}`,
+          `审读状态：${reviewStatus}`,
+          `裁决记录：作者于 ${new Date().toISOString()} 批准定稿入档（kind=${decision.kind}, 决定=${decision.决定}）`,
+        ],
+        provenance,
+      })
+      if (!res.ok) return { ok: false, reason: res.reason }
+      return {
+        ok: true,
+        path: finalRel,
+        draftPath: draftRel,
+        集,
+        标题: ep.标题,
+        alreadyCommitted: res.alreadyCommitted === true,
+        审读状态: reviewStatus,
+        message: res.alreadyCommitted === true
+          ? `本集此前已核实定稿入档（${res.message}），无需重复提交：${finalRel}`
+          : `短剧单集定稿完成（${res.message}），已入档：${res.dests.join('、')}`,
+      }
+    } catch (error) {
+      return failureFrom(error, '短剧单集定稿失败：')
+    }
+  }, provenance)
+}
+
+/** 渲染工具在异步书仓写入锁内执行原生写入；定稿工具在作者裁决后加同步锁原子提交。 */
 export function createShortdramaTools(deps: ShortdramaToolsDeps): NovelToolDefinition[] {
   return SHORTDRAMA_TOOL_DEFINITIONS.map(tool => {
+    if (tool.name === 'novel_shortdrama_settle_episode') {
+      return {
+        ...tool,
+        execute: (args, exec) => executeSettleEpisode(deps, args, exec),
+      }
+    }
     if (tool.name !== 'novel_shortdrama_render_episode') return tool
     const parameters = tool.parameters as { properties: Record<string, unknown>; required: string[] }
     return {
@@ -339,12 +567,10 @@ export function createShortdramaTools(deps: ShortdramaToolsDeps): NovelToolDefin
         required: ['bookId', ...parameters.required],
       },
       execute: async (args, exec) => {
-        const bookId = typeof args['bookId'] === 'string' ? args['bookId'].trim() : ''
-        if (bookId === '') return toolFailure('book-not-found', 'bookId 必填，请先核对当前短剧书目。')
         try {
-          const root = deps.bookRootOfBookId(bookId, exec?.agent)
-          if (root === undefined) return toolFailure('book-not-found', `书id不存在或不唯一：${bookId}`)
-          if (readExistingContract(root).fields['输出形态'] !== '短剧') return toolFailure('invalid-argument', '作品契约的输出形态必须是短剧，不能保存到其他项目。')
+          const resolved = resolveShortdramaBook(deps, args['bookId'], exec, '保存到其他项目')
+          if (!resolved.ok) return resolved
+          const { bookRoot: root } = resolved
           const rendered = renderEpisodeScript(args as unknown as EpisodeScriptInput)
           const draftPath = `草稿区/${rendered.path}`
           const access = gateFileAccess(root, draftPath)

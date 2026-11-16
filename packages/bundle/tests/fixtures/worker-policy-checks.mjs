@@ -132,9 +132,9 @@ export async function checkWorkerPolicy({ root, book, workspace, ctx, service, c
   try {
     await check('原生委派按显式角色隔离规则与执行权限', async () => {
       assert.deepEqual(novelNames(), [...toolCatalog.production].sort())
-      assert.equal(toolCatalog.business.length, 46)
+      assert.equal(toolCatalog.business.length, 47)
       assert.equal(toolCatalog.conditional.length, 1)
-      assert.equal(new Set(toolCatalog.production).size, 47)
+      assert.equal(new Set(toolCatalog.production).size, 48)
       for (const role of Object.keys(labels)) await runCase(role)
       await runCase(undefined)
       // Same parent, overlapping starts: one role must not leak into its sibling.

@@ -37,7 +37,7 @@ import { captureApprovalFiles } from './approval-snapshot'
 import { readStoryStatus } from './story-status'
 import { MAINTENANCE_OUTPUT, MAINTENANCE_PARAMETERS } from './maintenance-output'
 import { createBookUpgradeTools } from './book-upgrade-tools'
-import { failureFrom, expectedFailure, FAILURE_FIELDS, normalizeFailure, toolFailure } from './tool-failure'
+import { failureFrom, expectedFailure, FAILURE_FIELDS, normalizeFailure, notApproved, toolFailure } from './tool-failure'
 import * as fs from 'node:fs'
 import * as nodePath from 'node:path'
 import type { ToolOutputDefinition } from '@deepseek-ai/dsh-tools'
@@ -260,11 +260,6 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
     if (章名 === '') return { ok: false, reason: '章名不能为空（须与近期窗口条目逐字一致）' }
     return { ok: true, key: { 卷, 章, 章名 } }
   }
-
-  /** 作者没有批准：区分关闭窗口与明确驳回，都不要重试。 */
-  const notApproved = (reason: string) => /取消|abort/i.test(reason)
-    ? toolFailure('author-cancelled', `作者裁决已取消，没有做出决定（${reason}），本次没有写入`)
-    : toolFailure('author-declined', `未获作者批准：${reason}`)
 
   const memoryProperties: Record<string, JsonSchemaNode> = {
     名称: { type: 'string', description: '一事一条；同一事项沿用已有名称' },
@@ -2142,7 +2137,7 @@ ${摘要现文}`,
       bookRootOfBookId: deps.bookRootOfBookId,
       readContractFields: (bookRoot) => readExistingContract(bookRoot).fields,
     }),
-    ...createShortdramaTools({ bookRootOfBookId: deps.bookRootOfBookId, writeDraft: writeNative }),
+    ...createShortdramaTools({ bookRootOfBookId: deps.bookRootOfBookId, writeDraft: writeNative, askFn: deps.askFn, provenanceOf }),
   )
 
   // Tool calls are the product write boundary. Keep the read-modify-write

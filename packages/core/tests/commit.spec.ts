@@ -97,8 +97,10 @@ describe('提交路径(不变量 8)', () => {
     if (!r.ok) expect(r.reason).toMatch(/知识库条目正文不得进入定稿提交/)
   })
 
-  it('允许定稿真源', () => {
+  it('允许定稿真源与剧本真源', () => {
     expect(checkCommitRelPath('定稿/卷01/0003-初见.md').ok).toBe(true)
+    expect(checkCommitRelPath('剧本/短剧/集001.md').ok).toBe(true)
+    expect(checkCommitRelPath('剧本/电影/剧本.md').ok).toBe(true)
   })
 })
 

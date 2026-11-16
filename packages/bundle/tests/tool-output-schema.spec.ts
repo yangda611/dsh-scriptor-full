@@ -77,6 +77,7 @@ describe('工具 output.schema 与真实返回形状一致(dsh 校验器)', () =
     })
     rec('novel_editor_suggest', await call('novel_editor_suggest', { requestId: 'schema1', kind: 'replace', text: '改过的句子。', note: '更顺。' }))
     rec('novel_editor_suggest', await call('novel_editor_suggest', { requestId: 'missing1', kind: 'none' }))
+    rec('novel_shortdrama_settle_episode', await call('novel_shortdrama_settle_episode', { bookId, 集: 1, summary: '第1集 定稿' }))
     // Use the installed bundle dependency, never an old copy left in the pnpm store.
     // Node avoids Vite's handling of percent-encoded Windows paths here.
     const bundleRequire = createRequire(path.join(repoRoot, 'packages/bundle/package.json'))

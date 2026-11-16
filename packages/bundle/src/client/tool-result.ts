@@ -21,6 +21,7 @@ export const novelToolTitles: Readonly<Record<string, string>> = {
   novel_screenplay_review: '剧本审读', novel_screenplay_render: '渲染剧本',
   novel_shortdrama_plan_episodes: '规划短剧分集', novel_shortdrama_render_episode: '渲染短剧单集',
   novel_shortdrama_check_beats: '短剧节拍检查', novel_shortdrama_review_episode: '短剧单集审读',
+  novel_shortdrama_settle_episode: '短剧单集定稿',
 }
 
 export interface NovelResultModel {

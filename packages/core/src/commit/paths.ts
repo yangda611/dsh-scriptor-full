@@ -5,7 +5,7 @@
 
 import * as path from 'node:path'
 
-const ALLOWED_TOP = new Set(['定稿', '大纲', '世界书', '账本', '本书记忆', '作品契约', '构想'])
+const ALLOWED_TOP = new Set(['定稿', '剧本', '大纲', '世界书', '账本', '本书记忆', '作品契约', '构想'])
 const REJECT_TOP = new Set(['知识库', 'profiles', 'books', '草稿区'])
 
 export type CommitPathCheck =

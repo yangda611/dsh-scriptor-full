@@ -78,7 +78,7 @@ it('原生 subagent 显式角色、普通同级隔离及持久恢复', async () 
     expect(report.workerPolicy).toMatchObject({ explicitRoles: 5, ordinaryUnchanged: true, concurrentSiblings: true, nativeSchemaPreserved: true, restoredRole: true,
       independentPreset: true, explicitBookChapterPreserved: true, nativeWorkflowLifecycle: true, activationThenCompletion: true, failedCompletion: true, cancelledWithoutWrite: true,
       nativeChunkSave: { exactFinalContent: true, failedEditUnchanged: true, finalRead: true },
-      tools: { business: 46, conditional: 1, registered: 47 } })
+      tools: { business: 47, conditional: 1, registered: 48 } })
     expect(report.workerPolicy.nativeChunkSave.savedCharacters).toBeGreaterThan(1024)
     expect(report.workerPolicy.nativeChunkSave.maximumChunkCharacters).toBeLessThanOrEqual(400)
   } finally { removeSync(root) }

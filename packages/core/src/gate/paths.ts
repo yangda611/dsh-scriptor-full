@@ -76,6 +76,7 @@ export function trueSourceTool(relPath: string): string {
     [/^世界书\//, 'novel_confirm_worldbook_entry（设计条目）；已入档事实更正走 novel_apply_retcon'],
     [/^账本\//, 'novel_settle_chapter（新增沉淀）；已入档条目更正走 novel_apply_retcon'],
     [/^本书记忆\//, 'novel_record_memory（本书范围）；定稿候选随 novel_settle_chapter 沉淀'],
+    [/^剧本\/短剧\//, 'novel_shortdrama_settle_episode（定稿入档）；草稿请用 novel_shortdrama_render_episode'],
   ]
   const tool = rules.find(([pattern]) => pattern.test(relPath))?.[1]
   return tool === undefined ? '请改用对应的专用工具。' : `请改用 ${tool}。`
