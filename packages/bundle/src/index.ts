@@ -46,6 +46,7 @@ import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { SettingsForms } from '@deepseek-ai/dsh-settings'
 import { createIndexAutoPreference } from './preferences-host'
 import {
+  AUTOMATION_MODES,
   DEFAULT_WEBNOVEL_PREFERENCES,
   GRAPH_PERSPECTIVES,
   VISUAL_MODES,
@@ -53,16 +54,19 @@ import {
   hasExplicitAutoIndex,
   normalizeWebnovelPreferences,
   validateWebnovelPreferences,
+  type AutomationMode,
   type WebnovelPreferencesInput,
 } from './preferences'
 
 export const name = 'webnovel-bundle'
 export { NOVEL_TOOL_NAMES, NOVEL_CONDITIONAL_TOOL_NAMES, NOVEL_PRODUCTION_TOOL_NAMES } from './tool-catalog'
 export {
+  AUTOMATION_MODES,
   WEBNOVEL_SETTINGS_NAMESPACE,
   DEFAULT_WEBNOVEL_PREFERENCES,
   normalizeWebnovelPreferences,
   hasExplicitAutoIndex,
+  type AutomationMode,
   type WebnovelPreferences,
   type WebnovelPreferencesInput,
   type VisualMode,
@@ -70,6 +74,7 @@ export {
 } from './preferences'
 
 export const PreferenceSchema: z<WebnovelPreferencesInput> = z.object({
+  automationMode: z.union([...AUTOMATION_MODES]).default(DEFAULT_WEBNOVEL_PREFERENCES.automationMode).description('创作流程 · 自动化模式（semi-auto=半自动两步走，auto=全自动托管，manual=严格逐项确认）'),
   autoIndexOnCommit: z.boolean().description('检索 · 提交后自动更新定稿索引'),
   showVisualTab: z.boolean().default(DEFAULT_WEBNOVEL_PREFERENCES.showVisualTab).description('可视化 · 对话区标签'),
   showLayoutSwap: z.boolean().default(DEFAULT_WEBNOVEL_PREFERENCES.showLayoutSwap).description('工作台 · 布局互换按钮'),
@@ -474,6 +479,22 @@ export function apply(ctx: Context, entry?: ReturnType<typeof Config> | Webnovel
   const editorRequests = new EditorRequestHub()
   attachStudyWeb(ctx, indexing, editorRequests)
 
+  const readAutomationMode = (): AutomationMode => {
+    try {
+      const settings = ctxGet<SettingsForms>(ctx, 'settings')
+      const doc = settings?.describe?.().find(item => item.ns === WEBNOVEL_SETTINGS_NAMESPACE)
+      if (doc?.value !== undefined) return normalizeWebnovelPreferences(doc.value).automationMode
+    } catch { /* fall through */ }
+    if (entry && typeof (entry as { get?: unknown }).get === 'function') {
+      try {
+        return normalizeWebnovelPreferences((entry as { get(): unknown }).get()).automationMode
+      } catch { /* fall through */ }
+    } else if (entry !== undefined) {
+      return normalizeWebnovelPreferences(entry).automationMode
+    }
+    return DEFAULT_WEBNOVEL_PREFERENCES.automationMode
+  }
+
   /** 就绪时建一次工具集（裁决通道取自宿主 userQuestions；缺则 askFn undefined，
    *  沉淀 fail-closed——裁决 14）。依赖出现由 inject 反应式驱动。 */
   function ensureToolKit(scope: Context): void {
@@ -491,6 +512,7 @@ export function apply(ctx: Context, entry?: ReturnType<typeof Config> | Webnovel
         workspaceRoot: (agent) => agentWorkspaceRoot(agent),
         bookRootOfBookId: (bookId, agent) => bookRootOfBookIdFor(bookId, agent),
         askFn,
+        automationMode: readAutomationMode,
         nativeWrite: bridge?.write,
         // 测试/走查专用工具(seed 占位设计)只在显式开启时注册,作者环境看不到
         testTools: process.env['WEBNOVEL_TEST_TOOLS'] === '1',

@@ -35,7 +35,7 @@ export function materialsCli(argv: readonly string[]): number {
     return 1
   }
   try {
-    const c = computeMaterials(book, { 卷, 章, 章名 })
+    const c = computeMaterials(book, { 卷, 章, 章名, 质量模式: true })
     console.log(JSON.stringify({
       ok: c.ok,
       状态: c.状态,

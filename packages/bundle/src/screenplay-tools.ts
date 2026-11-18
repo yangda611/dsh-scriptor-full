@@ -17,15 +17,27 @@
  * 定稿路径只认 paths.电影剧本()（剧本/电影/剧本.md），见 pipeline.ts。
  */
 
-import type { NovelToolDefinition } from './novel-tools'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import { captureApprovalFiles } from './approval-snapshot'
+import type { BatchApprovalStore } from './batch-approval'
+import type { AutomationMode } from './preferences'
+import { failureFrom, notApproved, toolFailure } from './tool-failure'
+import type { NovelToolDefinition, NovelToolsDeps, ToolExecContext } from './novel-tools'
 import { computeScreenplayFindings } from '@webnovel/review'
 import {
-  checkScreenplayGate, draftFromOutline, emptySceneOutline, emptyStoryDraft,
-  outlineFromStory, parseSceneOutline, parseScreenplay, parseStoryDraft,
+  archiveChapter,
+  askAuthor,
+  authorDocumentPath,
+  AuthorDocumentError,
+  checkScreenplayGate, draftFromOutline, draftHashOf, emptySceneOutline, emptyStoryDraft,
+  gateFileAccess,
+  outlineFromStory, parseSceneOutline, parseScreenplay, parseStoryDraft, paths,
+  readExistingContract,
   renderSceneOutline, renderScreenplay, renderStoryDraft, runScreenplayPipeline,
   screenplayFinalPath, validateSceneOutline, validateScreenplay,
-  validateStoryDraft, estimatePages,
-  MARKET_VALUES, OUTPUT_FORM_VALUES, GENRE_TIER_IDS, type GenreTierId,
+  validateStoryDraft, estimatePages, withBookWrite,
+  MARKET_VALUES, OUTPUT_FORM_VALUES, GENRE_TIER_IDS, type AskFn, type FileOp, type GenreTierId, type OperationProvenance,
 } from '@webnovel/core'
 
 export const SCREENPLAY_TOOL_NAMES: readonly string[] = [
@@ -35,12 +47,19 @@ export const SCREENPLAY_TOOL_NAMES: readonly string[] = [
   'novel_screenplay_build_draft',
   'novel_screenplay_review',
   'novel_screenplay_render',
+  'novel_screenplay_save_draft',
+  'novel_screenplay_settle',
 ]
 
-/** 接线时可选的依赖：只用于按 bookId 读契约字段；不传时工具只用显式参数。 */
+/** 接线时可选的依赖：读契约字段、草稿落盘、定稿提交与批量托管授权。 */
 export interface ScreenplayToolsDeps {
-  readonly bookRootOfBookId?: (bookId: string) => string | undefined
+  readonly bookRootOfBookId?: NovelToolsDeps['bookRootOfBookId']
   readonly readContractFields?: (bookRoot: string) => { readonly 市场?: unknown; readonly 输出形态?: unknown } | undefined
+  readonly writeDraft?: (root: string, op: FileOp, exec?: ToolExecContext) => Promise<void>
+  readonly askFn?: AskFn
+  readonly provenanceOf?: (ctx: ToolExecContext | undefined, targets?: readonly string[]) => OperationProvenance | undefined
+  readonly automationMode?: () => AutomationMode
+  readonly batchStore?: BatchApprovalStore
 }
 
 function renderOutput(value: unknown): Array<{ readonly type: 'text'; readonly text: string }> {
@@ -86,12 +105,12 @@ export function createScreenplayTools(deps: ScreenplayToolsDeps = {}): NovelTool
         },
         render: (_args, value) => renderOutput(value),
       },
-      execute: (args) => {
+      execute: (args, exec) => {
         let 市场 = enumArg(args, '市场')
         let 输出形态 = enumArg(args, '输出形态')
         const bookId = enumArg(args, 'bookId')
         if (bookId !== undefined && deps.bookRootOfBookId !== undefined && deps.readContractFields !== undefined) {
-          const root = deps.bookRootOfBookId(bookId)
+          const root = deps.bookRootOfBookId(bookId, exec?.agent)
           const fields = root === undefined ? undefined : deps.readContractFields(root)
           if (typeof fields?.市场 === 'string') 市场 = fields.市场
           if (typeof fields?.输出形态 === 'string') 输出形态 = fields.输出形态
@@ -293,6 +312,230 @@ export function createScreenplayTools(deps: ScreenplayToolsDeps = {}): NovelTool
           格式问题: findings.map((f) => `${f.模块名}〔${f.严重程度}〕${f.证据位置}：${f.问题说明}`),
           原因: [],
         }
+      },
+    },
+    {
+      name: 'novel_screenplay_save_draft',
+      description: '保存电影剧本草稿区文件（故事稿.md / 分场大纲.md / 剧本草稿.md）到草稿区/剧本/，校验结构后原子落盘并读回核验，免去分段手写编辑。',
+      parameters: {
+        type: 'object',
+        properties: {
+          bookId: { type: 'string', description: '当前电影剧本的书id（必填）' },
+          类型: { type: 'string', enum: ['故事稿', '分场大纲', '剧本草稿'], description: '草稿工件类型' },
+          正文: { type: 'string', description: '完整 Markdown 正文' },
+        },
+        required: ['bookId', '类型', '正文'],
+      },
+      output: {
+        schema: {
+          type: 'object',
+          properties: {
+            ok: { type: 'boolean' },
+            path: { type: 'string' },
+            saved: { type: 'boolean' },
+            警告: { type: 'array', items: { type: 'string' } },
+            message: { type: 'string' },
+            reason: { type: 'string' },
+          },
+          required: ['ok'],
+        },
+        render: (_args, value) => renderOutput(value),
+      },
+      execute: async (args, exec) => {
+        const bookId = enumArg(args, 'bookId')
+        if (!bookId || !deps.bookRootOfBookId) return toolFailure('book-not-found', 'bookId 必填，请先核对当前书目。')
+        const bookRoot = deps.bookRootOfBookId(bookId, exec?.agent)
+        if (!bookRoot) return toolFailure('book-not-found', `书id不存在或不唯一：${bookId}`)
+        if (readExistingContract(bookRoot).fields['输出形态'] !== '电影剧本') {
+          return toolFailure('invalid-argument', '作品契约的输出形态必须是电影剧本，不能保存电影剧本草稿。')
+        }
+        if (!deps.writeDraft) return toolFailure('host-unavailable', '当前环境未挂载书仓写入通道，无法保存剧本草稿。')
+        const kind = enumArg(args, '类型')
+        if (kind !== '故事稿' && kind !== '分场大纲' && kind !== '剧本草稿') {
+          return toolFailure('invalid-argument', `类型必须是 故事稿 / 分场大纲 / 剧本草稿（收到：${String(args['类型'] ?? '未传')}）`)
+        }
+        const content = textArg(args, '正文')
+        if (content.trim() === '') return toolFailure('invalid-argument', '正文不能为空。')
+        const warnings: string[] = []
+        if (kind === '故事稿') {
+          const parsed = parseStoryDraft(content)
+          if (parsed.story === undefined) return { ...toolFailure('parse-error', `故事稿格式有误：${parsed.problems.join('；')}`), saved: false }
+          const v = validateStoryDraft(parsed.story)
+          if (v.errors.length > 0) return { ...toolFailure('parse-error', `故事稿校验失败：${v.errors.join('；')}`), saved: false }
+          warnings.push(...v.warnings)
+        } else if (kind === '分场大纲') {
+          const parsed = parseSceneOutline(content)
+          if (parsed.outline === undefined) return { ...toolFailure('parse-error', `分场大纲格式有误：${parsed.problems.join('；')}`), saved: false }
+          const v = validateSceneOutline(parsed.outline)
+          if (v.errors.length > 0) return { ...toolFailure('parse-error', `分场大纲校验失败：${v.errors.join('；')}`), saved: false }
+          warnings.push(...v.warnings)
+        } else {
+          const parsed = parseScreenplay(content)
+          if (parsed.draft === undefined) return { ...toolFailure('parse-error', `剧本草稿格式有误：${parsed.problems.join('；')}`), saved: false }
+          warnings.push(...validateScreenplay(parsed.draft).map(f => `${f.模块名}〔${f.严重程度}〕${f.证据位置}：${f.问题说明}`))
+        }
+        const draftRel = `草稿区/剧本/${kind}.md`
+        const access = gateFileAccess(bookRoot, draftRel)
+        if (!access.allow || access.zone !== '草稿区') {
+          return { ...toolFailure('runtime-link', `剧本草稿目标必须留在草稿区：${access.allow ? draftRel : access.reason}`), saved: false }
+        }
+        const normalized = content.endsWith('\n') ? content : `${content}\n`
+        try {
+          exec?.signal?.throwIfAborted()
+          await deps.writeDraft(bookRoot, { relPath: draftRel, content: normalized }, exec)
+          if (fs.readFileSync(path.join(bookRoot, draftRel), 'utf8') !== normalized) {
+            return { ...toolFailure('internal', '剧本草稿保存后读回正文不一致，请核对文件。'), saved: false }
+          }
+          return { ok: true, path: draftRel, saved: true, 警告: warnings, message: `电影剧本「${kind}」已保存至 ${draftRel}。` }
+        } catch (error) {
+          if (exec?.signal?.aborted) throw error
+          return { ...failureFrom(error, '保存电影剧本草稿失败：'), saved: false }
+        }
+      },
+    },
+    {
+      name: 'novel_screenplay_settle',
+      description: '电影剧本定稿入档：校验草稿区/剧本/剧本草稿.md 无高级别阻断项后，经作者批准（或批量托管授权）原子写入真源 剧本/电影/剧本.md 并执行单次 ch: Git 提交。',
+      parameters: {
+        type: 'object',
+        properties: {
+          bookId: { type: 'string', description: '当前电影剧本的书id（必填）' },
+          summary: { type: 'string', description: '提交摘要（如 电影剧本定稿）' },
+          片长: { type: 'string', enum: ['长片', '短片'], description: '长片或短片，默认 长片' },
+        },
+        required: ['bookId', 'summary'],
+      },
+      output: {
+        schema: {
+          type: 'object',
+          properties: {
+            ok: { type: 'boolean' },
+            path: { type: 'string' },
+            draftPath: { type: 'string' },
+            alreadyCommitted: { type: 'boolean' },
+            message: { type: 'string' },
+            reason: { type: 'string' },
+          },
+          required: ['ok'],
+        },
+        render: (_args, value) => renderOutput(value),
+      },
+      execute: async (args, exec) => {
+        const bookId = enumArg(args, 'bookId')
+        if (!bookId || !deps.bookRootOfBookId) return toolFailure('book-not-found', 'bookId 必填，请先核对当前书目。')
+        const bookRoot = deps.bookRootOfBookId(bookId, exec?.agent)
+        if (!bookRoot) return toolFailure('book-not-found', `书id不存在或不唯一：${bookId}`)
+        if (readExistingContract(bookRoot).fields['输出形态'] !== '电影剧本') {
+          return toolFailure('invalid-argument', '作品契约的输出形态必须是电影剧本，不能走电影剧本定稿。')
+        }
+        const mode = deps.automationMode?.() ?? 'manual'
+        const batchMatch = mode !== 'manual' ? deps.batchStore?.match(bookRoot, exec, 'screenplay') : undefined
+        if (!batchMatch && !deps.askFn) return toolFailure('host-unavailable', '裁决通道不可用：当前环境无法弹出作者裁决窗口，本次没有写入。')
+        const summary = textArg(args, 'summary').trim()
+        if (summary === '') return toolFailure('invalid-argument', 'summary 不能为空。')
+
+        const draftRel = '草稿区/剧本/剧本草稿.md'
+        const outlineRel = '草稿区/剧本/分场大纲.md'
+        const finalRel = screenplayFinalPath()
+        let draftAbs: string
+        let finalAbs: string
+        try {
+          draftAbs = authorDocumentPath(bookRoot, draftRel)
+          finalAbs = authorDocumentPath(bookRoot, finalRel)
+        } catch (error) {
+          if (error instanceof AuthorDocumentError && error.code === 'invalid-path') {
+            return toolFailure('runtime-link', `剧本路径不得经过目录链接：${error.message}`)
+          }
+          return failureFrom(error, '剧本路径校验失败：')
+        }
+        let draftText: string
+        try {
+          draftText = fs.readFileSync(draftAbs, 'utf8')
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return toolFailure('invalid-argument', `剧本草稿不存在：${draftRel}，请先调用 novel_screenplay_save_draft 保存剧本草稿。`)
+          }
+          return failureFrom(error, '读取剧本草稿失败：')
+        }
+        const parsedDraft = parseScreenplay(draftText)
+        if (parsedDraft.draft === undefined) {
+          return toolFailure('parse-error', `剧本草稿解析失败（${draftRel}）：${parsedDraft.problems.join('；')}`)
+        }
+        let outlineText = ''
+        let parsedOutline: ReturnType<typeof parseSceneOutline> | undefined
+        try {
+          const outlineAbs = authorDocumentPath(bookRoot, outlineRel)
+          if (fs.existsSync(outlineAbs)) {
+            outlineText = fs.readFileSync(outlineAbs, 'utf8')
+            parsedOutline = parseSceneOutline(outlineText)
+          }
+        } catch { /* optional */ }
+        const 片长 = enumArg(args, '片长') === '短片' ? '短片' : '长片'
+        const review = computeScreenplayFindings({
+          剧本草稿: parsedDraft.draft,
+          剧本草稿文本: draftText,
+          ...(parsedOutline?.outline !== undefined ? { 分场大纲: parsedOutline.outline, 分场大纲文本: outlineText } : {}),
+          片长,
+        })
+        if (review.是否阻断) {
+          const blockers = review.findings.filter(f => f.严重程度 === '高').map(f => `${f.证据位置}：${f.问题说明}`).join('；')
+          return toolFailure('invalid-argument', `剧本草稿存在阻断项，不能定稿：${blockers}`)
+        }
+        if (fs.existsSync(finalAbs) && fs.readFileSync(finalAbs, 'utf8') !== draftText) {
+          return toolFailure('source-conflict', `定稿只增不改：目标 ${finalRel} 已存在且内容不同，本次没有写入。`)
+        }
+        const approvalFiles = [draftRel, finalRel, paths.契约()]
+        const approvalReq = { bookId, summary, 片长 }
+        const before = captureApprovalFiles(bookRoot, approvalFiles, approvalReq)
+        if (!before.ok) return before
+
+        let approvalRecordLine: string
+        if (batchMatch) {
+          approvalRecordLine = `裁决记录：${batchMatch.裁决记录}`
+        } else {
+          const decision = await askAuthor(
+            deps.askFn!,
+            '定稿入档',
+            { 范围: finalRel, 摘要: `电影剧本《${parsedDraft.draft.标题}》（${parsedDraft.draft.场.length} 场，估算 ${estimatePages(parsedDraft.draft)} 页）｜${summary}` },
+            { agent: exec?.agent, signal: exec?.signal },
+          )
+          if (!decision.ok) return notApproved(decision.reason)
+          if (exec?.signal?.aborted) return toolFailure('author-cancelled', '作者裁决已取消，本次没有写入。')
+          if (decision.决定 !== '已批准') return toolFailure('author-declined', `未获作者批准：作者${decision.决定}，电影剧本没有入档。`)
+          approvalRecordLine = `裁决记录：作者于 ${new Date().toISOString()} 批准定稿入档（kind=${decision.kind}, 决定=${decision.决定}）`
+        }
+
+        const provenance = deps.provenanceOf?.(exec, [finalRel])
+        return withBookWrite(bookRoot, () => {
+          if (exec?.signal?.aborted) return toolFailure('author-cancelled', '作者裁决已取消，本次没有写入。')
+          const after = captureApprovalFiles(bookRoot, approvalFiles, approvalReq)
+          if (!after.ok || after.fingerprint !== before.fingerprint) {
+            return toolFailure('approval-stale', '剧本草稿或契约在等待裁决期间已变化，旧批准不可使用。')
+          }
+          const res = archiveChapter({
+            bookRoot,
+            files: [{ 目标: finalRel, 内容: draftText, sha256: draftHashOf(draftText) }],
+            summary,
+            lines: [
+              `电影剧本定稿：${parsedDraft.draft!.标题}`,
+              `来源草稿：${draftRel}`,
+              `场次：${parsedDraft.draft!.场.length} 场（${片长}）`,
+              approvalRecordLine,
+            ],
+            provenance,
+          })
+          if (!res.ok) return { ok: false, reason: res.reason }
+          return {
+            ok: true,
+            path: finalRel,
+            draftPath: draftRel,
+            alreadyCommitted: res.alreadyCommitted === true,
+            ...(batchMatch ? { batchId: batchMatch.batchId } : {}),
+            message: res.alreadyCommitted === true
+              ? `电影剧本此前已核实定稿入档（${res.message}）：${finalRel}`
+              : `电影剧本定稿完成（${res.message}），已入档：${res.dests.join('、')}`,
+          }
+        }, provenance)
       },
     },
   ]

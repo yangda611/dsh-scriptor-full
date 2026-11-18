@@ -9,9 +9,9 @@ const tools = createScreenplayTools()
 const byName = new Map(tools.map((t) => [t.name, t]))
 
 describe('阶段 2：电影剧本工具定义（screenplay-tools，不改 novel-tools）', () => {
-  it('导出 6 个工具，名称与 SCREENPLAY_TOOL_NAMES 一致', () => {
+  it('导出 8 个工具，名称与 SCREENPLAY_TOOL_NAMES 一致', () => {
     expect(tools.map((t) => t.name)).toEqual([...SCREENPLAY_TOOL_NAMES])
-    expect(SCREENPLAY_TOOL_NAMES).toHaveLength(6)
+    expect(SCREENPLAY_TOOL_NAMES).toHaveLength(8)
   })
 
   it('门禁工具：电影剧本通过，小说/短剧拒绝；中文市场不能选海外档', async () => {

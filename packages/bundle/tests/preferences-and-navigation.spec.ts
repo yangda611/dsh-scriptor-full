@@ -79,16 +79,16 @@ describe('shared Scriptor preference view', () => {
     expect(mount).toHaveBeenCalledTimes(2)
     off(); expect(unmount).toHaveBeenCalledTimes(2)
   })
-  it('renders all eight preferences in three groups and disables writes for an unavailable Host', async () => {
+  it('renders all preferences in four groups and disables writes for an unavailable Host', async () => {
     const host = {} as ClientHost, source = form()
     const store = preferencesFor(host)
     const detach = store.bind(source as unknown as ConfigForm<WebnovelPreferencesInput>)
     let renderer!: ReactTestRenderer
     await act(async () => { renderer = create(React.createElement(ScriptorBundleConfig, { host })) })
     renders.push(renderer)
-    expect(renderer.root.findAll(node => !!node.props['data-webnovel-pref-group']).map(node => node.props['data-webnovel-pref-group'])).toEqual(['visibility', 'views', 'retrieval'])
+    expect(renderer.root.findAll(node => !!node.props['data-webnovel-pref-group']).map(node => node.props['data-webnovel-pref-group'])).toEqual(['automation', 'visibility', 'views', 'retrieval'])
     expect(renderer.root.findAllByType('input').filter(node => node.props.type === 'checkbox')).toHaveLength(6)
-    expect(renderer.root.findAll(node => node.props.role === 'tablist')).toHaveLength(2)
+    expect(renderer.root.findAll(node => node.props.role === 'tablist')).toHaveLength(3)
     await act(async () => { detach() })
     expect(renderer.root.findAllByType('input').every(node => node.props.disabled)).toBe(true)
     expect(source.mutate).not.toHaveBeenCalled()

@@ -19,6 +19,7 @@
  */
 
 import { requiredTurns } from './beat-checker'
+import { checkEpisodeCraft } from './episode-checks'
 import { RHYTHM_TEMPLATES } from './templates'
 import {
   MAX_DIALOGUE_CHARS,
@@ -106,10 +107,12 @@ export function reviewShortDramaEpisode(input: ShortDramaReviewInput): ShortDram
       if (n > MAX_DIALOGUE_CHARS) {
         push(
           `${ep}/${sceneNo(scene.场)}`,
-          '中',
+          '低',
           false,
           `${line.角色}的台词 ${n} 字，超过单句 ${MAX_DIALOGUE_CHARS} 字上限：「${line.台词}」。`,
-          '拆成两句短台词，或改成动作行（对白即行动，短句才有力）。',
+          剧本.画幅 === '横屏'
+            ? '横屏允许更自然的潜台词与长对白，仅作参考；若口播偏长再适当拆分。'
+            : '竖屏台词宜短促有力，可按需要拆成两句短台词或用动作戏承接（此项仅建议，不阻断定稿）。',
           '单集剧本',
         )
       }
@@ -143,6 +146,8 @@ export function reviewShortDramaEpisode(input: ShortDramaReviewInput): ShortDram
   if (剧本.结尾悬念.trim() !== 大纲.结尾悬念.trim()) {
     push(ep, '高', true, '结尾悬念与大纲不一致：必须切在同一个问题上。', '以大纲为准改剧本结尾，或回分集大纲改悬念。', '分集大纲')
   }
+
+  findings.push(...checkEpisodeCraft(剧本))
 
   return findings
 }

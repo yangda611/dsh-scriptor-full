@@ -14,6 +14,17 @@ export function ScriptorBundleConfig({ host }: { host: ClientHost }) {
   return <div className="webnovel nw-preferences">
     <h2 className="nw-preferences-title">Scriptor 偏好</h2>
     {!state.writable ? <p className="nw-preferences-note" role="status">当前环境配置只读，无法修改偏好。</p> : null}
+    <section className="nw-preference-group" data-webnovel-pref-group="automation" tabIndex={-1} aria-label="创作流程">
+      <h3 className="nw-preference-title">创作流程</h3>
+      <SegmentedControl id={id + '-automation'} label="确认与批量托管模式" value={state.value.automationMode} disabled={disabled}
+        options={[
+          { value: 'semi-auto', label: '半自动两步走（推荐）' },
+          { value: 'auto', label: '全自动托管' },
+          { value: 'manual', label: '严格逐项确认' },
+        ]}
+        onChange={value => { void store.set('automationMode', value) }} />
+      <p className="nw-preferences-note">半自动两步走：自动建书并起草蓝图，你确认一次方向后自动批量生成并入档；全自动托管少问甚至一次过审；严格模式保留逐章/逐集弹窗。</p>
+    </section>
     <section className="nw-preference-group" data-webnovel-pref-group="visibility" tabIndex={-1} aria-label="入口与可见性">
       <h3 className="nw-preference-title">入口与可见性</h3>
       {checkbox('showVisualTab', '可视化 · 对话区标签')}

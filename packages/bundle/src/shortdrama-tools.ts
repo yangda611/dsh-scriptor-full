@@ -3,6 +3,8 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { captureApprovalFiles } from './approval-snapshot'
+import type { BatchApprovalStore } from './batch-approval'
+import type { AutomationMode } from './preferences'
 import { failureFrom, notApproved, toolFailure } from './tool-failure'
 import type { NovelToolDefinition, NovelToolsDeps, ToolExecContext } from './novel-tools'
 import { computeEpisodeFindings } from '@webnovel/review'
@@ -37,6 +39,7 @@ export const SHORTDRAMA_TOOL_NAMES = [
   'novel_shortdrama_check_beats',
   'novel_shortdrama_review_episode',
   'novel_shortdrama_settle_episode',
+  'novel_shortdrama_save_script',
 ] as const
 
 function asRecord(value: unknown, name: string): Record<string, unknown> {
@@ -365,6 +368,36 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
     },
     execute: () => toolFailure('host-unavailable', '裁决通道不可用：当前环境无法弹出作者裁决窗口，本次没有写入'),
   },
+  {
+    name: 'novel_shortdrama_save_script',
+    description: '直接保存短剧单集 Markdown 剧本文本到草稿区（免去逐句拼嵌套 JSON，提升创作连贯性）。校验格式与集号后原子写入草稿区/剧本/短剧/集NNN.md，读回核验一致返回 saved=true。',
+    parameters: {
+      type: 'object',
+      properties: {
+        bookId: { type: 'string', description: '当前短剧的书id（必填）' },
+        集: { type: 'integer', description: '集号，1–100（须与正文 # 集NNN：标题 一致）' },
+        正文: { type: 'string', description: '符合短剧格式的单集完整 Markdown 剧本文本（含集元数据、1-1 日／内 地点 场头、镜头块、对白、淡出与节拍表）' },
+      },
+      required: ['bookId', '集', '正文'],
+    },
+    output: {
+      schema: {
+        type: 'object',
+        properties: {
+          ok: { type: 'boolean' },
+          path: { type: 'string' },
+          finalPath: { type: 'string' },
+          saved: { type: 'boolean' },
+          警告: { type: 'array', items: { type: 'string' } },
+          message: { type: 'string' },
+          reason: { type: 'string' },
+        },
+        required: ['ok'],
+      },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+    },
+    execute: () => toolFailure('host-unavailable', '当前环境未挂载书仓写入通道，无法保存短剧草稿'),
+  },
 ]
 
 interface ShortdramaToolsDeps {
@@ -372,6 +405,8 @@ interface ShortdramaToolsDeps {
   readonly writeDraft: (root: string, op: FileOp, exec?: ToolExecContext) => Promise<void>
   readonly askFn?: AskFn
   readonly provenanceOf?: (ctx: ToolExecContext | undefined, targets?: readonly string[]) => OperationProvenance | undefined
+  readonly automationMode?: () => AutomationMode
+  readonly batchStore?: BatchApprovalStore
 }
 
 function resolveShortdramaBook(
@@ -390,10 +425,11 @@ function resolveShortdramaBook(
   return { ok: true, bookId, bookRoot }
 }
 
-function episodeReviewSummary(bookRoot: string, 集: number, draftText: string): string {
+function episodeReviewSummary(bookRoot: string, 集: number, draftText: string, canonicalText?: string): string {
   const record = loadEpisodeReviewRecord(bookRoot, 集)
   if (record === null) return `未找到审读记录（${paths.短剧审核记录(集)}）`
-  if (record.审稿哈希 !== draftHashOf(draftText)) return '审读记录已过期（当前草稿与被审稿件哈希不一致）'
+  const validHashes = [draftHashOf(draftText), ...(canonicalText ? [draftHashOf(canonicalText)] : [])]
+  if (record.审稿哈希 === undefined || !validHashes.includes(record.审稿哈希)) return '审读记录已过期（当前草稿与被审稿件哈希不一致）'
   const pendingModules = Object.entries(record.模块)
     .filter(([, state]) => !state.完成 || state.待回写 === true)
     .map(([name]) => name)
@@ -424,7 +460,6 @@ async function executeSettleEpisode(
   args: Record<string, unknown>,
   exec?: ToolExecContext,
 ): Promise<unknown> {
-  if (!deps.askFn) return toolFailure('host-unavailable', '裁决通道不可用：当前环境无法弹出作者裁决窗口，本次没有写入')
   let resolved: { readonly ok: true; readonly bookId: string; readonly bookRoot: string } | ReturnType<typeof toolFailure>
   try {
     resolved = resolveShortdramaBook(deps, args['bookId'], exec, '走短剧定稿')
@@ -439,6 +474,10 @@ async function executeSettleEpisode(
     return toolFailure('invalid-argument', `集必须是 1–100 的整数（收到：${String(rawEp ?? '未传')}）`)
   }
   const 集 = rawEp
+  const mode = deps.automationMode?.() ?? 'manual'
+  const batchMatch = mode !== 'manual' ? deps.batchStore?.match(bookRoot, exec, 'episode', 集) : undefined
+  if (!batchMatch && !deps.askFn) return toolFailure('host-unavailable', '裁决通道不可用：当前环境无法弹出作者裁决窗口，本次没有写入')
+
   const summary = typeof args['summary'] === 'string' ? args['summary'].trim() : ''
   if (summary === '') {
     return toolFailure('invalid-argument', 'summary 不能为空，请填写本次定稿提交摘要（如「集001 定稿」）。')
@@ -460,7 +499,7 @@ async function executeSettleEpisode(
     draftText = fs.readFileSync(draftPathCheck.absPath, 'utf8')
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return toolFailure('invalid-argument', `短剧单集草稿不存在：${draftRel}，请先调用 novel_shortdrama_render_episode 保存草稿。`)
+      return toolFailure('invalid-argument', `短剧单集草稿不存在：${draftRel}，请先调用 novel_shortdrama_render_episode 或 novel_shortdrama_save_script 保存草稿。`)
     }
     return failureFrom(error, '短剧单集草稿读取失败：')
   }
@@ -486,7 +525,7 @@ async function executeSettleEpisode(
   if (!before.ok) return before
 
   const ep = parsed.episode
-  const reviewStatus = episodeReviewSummary(bookRoot, 集, draftText)
+  const reviewStatus = episodeReviewSummary(bookRoot, 集, draftText, renderEpisodeScript(ep).内容)
   const approvalSummary = [
     `集${episodeNo(集)}：${ep.标题}（${ep.画幅}，${ep.时长秒} 秒，${ep.场景.length} 场，台词 ${totalDialogueChars(ep.场景)} 字）`,
     `来源草稿：${draftRel}`,
@@ -494,15 +533,21 @@ async function executeSettleEpisode(
     `提交摘要：${summary}`,
   ].join('｜')
 
-  const decision = await askAuthor(
-    deps.askFn,
-    '定稿入档',
-    { 范围: finalRel, 摘要: approvalSummary },
-    { agent: exec?.agent, signal: exec?.signal },
-  )
-  if (!decision.ok) return notApproved(decision.reason)
-  if (exec?.signal?.aborted) return toolFailure('author-cancelled', '作者裁决已取消（会话已中止），没有做出决定，本次没有写入')
-  if (decision.决定 !== '已批准') return toolFailure('author-declined', `未获作者批准：作者${decision.决定}，本集没有入档`)
+  let approvalRecordLine: string
+  if (batchMatch) {
+    approvalRecordLine = `裁决记录：${batchMatch.裁决记录}`
+  } else {
+    const decision = await askAuthor(
+      deps.askFn!,
+      '定稿入档',
+      { 范围: finalRel, 摘要: approvalSummary },
+      { agent: exec?.agent, signal: exec?.signal },
+    )
+    if (!decision.ok) return notApproved(decision.reason)
+    if (exec?.signal?.aborted) return toolFailure('author-cancelled', '作者裁决已取消（会话已中止），没有做出决定，本次没有写入')
+    if (decision.决定 !== '已批准') return toolFailure('author-declined', `未获作者批准：作者${decision.决定}，本集没有入档`)
+    approvalRecordLine = `裁决记录：作者于 ${new Date().toISOString()} 批准定稿入档（kind=${decision.kind}, 决定=${decision.决定}）`
+  }
 
   const provenance = deps.provenanceOf?.(exec, [finalRel])
   return withBookWrite(bookRoot, () => {
@@ -524,7 +569,7 @@ async function executeSettleEpisode(
           `短剧单集定稿：集${episodeNo(集)} ${ep.标题}`,
           `来源草稿：${draftRel}`,
           `审读状态：${reviewStatus}`,
-          `裁决记录：作者于 ${new Date().toISOString()} 批准定稿入档（kind=${decision.kind}, 决定=${decision.决定}）`,
+          approvalRecordLine,
         ],
         provenance,
       })
@@ -537,6 +582,7 @@ async function executeSettleEpisode(
         标题: ep.标题,
         alreadyCommitted: res.alreadyCommitted === true,
         审读状态: reviewStatus,
+        ...(batchMatch ? { batchId: batchMatch.batchId } : {}),
         message: res.alreadyCommitted === true
           ? `本集此前已核实定稿入档（${res.message}），无需重复提交：${finalRel}`
           : `短剧单集定稿完成（${res.message}），已入档：${res.dests.join('、')}`,
@@ -547,6 +593,56 @@ async function executeSettleEpisode(
   }, provenance)
 }
 
+async function executeSaveScript(
+  deps: ShortdramaToolsDeps,
+  args: Record<string, unknown>,
+  exec?: ToolExecContext,
+): Promise<unknown> {
+  try {
+    const resolved = resolveShortdramaBook(deps, args['bookId'], exec, '保存短剧草稿')
+    if (!resolved.ok) return resolved
+    const { bookRoot: root } = resolved
+    const rawEp = args['集']
+    if (typeof rawEp !== 'number' || !Number.isSafeInteger(rawEp) || rawEp < 1 || rawEp > 100) {
+      return toolFailure('invalid-argument', `集必须是 1–100 的整数（收到：${String(rawEp ?? '未传')}）`)
+    }
+    const rawText = typeof args['正文'] === 'string' ? args['正文'].trim() : ''
+    if (rawText === '') {
+      return toolFailure('invalid-argument', '正文不能为空，请传入单集剧本 Markdown 全文。')
+    }
+    const parsed = parseEpisodeScript(rawText)
+    if (!parsed.ok || parsed.episode === undefined) {
+      return { ...toolFailure('parse-error', `短剧格式校验未通过：${parsed.problems.join('；')}`), saved: false }
+    }
+    if (parsed.episode.集 !== rawEp) {
+      return { ...toolFailure('invalid-argument', `集号不一致：参数为集${rawEp}，正文标题为集${parsed.episode.集}`), saved: false }
+    }
+    const rendered = renderEpisodeScript(parsed.episode)
+    const draftPath = `草稿区/${rendered.path}`
+    const access = gateFileAccess(root, draftPath)
+    if (!access.allow || access.zone !== '草稿区') {
+      return toolFailure('runtime-link', `短剧草稿目标必须留在草稿区，请核对目录链接：${access.allow ? draftPath : access.reason}`)
+    }
+    const normalized = rawText.endsWith('\n') ? rawText : `${rawText}\n`
+    exec?.signal?.throwIfAborted()
+    await deps.writeDraft(root, { relPath: draftPath, content: normalized }, exec)
+    if (fs.readFileSync(path.join(root, draftPath), 'utf8') !== normalized) {
+      return { ...toolFailure('internal', '短剧草稿保存后读回正文不一致，请核对实际文件后再继续。'), saved: false }
+    }
+    return {
+      ok: true,
+      path: draftPath,
+      finalPath: rendered.path,
+      saved: true,
+      警告: rendered.警告,
+      message: `短剧第 ${rawEp} 集草稿已保存（${draftPath}），尚待节拍检查、审读与定稿入档。`,
+    }
+  } catch (error) {
+    if (exec?.signal?.aborted) throw error
+    return { ...failureFrom(error, '短剧草稿保存失败：'), saved: false }
+  }
+}
+
 /** 渲染工具在异步书仓写入锁内执行原生写入；定稿工具在作者裁决后加同步锁原子提交。 */
 export function createShortdramaTools(deps: ShortdramaToolsDeps): NovelToolDefinition[] {
   return SHORTDRAMA_TOOL_DEFINITIONS.map(tool => {
@@ -554,6 +650,12 @@ export function createShortdramaTools(deps: ShortdramaToolsDeps): NovelToolDefin
       return {
         ...tool,
         execute: (args, exec) => executeSettleEpisode(deps, args, exec),
+      }
+    }
+    if (tool.name === 'novel_shortdrama_save_script') {
+      return {
+        ...tool,
+        execute: (args, exec) => executeSaveScript(deps, args, exec),
       }
     }
     if (tool.name !== 'novel_shortdrama_render_episode') return tool

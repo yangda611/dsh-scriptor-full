@@ -160,7 +160,7 @@ export function validateStoryDraft(story: StoryDraft): { readonly errors: readon
   if (story.关键转折.length === 0) errors.push('没有关键转折')
   if (story.结尾.trim() === '') errors.push('「结尾」为空')
   for (const c of story.人物) {
-    if (!/动机|想要|想|目标|害怕|怕|非.*不可|渴望|执念/.test(c.小传)) {
+    if (!/动机|想要|想|目标|害怕|怕|非.*不可|渴望|执念|旨在|必须|为了|保住|查明|洗清|掩盖|夺回|守护|阻止|复仇/.test(c.小传)) {
       warnings.push(`人物「${c.姓名}」的小传里没写清动机（想要什么、为什么非要不可），剧本继承不了这个人物的深度`)
     }
   }

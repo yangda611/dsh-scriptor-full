@@ -15,7 +15,7 @@ import { paths } from '../repo/paths'
 import { parseMemoryIndexLinks } from '../repo/memory-index-links'
 import { MACHINE_SCHEMA_VERSION, parseMachineJson, serializeMachineJson } from '../repo/schema'
 import { parseSourceRef } from '../repo/sourceRef'
-import { 材料预算 } from './budget'
+import { 材料预算, 高质量材料预算 } from './budget'
 import { 材料包十段, sectionFileName, type 材料包段名, type 材料包状态, type SectionRecord, type MaterialSectionRecord, type SupplementEdit } from './sections'
 import { bookWriter } from '../repo/atomic'
 import { appendSupplements, type SupplementPreview } from './supplements'
@@ -37,6 +37,8 @@ export interface AssembleInput {
   readonly 仅预览?: boolean
   /** Empty string represents no existing manifest, as returned by preview. */
   readonly 材料清单哈希?: string
+  /** 为 true 时使用高预算与扩展世界书/契约/骨架拼装，优先保证创作质量。 */
+  readonly 质量模式?: boolean
 }
 
 export interface AssembleResult {
@@ -130,6 +132,29 @@ function collectWorldbookRels(body: string): string[] {
   return rels
 }
 
+function listWorldbookFiles(bookRoot: string): string[] {
+  const wbRoot = resolveInsideBook(bookRoot, '世界书')
+  if (wbRoot === null || !fs.existsSync(wbRoot)) return []
+  const out: string[] = []
+  const visit = (absDir: string, relPrefix: string) => {
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(absDir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) continue
+      const rel = `${relPrefix}/${entry.name}`
+      const abs = path.join(absDir, entry.name)
+      if (entry.isDirectory()) visit(abs, rel)
+      else if (entry.isFile() && entry.name.endsWith('.md')) out.push(rel)
+    }
+  }
+  visit(wbRoot, '世界书')
+  return out.sort((a, b) => a.localeCompare(b, 'zh'))
+}
+
 function sliceFile(bookRoot: string, rel: string): { text: string; missing: boolean } {
   const abs = resolveInsideBook(bookRoot, rel)
   if (abs === null) return { text: '', missing: true }
@@ -209,6 +234,7 @@ function renderLedgerEntry(entry: LedgerEntry): string {
 
 /** 组装材料包(R21 切割):纯算零写盘,返回精确写盘载荷;无确认细纲则失败、不产文件。 */
 function computeBaseMaterials(bookRoot: string, input: AssembleInput): ComputedMaterials {
+  const budget = input.质量模式 === true ? 高质量材料预算 : 材料预算
   const dir = paths.材料包目录(input.卷, input.章名)
   const confirmedRel = paths.确认细纲(input.卷, input.章, input.章名)
   const confirmedText = readText(bookRoot, confirmedRel)
@@ -251,7 +277,19 @@ function computeBaseMaterials(bookRoot: string, input: AssembleInput): ComputedM
   if (outlineBody === '') gaps.push('确认细纲正文为空')
 
   const hardLines = parsed.constraints.filter((c) => c.mark === '硬').map((c) => c.line)
-  const worldRels = collectWorldbookRels(`${outlineBody}\n${sourceLines.join('\n')}`)
+  const explicitWorldRels = collectWorldbookRels(`${outlineBody}\n${sourceLines.join('\n')}`)
+  const worldRelSet = new Set(explicitWorldRels)
+  const worldRels = [...explicitWorldRels]
+  if (input.质量模式 === true) {
+    for (const rel of listWorldbookFiles(bookRoot)) {
+      if (worldRelSet.has(rel)) continue
+      const stem = path.posix.basename(rel, '.md')
+      if (stem.length >= 2 && outlineBody.includes(stem)) {
+        worldRelSet.add(rel)
+        worldRels.push(rel)
+      }
+    }
+  }
   const worldSlices: string[] = []
   for (const rel of worldRels) {
     const sliced = sliceFile(bookRoot, rel)
@@ -276,6 +314,7 @@ function computeBaseMaterials(bookRoot: string, input: AssembleInput): ComputedM
   let 衔接完整: SectionRecord['完整性'] = '完整'
   const chapters = listChapters(bookRoot).filter((k) => k.章 > 0)
   const prev = chapters.find((k) => k.章 === input.章 - 1) ?? null
+  let prevBodyText = ''
   // 跨卷(任务21, 件二):卷 N 首章备料带卷 N−1 卷摘要整文件(不按章号过滤,章号全书连续天然在界内);
   // 前一卷无卷摘要如实标缺,不静默省略;来源清单路径自带卷号。
   if (prev !== null && prev.卷 < input.卷) {
@@ -298,12 +337,13 @@ function computeBaseMaterials(bookRoot: string, input: AssembleInput): ComputedM
       衔接Parts.push('（无上一章定稿）')
       衔接完整 = '空'
     } else {
-      衔接Parts.push(tailByParagraph(bodyOnly(prevText), 材料预算.上一章末尾字数))
+      prevBodyText = bodyOnly(prevText)
+      衔接Parts.push(tailByParagraph(prevBodyText, budget.上一章末尾字数))
       衔接Sources.push(prevRel)
     }
   }
   const summaries: string[] = []
-  for (let no = input.章 - 材料预算.最近章摘要数; no < input.章; no += 1) {
+  for (let no = input.章 - budget.最近章摘要数; no < input.章; no += 1) {
     if (no <= 0) continue
     const ck = chapters.find((k) => k.章 === no)
     if (ck === undefined) continue
@@ -335,7 +375,7 @@ function computeBaseMaterials(bookRoot: string, input: AssembleInput): ComputedM
     return ch === null || ch <= input.章
   })
   const tlExcluded = tlEntriesAll.length - tlEntries.length
-  const recent = tlEntries.slice(-材料预算.时间线最近条数)
+  const recent = tlEntries.slice(-budget.时间线最近条数)
   const terms = 时空.split(/[，,、；;。！!？?\s]+/).map((t) => t.trim()).filter((t) => t.length >= 2)
   const hits = tlEntries.filter((e) => {
     const content = renderTimelineContent(e)
@@ -393,16 +433,34 @@ function computeBaseMaterials(bookRoot: string, input: AssembleInput): ComputedM
     ? (activeEntries.length === 0 ? '空' : '完整')
     : (ledgerResult.kind === 'parse-error' ? '残缺' : (activeEntries.length === 0 ? '空' : '完整'))
 
-  // ── 暂定与警告:契约文风与暂定/留白行;卷纲候选仅供选料,已选原文经补充登记 ──
+  // ── 暂定与警告:契约核心定位、文风与暂定/留白行;质量模式附带完整契约/骨架/卷布局与卷纲参考 ──
   const 契约Body = 契约 === null ? null : bodyOnly(契约)
   const 卷纲Body = 卷纲 === null ? null : bodyOnly(卷纲)
   const 契约禁区 = 契约Body === null ? null : extractSection(契约Body, '创作禁区与不可妥协项')
+  const contractTitles = input.质量模式 === true
+    ? ['题材与读者定位', '核心看点与差异化', '阅读体验与情绪承诺', '主角原则与关系边界', '叙事方式与文风基调']
+    : ['叙事方式与文风基调']
   const 暂定Parts: string[] = []
-  for (const title of ['叙事方式与文风基调']) {
+  for (const title of contractTitles) {
     const section = 契约Body === null ? null : extractSection(契约Body, title)
     if (section !== null && section !== '') 暂定Parts.push(`### 契约·${title}\n\n${section}`)
   }
   const 卷纲参考 = findVolumeReferences(卷纲, input.卷, input.章名)
+  if (input.质量模式 === true) {
+    const 骨架Raw = readText(bookRoot, paths.故事骨架())
+    const 骨架Body = 骨架Raw === null ? '' : bodyOnly(骨架Raw)
+    if (骨架Body !== '') {
+      暂定Parts.push(`### 上层·故事骨架摘要\n\n${Array.from(骨架Body).slice(0, 1800).join('')}`)
+    }
+    const 布局Raw = readText(bookRoot, paths.分卷布局())
+    const 布局Body = 布局Raw === null ? '' : bodyOnly(布局Raw)
+    if (布局Body !== '') {
+      暂定Parts.push(`### 上层·分卷布局摘要\n\n${Array.from(布局Body).slice(0, 1500).join('')}`)
+    }
+    if (卷纲参考.自动定位 === '未命中' && 卷纲Body !== null && 卷纲Body !== '') {
+      暂定Parts.push(`### 本卷大纲概览（未逐章精确点名，供连续推演参考）\n\n${Array.from(卷纲Body).slice(0, 2200).join('')}`)
+    }
+  }
   const 暂定行 = [契约Body ?? '', 卷纲Body ?? ''].join('\n').split('\n').filter((line) => line.includes('〔暂定〕') || line.includes('〔留白〕'))
   if (暂定行.length > 0) 暂定Parts.push(['### 暂定与留白', '', ...暂定行].join('\n'))
   const 暂定Body = 暂定Parts.join('\n\n') || '（无）'
@@ -442,7 +500,10 @@ function computeBaseMaterials(bookRoot: string, input: AssembleInput): ComputedM
     文风问题.push(`${indexRel}:本书记忆索引缺失，已保留可读文风条目，不能视为完整材料`)
   }
   const named = styleEntries.filter((e) => outlineBody.includes(`[[${e.名称}]]`) || outlineBody.includes(e.名称))
-  const chosen = named.length > 0 ? named : styleEntries.slice(-材料预算.文风最近条数)
+  const recentStyles = styleEntries.slice(-budget.文风最近条数)
+  const chosen = input.质量模式 === true
+    ? [...named, ...recentStyles.filter((e) => !named.some((n) => n.名称 === e.名称))]
+    : (named.length > 0 ? named : recentStyles)
   const selected = chosen
   if (selected.length > 0) {
     文风Parts.push(['### 条目正文', '', ...selected.map((e) => `## ${e.名称}\n\n${e.正文}`)].join('\n\n'))

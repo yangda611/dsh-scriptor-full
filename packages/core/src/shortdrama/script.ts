@@ -474,8 +474,8 @@ const EPISODE_SETTING_RE = /^场景环境[：:]\s*(.+?)\s*$/
 const EPISODE_SOUND_RE = /^【环境声[：:](.+)】$/
 const EPISODE_SUBTITLE_RE = /^【字幕[：:](.+)】$/
 const EPISODE_DIALOGUE_RE = /^([^：:（(]{1,15}?)(?:[（(]([^）)]+)[）)])?[：:](.+)$/
-const EPISODE_BEAT_OPEN_RE = /^-\s*开场冲突：\s*第\s*(\d+)\s*秒/
-const EPISODE_BEAT_HOOK_RE = /^-\s*结尾钩子：\s*第\s*(\d+)\s*秒/
+const EPISODE_BEAT_OPEN_RE = /^-\s*开场冲突[：:]\s*(?:第\s*)?(\d+)\s*(?:秒|s)/i
+const EPISODE_BEAT_HOOK_RE = /^-\s*结尾钩子[：:]\s*(?:第\s*)?(\d+)\s*(?:秒|s)/i
 
 function parseShotTimecode(raw: string, where: string, problems: string[]): { 开始秒: number | null; 结束秒: number | null } {
   const value = raw.trim()
@@ -559,8 +559,9 @@ export function parseEpisodeScript(text: string): EpisodeParseResult {
   if (画幅 !== '竖屏' && 画幅 !== '横屏') problems.push(`单集剧本缺少或写错画幅（应为 竖屏 或 横屏）：${画幅raw ?? '无'}`)
   const 时长raw = episodeMetaValue(lines, '时长')
   const 时长秒 = 时长raw === undefined ? NaN : Number(/(\d+)/.exec(时长raw)?.[1])
-  const 钩子类型 = episodeMetaValue(lines, '钩子类型')
-  if (钩子类型 !== '身份' && 钩子类型 !== '情感' && 钩子类型 !== '顿悟') problems.push(`单集剧本缺少或写错钩子类型（身份/情感/顿悟）：${钩子类型 ?? '无'}`)
+  const rawHook = episodeMetaValue(lines, '钩子类型')
+  const 钩子类型 = rawHook === undefined ? undefined : rawHook.replace(/钩$/, '').trim()
+  if (钩子类型 !== '身份' && 钩子类型 !== '情感' && 钩子类型 !== '顿悟') problems.push(`单集剧本缺少或写错钩子类型（身份/情感/顿悟）：${rawHook ?? '无'}`)
   const 核心想法 = episodeMetaValue(lines, '核心想法') ?? ''
   const 爽点 = episodeMetaValue(lines, '爽点') ?? ''
   const 结尾悬念 = episodeMetaValue(lines, '结尾悬念') ?? ''
@@ -680,7 +681,7 @@ export function parseEpisodeScript(text: string): EpisodeParseResult {
       const twist = /^-\s*反转[：:]\s*(.+?)\s*$/.exec(line)
       if (twist) {
         const value = twist[1]!.trim()
-        反转秒 = value === '无' ? [] : [...value.matchAll(/第\s*(\d+)\s*秒/g)].map((m) => Number(m[1]))
+        反转秒 = value === '无' ? [] : [...value.matchAll(/(?:第\s*)?(\d+)\s*(?:秒|s)/gi)].map((m) => Number(m[1]))
         continue
       }
       continue

@@ -9,8 +9,10 @@ export const referenceDocs = [
   'skills/novel-settle/底本/沉淀对账.md',
   'skills/novel-maintenance/参考/书仓格式速查.md',
   ...['剧本对白审读', '剧本节奏审读', '剧本场次完整性审读', '全量审读'].map(name => `skills/novel-screenplay/底本/${name}.md`),
+  ...['1-故事稿与人物小传', '2-分场大纲与三幕节拍', '3-视觉动作与潜台词对白', '4-剧本精修与改稿'].map(name => `skills/novel-screenplay/工序/${name}.md`),
   'skills/novel-shortdrama/底本/短剧审读.md',
   ...['分集大纲', '单集剧本'].map(name => `skills/novel-shortdrama/工序/${name}.md`),
+  ...['戏剧工艺层', '台词七维诊断', '情绪流单元链与往返法', '开篇钩子与断章公式', '保护性反例集', '题材与爽点速查'].map(name => `skills/novel-shortdrama/参考/${name}.md`),
 ]
 export const thinScripts = [
   ['skills/novel-drafting/scripts/核验字数.mjs', 'draftLengthCli'],

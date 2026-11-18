@@ -35,18 +35,22 @@ export const NOVEL_TOOL_NAMES: readonly string[] = [
   'novel_note_pending',
   'novel_get_book_progress',
   'novel_editor_suggest',
-  // 影视剧扩展（muse-dev 阶段 2 电影剧本 / 阶段 3 短剧）
+  'novel_authorize_batch',
+  // 影视剧扩展（muse-dev 阶段 2 电影剧本 / 阶段 3 短剧 + 半自动落盘/定稿闭环）
   'novel_screenplay_check_contract',
   'novel_screenplay_validate_story',
   'novel_screenplay_build_outline',
   'novel_screenplay_build_draft',
   'novel_screenplay_review',
   'novel_screenplay_render',
+  'novel_screenplay_save_draft',
+  'novel_screenplay_settle',
   'novel_shortdrama_plan_episodes',
   'novel_shortdrama_render_episode',
   'novel_shortdrama_check_beats',
   'novel_shortdrama_review_episode',
   'novel_shortdrama_settle_episode',
+  'novel_shortdrama_save_script',
 ]
 
 export const WRITING_DELEGATE_TOOL = 'novel_delegate'

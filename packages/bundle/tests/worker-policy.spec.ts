@@ -11,19 +11,17 @@ import { loadSourceHost } from '../scripts/dsh-source.mjs'
 import { workerPolicyFor } from '../src/worker-policy'
 import { writingRoleOf } from '../src/writing-delegation'
 
-it('可写子代理首次保存长文本就分段，失败恢复仅使用本任务标记', () => {
+it('可写子代理正常一次写入完整稿件，仅在工具截断报错时退回分段恢复', () => {
   for (const role of ['drafting', 'polish', 'screenplay', 'shortdrama'] as const) {
     const policy = workerPolicyFor(role)
-    expect(policy).toContain('长文本写入恢复')
+    expect(policy).toContain('长文本写入与异常处理')
+    expect(policy).toContain('一次提交完整正文')
     expect(policy).toContain('Unterminated string in JSON')
-    expect(policy).toContain('400')
     expect(policy).toContain('ASCII 尾标记')
-    expect(policy).toContain('首次保存就分段')
-    expect(policy).toContain('本任务创建')
-    expect(policy).toContain('每段成功后')
+    expect(policy).toContain('不得覆盖或猜补')
   }
   for (const role of ['revision', 'review', 'settle'] as const) {
-    expect(workerPolicyFor(role)).not.toContain('长文本写入恢复')
+    expect(workerPolicyFor(role)).not.toContain('长文本写入与异常处理')
   }
 })
 
@@ -78,7 +76,7 @@ it('原生 subagent 显式角色、普通同级隔离及持久恢复', async () 
     expect(report.workerPolicy).toMatchObject({ explicitRoles: 5, ordinaryUnchanged: true, concurrentSiblings: true, nativeSchemaPreserved: true, restoredRole: true,
       independentPreset: true, explicitBookChapterPreserved: true, nativeWorkflowLifecycle: true, activationThenCompletion: true, failedCompletion: true, cancelledWithoutWrite: true,
       nativeChunkSave: { exactFinalContent: true, failedEditUnchanged: true, finalRead: true },
-      tools: { business: 47, conditional: 1, registered: 48 } })
+      tools: { business: 51, conditional: 1, registered: 52 } })
     expect(report.workerPolicy.nativeChunkSave.savedCharacters).toBeGreaterThan(1024)
     expect(report.workerPolicy.nativeChunkSave.maximumChunkCharacters).toBeLessThanOrEqual(400)
   } finally { removeSync(root) }

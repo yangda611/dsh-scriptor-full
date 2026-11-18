@@ -10,9 +10,9 @@ import { exampleOutlines, exampleVerticalBeats, exampleVerticalScripts } from '.
 const byName = new Map(SHORTDRAMA_TOOL_DEFINITIONS.map((t) => [t.name, t]))
 
 describe('阶段 3：短剧工具定义（shortdrama-tools，注册表接线后）', () => {
-  it('导出 5 个工具，名称与 SHORTDRAMA_TOOL_NAMES 一致', () => {
+  it('导出 6 个工具，名称与 SHORTDRAMA_TOOL_NAMES 一致', () => {
     expect(SHORTDRAMA_TOOL_DEFINITIONS.map((t) => t.name)).toEqual([...SHORTDRAMA_TOOL_NAMES])
-    expect(SHORTDRAMA_TOOL_NAMES).toHaveLength(5)
+    expect(SHORTDRAMA_TOOL_NAMES).toHaveLength(6)
   })
 
   it('未注入裁决通道时，短剧定稿定义明确拒绝写入', async () => {

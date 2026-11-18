@@ -7,7 +7,12 @@ export type VisualMode = (typeof VISUAL_MODES)[number]
 export const GRAPH_PERSPECTIVES = ['author', 'reader'] as const
 export type GraphPerspective = (typeof GRAPH_PERSPECTIVES)[number]
 
+export const AUTOMATION_MODES = ['semi-auto', 'auto', 'manual'] as const
+export type AutomationMode = (typeof AUTOMATION_MODES)[number]
+
 export interface WebnovelPreferences {
+  /** 创作流程 · 自动化模式（semi-auto=半自动两步走，auto=全自动托管，manual=严格逐项确认）。 */
+  readonly automationMode: AutomationMode
   /** 检索 · 提交后自动更新定稿索引（全局一处保存）。 */
   readonly autoIndexOnCommit: boolean
   /** 工作台入口 · 对话区「可视化」标签。 */
@@ -29,6 +34,7 @@ export interface WebnovelPreferences {
 export type WebnovelPreferencesInput = Partial<WebnovelPreferences>
 
 export const DEFAULT_WEBNOVEL_PREFERENCES: WebnovelPreferences = {
+  automationMode: 'semi-auto',
   autoIndexOnCommit: false,
   showVisualTab: true,
   showLayoutSwap: true,
@@ -54,6 +60,10 @@ export function isGraphPerspective(value: unknown): value is GraphPerspective {
   return typeof value === 'string' && (GRAPH_PERSPECTIVES as readonly string[]).includes(value)
 }
 
+export function isAutomationMode(value: unknown): value is AutomationMode {
+  return typeof value === 'string' && (AUTOMATION_MODES as readonly string[]).includes(value)
+}
+
 /** Whether the user's own settings already decided auto indexing; only then the legacy per-book flag stops migrating. */
 export function hasExplicitAutoIndex(raw: unknown): boolean {
   return isRecord(raw) && typeof raw.autoIndexOnCommit === 'boolean'
@@ -64,6 +74,7 @@ export function normalizeWebnovelPreferences(raw: unknown): WebnovelPreferences 
   const source = isRecord(raw) ? raw : {}
   const bool = (key: (typeof BOOLEAN_KEYS)[number]) => typeof source[key] === 'boolean' ? source[key] as boolean : DEFAULT_WEBNOVEL_PREFERENCES[key]
   return {
+    automationMode: isAutomationMode(source.automationMode) ? source.automationMode : DEFAULT_WEBNOVEL_PREFERENCES.automationMode,
     autoIndexOnCommit: bool('autoIndexOnCommit'),
     showVisualTab: bool('showVisualTab'),
     showLayoutSwap: bool('showLayoutSwap'),
@@ -84,5 +95,6 @@ export function validateWebnovelPreferences(raw: unknown): WebnovelPreferencesIn
   }
   if (raw.defaultVisualMode !== undefined && !isVisualMode(raw.defaultVisualMode)) throw new Error('默认可视化子视图无效')
   if (raw.defaultGraphPerspective !== undefined && !isGraphPerspective(raw.defaultGraphPerspective)) throw new Error('人物关系默认视角无效')
+  if (raw.automationMode !== undefined && !isAutomationMode(raw.automationMode)) throw new Error('创作流程自动化模式无效')
   return raw as WebnovelPreferencesInput
 }

@@ -34,6 +34,8 @@ import type { ReferenceHost } from './reference/host'
  */
 
 import { captureApprovalFiles } from './approval-snapshot'
+import { BatchApprovalStore, type BatchScopeTarget } from './batch-approval'
+import type { AutomationMode } from './preferences'
 import { readStoryStatus } from './story-status'
 import { MAINTENANCE_OUTPUT, MAINTENANCE_PARAMETERS } from './maintenance-output'
 import { createBookUpgradeTools } from './book-upgrade-tools'
@@ -198,6 +200,8 @@ export interface NovelToolsDeps {
   readonly testTools?: boolean
   /** 书房编辑器请求。缺席时 novel_editor_suggest 拒绝交回，不读写书仓。 */
   readonly editorRequests?: EditorRequestHub
+  /** 当前自动化模式（semi-auto=半自动两步走，auto=全自动，manual=严格逐项确认）。 */
+  readonly automationMode?: () => AutomationMode
 }
 
 function provenanceOf(ctx: ToolExecContext | undefined, targets?: readonly string[]): OperationProvenance | undefined {
@@ -223,6 +227,7 @@ export { NOVEL_TOOL_NAMES } from './tool-catalog'
 export const NOVEL_TEST_TOOL_NAMES: readonly string[] = ['novel_seed_min_design']
 
 export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
+  const batchStore = new BatchApprovalStore()
   async function writeNative(root: string, op: FileOp, exec?: ToolExecContext): Promise<void> {
     if (deps.nativeWrite === undefined) throw new Error('DSH 原生 write 不可用，拒绝无版本保护的写入')
     updateOperationTargets(root, undefined, [op.relPath])
@@ -345,14 +350,14 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
     },
     {
       name: 'novel_create_book',
-      description: '新建一部长篇小说并初始化规范书仓。前置要求：七个构想字段齐全、核心创意与题材目标读者明确，其余可留白；作者已确认立项。建书前必须先问作者三个问题再调，缺任何一个都会被直接拒绝。市场：这个项目面向海外还是中文市场？输出形态：要出短剧、电影剧本还是小说？目标总字数（汉字数）：这本书目标写多少字？三个值缺一不可；作者明确说“就按默认来”才传默认（中文 / 小说 / 100万字），不要用默认值悄悄建书。作者也可以在书房面板点“新建书”直接点选，选好后不用在聊天里再问。建书只能调本工具，禁止用文件工具手写书籍信息、大纲或章节文件来冒充建书。如果当前会话没有本工具，明确告诉作者没有建书工具，不要手写书稿文件。',
+      description: '新建作品并初始化规范书仓（支持短剧、电影剧本、小说）。前置要求：七个构想字段齐全（未定处可填留白）；作者已确认立项。建书前需明确市场（中文/海外）与输出形态（短剧/电影剧本/小说）；短剧与电影剧本可省略目标总字数（工具自动按形态折算），小说需明确目标总字数。若书房面板「新建书」向导已保存 _待建书.json，直接沿用其值，不要重复询问。建书只能调本工具，禁止用文件工具手写书籍信息、大纲或章节文件来冒充建书。',
       parameters: {
         type: 'object',
         properties: {
-          bookName: { type: 'string', description: '小说书名（不可含路径字符与保留字）' },
-          市场: { type: 'string', enum: [...MARKET_VALUES], description: '目标市场：海外（海外题材库）或中文（中文题材库）。建书前必须确认，缺了会被拒绝；作者明确说按默认才传中文。顶层参数优先于 concept 里的同名字段。' },
-          输出形态: { type: 'string', enum: [...OUTPUT_FORM_VALUES], description: '输出形态：短剧、电影剧本或小说。建书前必须确认，缺了会被拒绝；作者明确说按默认才传小说。短剧走按集流水线，电影剧本走剧本流水线，小说走原长篇流水线。顶层参数优先于 concept 里的同名字段。' },
-          目标总字数: { type: 'integer', minimum: 1, description: '目标总字数（汉字数，正整数）。建书前必须确认，缺了会被拒绝；作者明确说按默认才传 1000000（长篇）。顶层参数优先于 concept 里的同名字段。' },
+          bookName: { type: 'string', description: '作品书名（不可含路径字符与保留字）' },
+          市场: { type: 'string', enum: [...MARKET_VALUES], description: '目标市场：海外（海外题材库）或中文（中文题材库）。顶层参数优先于 concept 里的同名字段。' },
+          输出形态: { type: 'string', enum: [...OUTPUT_FORM_VALUES], description: '输出形态：短剧、电影剧本或小说。短剧走按集流水线，电影剧本走剧本流水线，小说走长篇流水线。顶层参数优先于 concept 里的同名字段。' },
+          目标总字数: { type: 'integer', minimum: 1, description: '目标总字数（汉字数，正整数；短剧与电影剧本可省略自动折算；小说需确认）。顶层参数优先于 concept 里的同名字段。' },
           concept: {
             type: 'object',
             description: '作品构想七要素（状态必须为已确认）',
@@ -365,9 +370,9 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
               核心看点: { type: 'string' },
               差异化方向: { type: 'string' },
               明确不要什么: { type: 'string' },
-              市场: { type: 'string', enum: [...MARKET_VALUES], description: '目标市场：海外或中文；建书前必须确认，缺了会被拒绝' },
-              输出形态: { type: 'string', enum: [...OUTPUT_FORM_VALUES], description: '输出形态：短剧、电影剧本或小说；建书前必须确认，缺了会被拒绝' },
-              目标总字数: { type: 'integer', minimum: 1, description: '目标总字数（汉字数，正整数）；建书前必须确认，缺了会被拒绝' },
+              市场: { type: 'string', enum: [...MARKET_VALUES], description: '目标市场：海外或中文' },
+              输出形态: { type: 'string', enum: [...OUTPUT_FORM_VALUES], description: '输出形态：短剧、电影剧本或小说' },
+              目标总字数: { type: 'integer', minimum: 1, description: '目标总字数（汉字数，正整数）' },
             },
             required: ['状态', '核心创意', '题材与目标读者', '主角核心欲望', '主要冲突', '核心看点', '差异化方向', '明确不要什么'],
           },
@@ -393,18 +398,21 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
         if (root === undefined) return toolFailure('host-unavailable', '工作范围未就绪：工作台还没有加载工作区')
         const bookName = String(args['bookName']).trim()
         const concept = args['concept'] as Concept
-        // 建书硬性流程（8.4.4）：市场 / 输出形态 / 目标总字数三项缺一不可。来源按顶层参数 > concept > 书房面板向导保存的待建书草稿；
-        // 三处都没有就拒绝并让模型先问作者，绝不用默认值悄悄建书（默认值只在作者明确说“就按默认来”时才由模型传进来）。
+        // 建书流程：市场 / 输出形态必填；短剧与电影剧本未传目标总字数时自动按形态折算，不再硬卡字数提问。
         const draft = readOnboardingDraft(root)
         const 市场 = (args['市场'] as Market | undefined) ?? concept.市场 ?? draft.市场
         const 输出形态 = (args['输出形态'] as OutputForm | undefined) ?? concept.输出形态 ?? draft.输出形态
         const rawWords = (args['目标总字数'] as number | string | undefined) ?? concept.目标总字数 ?? draft.目标总字数
-        const 目标总字数 = typeof rawWords === 'string' ? Number(rawWords) : rawWords
+        let 目标总字数 = typeof rawWords === 'string' ? Number(rawWords) : rawWords
+        if (目标总字数 === undefined && (输出形态 === '短剧' || 输出形态 === '电影剧本')) {
+          目标总字数 = 输出形态 === '短剧' ? 100000 : 50000
+        }
         const missing = onboardingMissing({ 市场, 输出形态, 目标总字数 })
         if (missing.length > 0) {
+          const draftHint = Object.keys(draft).length > 0 ? `（向导草稿已有：${JSON.stringify(draft)}）` : ''
           return toolFailure('invalid-argument',
-            `建书前必须先确认${missing.join('、')}，缺了不能建书。`,
-            `先问作者，同一条消息一次问完，各给选项。作者也可以在书房面板点“新建书”直接点选；选好后直接重调本工具。市场——“这个项目面向海外还是中文市场？”（1. 中文★推荐 2. 海外 3. 自己有想法，手动输入）；输出形态——“要出短剧、电影剧本还是小说？”（1. 小说★推荐 2. 短剧 3. 电影剧本 4. 自己有想法，手动输入）；目标总字数——“这本书目标写多少字？”（1. 短篇·5万字 2. 中篇·30万字 3. 长篇·100万字★推荐 4. 超长篇·200万字）；另可选：5. 自己有想法，手动输入具体数字。拿到答案再调 novel_create_book，把值传进来；作者明确说“就按默认来”才传默认（中文 / 小说 / 100万字）。不要用默认值直接建书。`)
+            `建书前必须先确认${missing.join('、')}，缺了不能建书。${draftHint}`,
+            `先问作者，同一条消息一次问完缺失项${draftHint}；作者也可以在书房面板点“新建书”直接点选。市场（1. 中文 2. 海外）；输出形态（1. 短剧 2. 电影剧本 3. 小说）；目标总字数（仅小说必填：1. 短篇·5万字 2. 中篇·30万字 3. 长篇·100万字 4. 超长篇·200万字，或直接输数字）。拿到答案再调 novel_create_book。`)
         }
         if (市场 !== undefined && !isMarketValue(市场)) return toolFailure('invalid-argument', `市场取值非法：${String(市场)}，只接受 海外 / 中文`)
         if (输出形态 !== undefined && !isOutputFormValue(输出形态)) return toolFailure('invalid-argument', `输出形态取值非法：${String(输出形态)}，只接受 短剧 / 电影剧本 / 小说`)
@@ -847,21 +855,34 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
         render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
       },
       execute: async (args, sessionContext) => {
-        if (!deps.askFn) return toolFailure('host-unavailable', '裁决通道不可用：当前环境无法弹出作者裁决窗口，本次没有写入')
+        const mode = deps.automationMode?.() ?? 'manual'
+        if (!deps.askFn && (mode === 'manual' || !batchStore.hasAnyForSession(sessionContext))) {
+          return toolFailure('host-unavailable', '裁决通道不可用：当前环境无法弹出作者裁决窗口，本次没有写入')
+        }
         const book = resolveBook(args, sessionContext)
         if (!book.ok) return book
         const bookRoot = book.bookRoot
         const keyResult = chapterKeyOf(args)
         if (!keyResult.ok) return keyResult
         const key = keyResult.key
+        const batchMatch = mode !== 'manual' ? batchStore.match(bookRoot, sessionContext, 'chapter', key.章) : undefined
+        if (!batchMatch && !deps.askFn) return toolFailure('host-unavailable', '裁决通道不可用：当前环境无法弹出作者裁决窗口，本次没有写入')
         const approvalFiles = [paths.待定稿包目录(key.卷, key.章名), paths.契约()]
         const before = captureApprovalFiles(bookRoot, approvalFiles, args)
         if (!before.ok) return before
-        const decision = await askAuthor(deps.askFn, '定稿入档', { 范围: `卷${key.卷.toString().padStart(2, '0')}/${key.章名}` }, { agent: sessionContext?.agent, signal: sessionContext?.signal })
-        if (!decision.ok) return notApproved(decision.reason)
-        if (sessionContext?.signal?.aborted) return toolFailure('author-cancelled', '作者裁决已取消（会话已中止），没有做出决定，本次没有写入')
-        // decision.ok 只表示答案有效;退回同样是有效答案,须按 决定 判。
-        const 裁决 = decision.决定 === '已批准' ? '已批准' : '已退回'
+        let 裁决: '已批准' | '已退回'
+        let 裁决记录文本: string
+        if (batchMatch) {
+          裁决 = '已批准'
+          裁决记录文本 = batchMatch.裁决记录
+        } else {
+          const decision = await askAuthor(deps.askFn!, '定稿入档', { 范围: `卷${key.卷.toString().padStart(2, '0')}/${key.章名}` }, { agent: sessionContext?.agent, signal: sessionContext?.signal })
+          if (!decision.ok) return notApproved(decision.reason)
+          if (sessionContext?.signal?.aborted) return toolFailure('author-cancelled', '作者裁决已取消（会话已中止），没有做出决定，本次没有写入')
+          // decision.ok 只表示答案有效;退回同样是有效答案,须按 决定 判。
+          裁决 = decision.决定 === '已批准' ? '已批准' : '已退回'
+          裁决记录文本 = `作者于 ${new Date().toISOString()} 批准定稿入档（kind=${decision.kind}, 决定=${decision.决定}）`
+        }
         return withBookWrite(bookRoot, () => {
           if (sessionContext?.signal?.aborted) return toolFailure('author-cancelled', '作者裁决已取消（会话已中止），没有做出决定，本次没有写入')
           const currentBook = resolveBook(args, sessionContext)
@@ -872,7 +893,7 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
           if (裁决 !== '已批准') {
             // 驳回本身必须保留原有语义;清单缺失时无法落裁决,但不能把作者决定
             // 误报成基础设施错误。若清单存在,上面的回写仍会打通退回通路。
-            return toolFailure('author-declined', `未获作者批准：作者${decision.决定}，本章没有入档`)
+            return toolFailure('author-declined', `未获作者批准：作者退回，本章没有入档`)
           }
           if (!decisionWrite.ok) return { ok: false, reason: decisionWrite.reason }
           try {
@@ -880,11 +901,15 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
               bookRoot,
               packageDir: paths.待定稿包目录(key.卷, key.章名),
               summary: String(args['summary']).trim(),
-              settlement: { 章节: key, 批准: true, 裁决记录: `作者于 ${new Date().toISOString()} 批准定稿入档（kind=${decision.kind}, 决定=${decision.决定}）` },
+              settlement: { 章节: key, 批准: true, 裁决记录: 裁决记录文本 },
               provenance: provenanceOf(sessionContext),
             })
             if (!res.ok) return { ok: false, reason: res.reason }
-            return { ok: true, message: `定稿沉淀完成（${res.message}），入档：${res.dests.join('、')}` }
+            return {
+              ok: true,
+              ...(batchMatch ? { batchId: batchMatch.batchId } : {}),
+              message: `定稿沉淀完成（${res.message}），入档：${res.dests.join('、')}`,
+            }
           } catch (err) {
             return failureFrom(err, `定稿沉淀失败：`)
           }
@@ -1303,6 +1328,7 @@ export function createNovelTools(deps: NovelToolsDeps): NovelToolDefinition[] {
         const { 卷, 章, 章名 } = keyResult.key
         try {
           const input = { 卷, 章, 章名,
+            质量模式: true,
             ...(Array.isArray(args['补充操作']) ? { 补充操作: args['补充操作'] as SupplementEdit[] } : {}),
             ...(typeof args['材料清单哈希'] === 'string' ? { 材料清单哈希: args['材料清单哈希'] } : {}),
           }
@@ -2129,15 +2155,90 @@ ${摘要现文}`,
       },
       execute: (args, sessionContext) => acceptEditorSuggestion(deps.editorRequests, sessionContext?.agent, args),
     },
+    {
+      name: 'novel_authorize_batch',
+      description: '半自动两步走授权入口：弹出一次作者裁决卡，请作者确认本批次设计/规划方向并批准后续批量生成与定稿入档（如 集001–集005 / 第1–3章 / 电影剧本全片）。批准后，本会话内该范围内的 novel_settle_chapter / novel_shortdrama_settle_episode / novel_screenplay_settle 将自动推进，不再逐章逐集弹窗。',
+      parameters: {
+        type: 'object',
+        properties: {
+          bookId: { type: 'string', description: '书id（必填）' },
+          范围: { type: 'string', description: '本次批准的范围说明（如「集001–集005」「第1–3章」「电影剧本全片」）' },
+          摘要: { type: 'string', description: '已呈报的设计与大纲核心摘要，展示在裁决卡供作者一次确认' },
+          目标类型: { type: 'string', enum: ['chapter', 'episode', 'screenplay', 'all'], description: '托管目标类型，默认 all' },
+          起号: { type: 'integer', minimum: 1, description: '可选起始章号或集号' },
+          止号: { type: 'integer', minimum: 1, description: '可选结束章号或集号' },
+        },
+        required: ['bookId', '范围', '摘要'],
+      },
+      output: {
+        schema: {
+          type: 'object',
+          properties: {
+            ok: { type: 'boolean' },
+            batchId: { type: 'string' },
+            范围: { type: 'string' },
+            automationMode: { type: 'string' },
+            message: { type: 'string' },
+            reason: { type: 'string' },
+          },
+          required: ['ok'],
+        },
+        render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+      },
+      execute: async (args, sessionContext) => {
+        const book = resolveBook(args, sessionContext)
+        if (!book.ok) return book
+        const 范围 = String(args['范围'] ?? '').trim()
+        const 摘要 = String(args['摘要'] ?? '').trim()
+        if (范围 === '' || 摘要 === '') return toolFailure('invalid-argument', '范围与摘要不能为空。')
+        const mode = deps.automationMode?.() ?? 'semi-auto'
+        if (mode === 'manual') {
+          return toolFailure('invalid-argument', '当前偏好为「严格逐项确认（manual）」，不支持批量托管；请逐章/逐集裁决，或在插件设置切换为半自动两步走。')
+        }
+        const targetType = (['chapter', 'episode', 'screenplay', 'all'].includes(String(args['目标类型'])) ? String(args['目标类型']) : 'all') as BatchScopeTarget
+        const 起号 = typeof args['起号'] === 'number' && Number.isSafeInteger(args['起号']) ? args['起号'] : undefined
+        const 止号 = typeof args['止号'] === 'number' && Number.isSafeInteger(args['止号']) ? args['止号'] : undefined
+        const granted = await batchStore.authorize({
+          askFn: deps.askFn,
+          bookRoot: book.bookRoot,
+          范围,
+          摘要,
+          targetType,
+          起号,
+          止号,
+          exec: sessionContext,
+        })
+        if (!granted.ok) return toolFailure(granted.code, granted.reason)
+        return {
+          ok: true,
+          batchId: granted.grant.batchId,
+          范围,
+          automationMode: mode,
+          message: `作者已批准批量托管（${范围}，batch=${granted.grant.batchId}）。现在请直接连续完成本批规划、起草/剧本、精修与定稿入档，中途不再逐个弹窗询问。`,
+        }
+      },
+    },
   ]
 
-  // 影视剧扩展；短剧渲染保存草稿，纳入下方异步写入锁。
+  // 影视剧扩展；电影剧本与短剧草稿保存纳入下方异步写入锁，定稿支持批量托管。
   tools.push(
     ...createScreenplayTools({
       bookRootOfBookId: deps.bookRootOfBookId,
       readContractFields: (bookRoot) => readExistingContract(bookRoot).fields,
+      writeDraft: writeNative,
+      askFn: deps.askFn,
+      provenanceOf,
+      automationMode: deps.automationMode,
+      batchStore,
     }),
-    ...createShortdramaTools({ bookRootOfBookId: deps.bookRootOfBookId, writeDraft: writeNative, askFn: deps.askFn, provenanceOf }),
+    ...createShortdramaTools({
+      bookRootOfBookId: deps.bookRootOfBookId,
+      writeDraft: writeNative,
+      askFn: deps.askFn,
+      provenanceOf,
+      automationMode: deps.automationMode,
+      batchStore,
+    }),
   )
 
   // Tool calls are the product write boundary. Keep the read-modify-write
@@ -2152,9 +2253,14 @@ ${摘要现文}`,
     'novel_assemble_materials', 'novel_apply_revision', 'novel_apply_revision_batch',
     'novel_import_draft', 'novel_record_review_findings', 'novel_record_proposal',
     'novel_resolve_proposal', 'novel_note_pending',
-    'novel_shortdrama_render_episode',
+    'novel_shortdrama_render_episode', 'novel_shortdrama_save_script', 'novel_screenplay_save_draft',
   ])
-  const nativeTools = new Set([...NATIVE_DESIGN_TOOLS, 'novel_shortdrama_render_episode'])
+  const nativeTools = new Set([
+    ...NATIVE_DESIGN_TOOLS,
+    'novel_shortdrama_render_episode',
+    'novel_shortdrama_save_script',
+    'novel_screenplay_save_draft',
+  ])
   const registered = deps.testTools === true ? tools : tools.filter((tool) => !NOVEL_TEST_TOOL_NAMES.includes(tool.name))
   const guarded = registered.map((tool) => {
     if (!locked.has(tool.name)) return tool
