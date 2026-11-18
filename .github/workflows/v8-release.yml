@@ -79,6 +79,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:version
+      # 审计忽略项登记在 pnpm-workspace.yaml 的 auditConfig：GHSA-fc5q-39xc-vjpf
+      # （picomatch ReDoS）仅经 devDependencies 的 typescript-eslint → tinyglobby →
+      # fdir 传入，生产依赖零漏洞；npm 最新版 4.0.7 仍受影响，上游修复后即移除该条目。
       - run: pnpm audit --audit-level=high
       - run: pnpm lint
       - run: pnpm test:release

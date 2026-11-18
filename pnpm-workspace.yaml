@@ -111,3 +111,10 @@ minimumReleaseAgeExclude:
   - '@deepseek-ai/dsh-subagent-spawn-in-process@0.2.1-rc.3'
   - '@deepseek-ai/dsh-tool-subagent@0.2.1-rc.3'
   - '@deepseek-ai/dsh-persona@0.2.1-rc.3'
+# GHSA-fc5q-39xc-vjpf: picomatch ReDoS 仅经 devDependencies 的
+# typescript-eslint → tinyglobby → fdir 传入，生产依赖零漏洞；npm 最新版 4.0.7
+# 仍受影响且上游暂无修复版本。发布与 CI 的 audit 门禁由此登记豁免，
+# 上游发布修复版本后应立即移除本条并升级。
+auditConfig:
+  ignoreGhsas:
+    - GHSA-fc5q-39xc-vjpf
