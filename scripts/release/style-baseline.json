@@ -46,7 +46,7 @@
   },
   "docs/user/troubleshooting.md": {
     "ratio": 0.996,
-    "strong": 5,
+    "strong": 7,
     "format": 0
   },
   "docs/user/ui-reference.md": {
@@ -55,8 +55,8 @@
     "format": 0
   },
   "docs/user/upgrade-backup.md": {
-    "ratio": 0.981,
-    "strong": 2,
+    "ratio": 0.982,
+    "strong": 3,
     "format": 0
   },
   "docs/user/walkthrough-film-drama.md": {
@@ -90,18 +90,18 @@
     "format": 0
   },
   "packages/bundle/skills/novel-design/SKILL.md": {
-    "ratio": 0.951,
-    "strong": 8,
+    "ratio": 0.936,
+    "strong": 7,
     "format": 0
   },
   "packages/bundle/skills/novel-director/SKILL.md": {
-    "ratio": 0.946,
+    "ratio": 0.945,
     "strong": 25,
     "format": 5
   },
   "packages/bundle/skills/novel-drafting/SKILL.md": {
-    "ratio": 0.985,
-    "strong": 15,
+    "ratio": 0.968,
+    "strong": 13,
     "format": 0
   },
   "packages/bundle/skills/novel-export/SKILL.md": {
@@ -110,8 +110,8 @@
     "format": 0
   },
   "packages/bundle/skills/novel-inspiration/SKILL.md": {
-    "ratio": 0.944,
-    "strong": 6,
+    "ratio": 0.934,
+    "strong": 4,
     "format": 5
   },
   "packages/bundle/skills/novel-maintenance/参考/书仓格式速查.md": {
@@ -125,13 +125,13 @@
     "format": 0
   },
   "packages/bundle/skills/novel-outline/SKILL.md": {
-    "ratio": 1,
+    "ratio": 0.994,
     "strong": 9,
     "format": 0
   },
   "packages/bundle/skills/novel-polish/工序/1-表达清理.md": {
-    "ratio": 0.987,
-    "strong": 6,
+    "ratio": 0.974,
+    "strong": 7,
     "format": 3
   },
   "packages/bundle/skills/novel-polish/工序/2-节奏与重塑.md": {
@@ -145,7 +145,7 @@
     "format": 0
   },
   "packages/bundle/skills/novel-polish/SKILL.md": {
-    "ratio": 0.918,
+    "ratio": 0.908,
     "strong": 5,
     "format": 1
   },
@@ -156,7 +156,7 @@
   },
   "packages/bundle/skills/novel-review/底本/节奏与张力审读.md": {
     "ratio": 0.984,
-    "strong": 5,
+    "strong": 4,
     "format": 0
   },
   "packages/bundle/skills/novel-review/底本/情节与因果审读.md": {
@@ -195,13 +195,13 @@
     "format": 0
   },
   "packages/bundle/skills/novel-review/SKILL.md": {
-    "ratio": 0.985,
-    "strong": 17,
+    "ratio": 0.977,
+    "strong": 18,
     "format": 0
   },
   "packages/bundle/skills/novel-revision/底本/改稿章程.md": {
     "ratio": 0.92,
-    "strong": 3,
+    "strong": 2,
     "format": 0
   },
   "packages/bundle/skills/novel-revision/SKILL.md": {
@@ -225,13 +225,33 @@
     "format": 0
   },
   "packages/bundle/skills/novel-screenplay/底本/全量审读.md": {
-    "ratio": 0.926,
-    "strong": 2,
+    "ratio": 0.897,
+    "strong": 4,
+    "format": 0
+  },
+  "packages/bundle/skills/novel-screenplay/工序/1-故事稿与人物小传.md": {
+    "ratio": 0.769,
+    "strong": 0,
+    "format": 0
+  },
+  "packages/bundle/skills/novel-screenplay/工序/2-分场大纲与三幕节拍.md": {
+    "ratio": 0.571,
+    "strong": 0,
+    "format": 0
+  },
+  "packages/bundle/skills/novel-screenplay/工序/3-视觉动作与潜台词对白.md": {
+    "ratio": 0.733,
+    "strong": 1,
+    "format": 0
+  },
+  "packages/bundle/skills/novel-screenplay/工序/4-剧本精修与改稿.md": {
+    "ratio": 0.375,
+    "strong": 0,
     "format": 0
   },
   "packages/bundle/skills/novel-screenplay/SKILL.md": {
-    "ratio": 0.892,
-    "strong": 5,
+    "ratio": 0.885,
+    "strong": 4,
     "format": 0
   },
   "packages/bundle/skills/novel-settle/底本/沉淀对账.md": {
@@ -240,31 +260,66 @@
     "format": 0
   },
   "packages/bundle/skills/novel-settle/SKILL.md": {
-    "ratio": 1,
+    "ratio": 0.995,
     "strong": 11,
     "format": 0
   },
+  "packages/bundle/skills/novel-shortdrama/参考/保护性反例集.md": {
+    "ratio": 0.833,
+    "strong": 0,
+    "format": 0
+  },
+  "packages/bundle/skills/novel-shortdrama/参考/开篇钩子与断章公式.md": {
+    "ratio": 0.893,
+    "strong": 0,
+    "format": 0
+  },
+  "packages/bundle/skills/novel-shortdrama/参考/情绪流单元链与往返法.md": {
+    "ratio": 0.813,
+    "strong": 0,
+    "format": 0
+  },
+  "packages/bundle/skills/novel-shortdrama/参考/台词七维诊断.md": {
+    "ratio": 1,
+    "strong": 0,
+    "format": 0
+  },
+  "packages/bundle/skills/novel-shortdrama/参考/题材与爽点速查.md": {
+    "ratio": 0.2,
+    "strong": 5,
+    "format": 0
+  },
+  "packages/bundle/skills/novel-shortdrama/参考/戏剧工艺层.md": {
+    "ratio": 0.9,
+    "strong": 0,
+    "format": 0
+  },
   "packages/bundle/skills/novel-shortdrama/底本/短剧审读.md": {
-    "ratio": 0.946,
-    "strong": 1,
+    "ratio": 0.833,
+    "strong": 4,
     "format": 0
   },
   "packages/bundle/skills/novel-shortdrama/工序/单集剧本.md": {
-    "ratio": 0.862,
-    "strong": 1,
+    "ratio": 0.767,
+    "strong": 0,
     "format": 0
   },
   "packages/bundle/skills/novel-shortdrama/工序/分集大纲.md": {
-    "ratio": 0.862,
-    "strong": 3,
+    "ratio": 0.941,
+    "strong": 1,
     "format": 0
   },
   "packages/bundle/skills/novel-shortdrama/SKILL.md": {
-    "ratio": 0.827,
+    "ratio": 0.857,
     "strong": 3,
     "format": 0
   },
   "packages/bundle/src/approval-snapshot.ts": {
+    "ratio": 1,
+    "strong": 0,
+    "format": 0
+  },
+  "packages/bundle/src/batch-approval.ts": {
     "ratio": 1,
     "strong": 0,
     "format": 0
@@ -295,7 +350,7 @@
     "format": 0
   },
   "packages/bundle/src/index.ts": {
-    "ratio": 1,
+    "ratio": 0.955,
     "strong": 0,
     "format": 0
   },
@@ -330,8 +385,8 @@
     "format": 0
   },
   "packages/bundle/src/novel-tools.ts": {
-    "ratio": 0.983,
-    "strong": 47,
+    "ratio": 0.98,
+    "strong": 40,
     "format": 3
   },
   "packages/bundle/src/paths.ts": {
@@ -370,8 +425,8 @@
     "format": 0
   },
   "packages/bundle/src/screenplay-tools.ts": {
-    "ratio": 0.854,
-    "strong": 5,
+    "ratio": 0.912,
+    "strong": 10,
     "format": 0
   },
   "packages/bundle/src/scripts/deterministic-checks.ts": {
@@ -420,8 +475,8 @@
     "format": 0
   },
   "packages/bundle/src/shortdrama-tools.ts": {
-    "ratio": 0.871,
-    "strong": 7,
+    "ratio": 0.924,
+    "strong": 18,
     "format": 0
   },
   "packages/bundle/src/status-context.ts": {
@@ -490,17 +545,17 @@
     "format": 0
   },
   "packages/bundle/src/tool-failure.ts": {
-    "ratio": 0.966,
+    "ratio": 0.968,
     "strong": 0,
     "format": 0
   },
   "packages/bundle/src/worker-policy.ts": {
-    "ratio": 1,
+    "ratio": 0.915,
     "strong": 2,
     "format": 0
   },
   "packages/bundle/src/worker-policy.ts#prompt": {
-    "ratio": 1,
+    "ratio": 0.93,
     "strong": 2,
     "format": 0
   },
@@ -1054,6 +1109,11 @@
     "strong": 0,
     "format": 0
   },
+  "packages/core/src/shortdrama/episode-checks.ts": {
+    "ratio": 0.955,
+    "strong": 0,
+    "format": 0
+  },
   "packages/core/src/shortdrama/examples.ts": {
     "ratio": 1,
     "strong": 0,
@@ -1065,13 +1125,13 @@
     "format": 0
   },
   "packages/core/src/shortdrama/review.ts": {
-    "ratio": 0.964,
+    "ratio": 0.967,
     "strong": 2,
     "format": 0
   },
   "packages/core/src/shortdrama/script.ts": {
-    "ratio": 0.955,
-    "strong": 14,
+    "ratio": 0.961,
+    "strong": 21,
     "format": 0
   },
   "packages/core/src/shortdrama/templates.ts": {
