@@ -264,9 +264,11 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
+        bookId: { type: 'string', description: '可选。与「集」一起传时，工具直接读取草稿区/剧本/短剧/集NNN.md 解析审读，不必再传整集剧本对象' },
+        集: { type: 'integer', description: '可选。配合 bookId 使用（1–100）' },
         剧本: {
           type: 'object',
-          description: '单集剧本（与 novel_shortdrama_render_episode 的参数同一形状）',
+          description: '单集剧本（与 novel_shortdrama_render_episode 的参数同一形状）；省略时按 bookId + 集 读草稿',
           properties: {
             集: { type: 'integer' },
             标题: { type: 'string' },
@@ -299,7 +301,7 @@ export const SHORTDRAMA_TOOL_DEFINITIONS: readonly NovelToolDefinition[] = [
           required: ['集', '标题', '钩子类型', '核心想法', '爽点', '开场冲突', '反转', '结尾悬念'],
         },
       },
-      required: ['剧本', '大纲'],
+      required: [],
     },
     output: {
       schema: {
@@ -439,6 +441,46 @@ function episodeReviewSummary(bookRoot: string, 集: number, draftText: string, 
   const pendingFindings = record.问题.filter((item) => !item.处置状态 || item.处置状态 === '待处理').length
   if (pendingFindings > 0) return `审读已回写，仍有 ${pendingFindings} 项发现项待处置`
   return '审读通过（模块齐全且零项待处置）'
+}
+
+/**
+ * 按 bookRoot + 集 读草稿区单集 Markdown 并解析，供审读与回写两个工具共用，保证两边指纹口径一致。
+ * 草稿里没有大纲，缺省大纲取剧本自身字段（一致性项自然通过，只做结构与工艺审读）；
+ * 要对照真实分集大纲时，调用方仍可显式传 大纲。
+ */
+export function loadEpisodeForReview(
+  bookRoot: string,
+  集: unknown,
+): { readonly ok: true; readonly 剧本: EpisodeScriptInput; readonly 大纲: EpisodeOutline } | ReturnType<typeof toolFailure> {
+  if (typeof 集 !== 'number' || !Number.isSafeInteger(集) || 集 < 1 || 集 > 100) {
+    return toolFailure('invalid-argument', `集必须是 1–100 的整数（收到：${String(集 ?? '未传')}）`)
+  }
+  const draftRel = `草稿区/${paths.短剧集(集)}`
+  let text: string
+  try {
+    text = fs.readFileSync(authorDocumentPath(bookRoot, draftRel), 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return toolFailure('invalid-argument', `短剧单集草稿不存在：${draftRel}，请先调用 novel_shortdrama_save_script 保存草稿。`)
+    }
+    return failureFrom(error, '短剧单集草稿读取失败：')
+  }
+  const parsed = parseEpisodeScript(text)
+  if (!parsed.ok || parsed.episode === undefined) {
+    return toolFailure('parse-error', `短剧单集草稿解析失败（${draftRel}）：${parsed.problems.join('；')}`)
+  }
+  const ep = parsed.episode
+  const 大纲: EpisodeOutline = {
+    集: ep.集,
+    标题: ep.标题,
+    钩子类型: ep.钩子类型,
+    核心想法: ep.核心想法,
+    爽点: ep.爽点,
+    开场冲突: '（草稿自带，未另给分集大纲）',
+    反转: ep.反转秒.map((s) => `第 ${s} 秒反转`),
+    结尾悬念: ep.结尾悬念,
+  }
+  return { ok: true, 剧本: ep, 大纲 }
 }
 
 function resolvePlainBookFile(
@@ -650,6 +692,20 @@ export function createShortdramaTools(deps: ShortdramaToolsDeps): NovelToolDefin
       return {
         ...tool,
         execute: (args, exec) => executeSettleEpisode(deps, args, exec),
+      }
+    }
+    if (tool.name === 'novel_shortdrama_review_episode') {
+      return {
+        ...tool,
+        execute: (args, exec) => {
+          if (typeof args['剧本'] === 'object' && args['剧本'] !== null) return tool.execute(args, exec)
+          const resolved = resolveShortdramaBook(deps, args['bookId'], exec, '审读短剧')
+          if (!resolved.ok) return resolved
+          const loaded = loadEpisodeForReview(resolved.bookRoot, args['集'])
+          if (!loaded.ok) return loaded
+          const 大纲 = typeof args['大纲'] === 'object' && args['大纲'] !== null ? args['大纲'] : loaded.大纲
+          return tool.execute({ 剧本: loaded.剧本, 大纲 }, exec)
+        },
       }
     }
     if (tool.name === 'novel_shortdrama_save_script') {
